@@ -671,7 +671,9 @@ export default function VehicleReportScreen() {
           if (val) query.set(key, String(val));
         });
 
-        const res = await fetch(`${API_URL}/vehicle-filters/match-variant?${query.toString()}`);
+        const res = await fetch(`${API_URL}/vehicle-filters/match-variant?${query.toString()}&_t=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' },
+        });
         if (res.ok) {
           const json = await res.json();
           if (json.success && (json.variantId || json.modelId)) {
@@ -794,6 +796,8 @@ export default function VehicleReportScreen() {
       const token = await AsyncStorage.getItem('accessToken');
       const headers: any = {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
         ...(token ? { Authorization: `Bearer ${token}` } : { 'x-guest-token': 'guest_mobile' }),
       };
 
@@ -839,7 +843,7 @@ export default function VehicleReportScreen() {
         const reportId = data.reportId || data.id;
 
         if (reportId) {
-          const detailRes = await fetch(`${API_URL}/vehicle-reports/${reportId}`, { headers });
+          const detailRes = await fetch(`${API_URL}/vehicle-reports/${reportId}?_t=${Date.now()}`, { headers });
           if (detailRes.ok) {
             const detailData = await detailRes.json();
             const parsedDetail = extractReportData(detailData);

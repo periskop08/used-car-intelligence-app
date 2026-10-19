@@ -39,6 +39,8 @@ interface BuyerPackage {
   description: string;
   popularTag?: string;
   features: string[];
+  reports?: number;
+  questions?: number;
 }
 
 const MONTHLY_PLANS: MonthlyPlan[] = [
@@ -259,9 +261,12 @@ export default function PackagesScreen() {
   };
 
   const handlePurchaseBuyerPkg = async (pkg: BuyerPackage) => {
+    const reportsCount = pkg.reports ?? (pkg.code === 'ALICI_MINI' ? 5 : pkg.code === 'ALICI_PLUS' ? 10 : 20);
+    const questionsCount = pkg.questions ?? (pkg.code === 'ALICI_MINI' ? 15 : pkg.code === 'ALICI_PLUS' ? 30 : 60);
+
     Alert.alert(
       `${pkg.name} Satın Al`,
-      `${pkg.name} (${pkg.priceText}) paketini hesabınıza tanımlamak istiyor musunuz?\n\n• ${pkg.reports} Araç Raporu\n• ${pkg.questions} AI Soru Hakkı`,
+      `${pkg.name} (${pkg.priceText}) paketini hesabınıza tanımlamak istiyor musunuz?\n\n• ${reportsCount} Araç Raporu\n• ${questionsCount} AI Soru Hakkı`,
       [
         { text: 'Vazgeç', style: 'cancel' },
         {
@@ -303,7 +308,7 @@ export default function PackagesScreen() {
               if (res.ok) {
                 Alert.alert(
                   'Tebrikler! 🎉',
-                  `${pkg.name} haklarınız (${pkg.reports} Rapor, ${pkg.questions} AI Soru) anında hesabınıza eklendi.`
+                  `${pkg.name} haklarınız (${reportsCount} Rapor, ${questionsCount} AI Soru) anında hesabınıza eklendi.`
                 );
                 fetchProfile();
               } else {

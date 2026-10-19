@@ -32,6 +32,10 @@ const resolveMediaUrl = (url?: string | null): string => {
   return url;
 };
 
+const formatPrice = (p: any): string => {
+  return new Intl.NumberFormat('tr-TR').format(Number(p) || 0);
+};
+
 interface ListingItem {
   id: string;
   title: string;

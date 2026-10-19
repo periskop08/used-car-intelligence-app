@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards, Request, Res } from '@nestjs/common';
 import { VehicleReportService } from './vehicle-report.service';
 import { CreateVehicleReportDto } from './vehicle-report.dto';
 import { OptionalJwtAuthGuard } from '../auth/jwt.guard';
@@ -18,7 +18,16 @@ export class VehicleReportController {
   }
 
   @Get(':reportId')
-  async getReport(@Request() req: any, @Param('reportId') reportId: string) {
+  async getReport(
+    @Request() req: any,
+    @Param('reportId') reportId: string,
+    @Res({ passthrough: true }) res: any,
+  ) {
+    if (res?.setHeader) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
     return this.reportService.getReportById(this.getUserId(req), reportId);
   }
 
