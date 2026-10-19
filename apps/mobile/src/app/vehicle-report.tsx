@@ -779,6 +779,10 @@ export default function VehicleReportScreen() {
             const detailData = await detailRes.json();
             const parsedDetail = extractReportData(detailData);
             if (parsedDetail) {
+              const hasSynthesis = Boolean(parsedDetail.expertDecisionSynthesis);
+              if (!hasSynthesis && !force) {
+                return fetchReport(targetVariantId, true);
+              }
               setReport(parsedDetail);
               setLoading(false);
               return;
@@ -788,6 +792,10 @@ export default function VehicleReportScreen() {
 
         const parsedDirect = extractReportData(data);
         if (parsedDirect) {
+          const hasSynthesis = Boolean(parsedDirect.expertDecisionSynthesis);
+          if (!hasSynthesis && !force) {
+            return fetchReport(targetVariantId, true);
+          }
           setReport(parsedDirect);
           setLoading(false);
           return;
@@ -1061,7 +1069,7 @@ export default function VehicleReportScreen() {
     ? 'Sınıfında referans kondisyonda, kontrolleri teyit edilerek doğrudan değerlendirilebilir.'
     : ((report?.finalVerdict as any)?.shortVerdict || (report as any)?.finalConditionalVerdict?.shortVerdict || report?.expertDecisionSynthesis?.finalConditionalVerdict?.shortVerdict || stateCfg.verdict);
 
-  const reportCode = `TS-${report?.vehicleIdentity?.modelYear || '2020'}-${String(report?.vehicleIdentity?.brand || 'CAR').substring(0, 2).toUpperCase()}-${report?.vehicleIdentity?.engineCode || '320i'}`;
+  const reportCode = `TS-${report?.vehicleIdentity?.modelYear || new Date().getFullYear()}-${String(report?.vehicleIdentity?.brand || 'CAR').substring(0, 3).toUpperCase()}-${report?.vehicleIdentity?.engineCode || 'SPEC'}`;
 
   const rawPurchase = (report?.expertDecisionSynthesis as any)?.purchaseConditions || (report?.finalVerdict as any)?.proceedIf || [];
   const purchaseConditions = (Array.isArray(rawPurchase) ? rawPurchase : [rawPurchase])
@@ -1256,7 +1264,7 @@ export default function VehicleReportScreen() {
 
               <View style={styles.specChipLight}>
                 <Ionicons name={isMotorcycle ? 'bicycle-outline' : 'car-outline'} size={13} color="#0284c7" />
-                <Text style={styles.specChipTextLight}>{isMotorcycle ? 'Motosiklet' : (params.bodyType ? String(params.bodyType) : 'Sedan')}</Text>
+                <Text style={styles.specChipTextLight}>{isMotorcycle ? 'Motosiklet' : (params.bodyType ? String(params.bodyType) : ((report.vehicleIdentity as any)?.bodyType || 'Binek'))}</Text>
               </View>
 
               {hpDisplay !== '—' && (

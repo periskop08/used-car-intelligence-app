@@ -1448,12 +1448,12 @@ export default function MobileDashboard() {
     let list: any[] = [];
     if (activeStep === 'brand') list = brands;
     else if (activeStep === 'model') list = models;
-    else if (activeStep === 'year') list = years.length > 0 ? years : Array.from({ length: 27 }, (_, i) => String(2026 - i));
-    else if (activeStep === 'bodyType') list = bodyTypes.length > 0 ? bodyTypes : ['Sedan', 'Hatchback', 'Station Wagon', 'Coupe', 'SUV', 'Cabrio'];
-    else if (activeStep === 'engine') list = engines.length > 0 ? engines : ['320i', '320i xDrive', '330i', '330i xDrive', 'M340i xDrive', 'M3'];
-    else if (activeStep === 'fuelType') list = fuelTypes.length > 0 ? fuelTypes : ['Benzin', 'Dizel', 'Hibrit', 'Plug-in Hybrid', 'Elektrik', 'LPG'];
-    else if (activeStep === 'transmission') list = transmissions.length > 0 ? transmissions : ['Otomatik', 'Manuel'];
-    else if (activeStep === 'trim') list = trims.length > 0 ? trims : ['M Sport', 'Sport Line', 'Luxury Line'];
+    else if (activeStep === 'year') list = years;
+    else if (activeStep === 'bodyType') list = bodyTypes;
+    else if (activeStep === 'engine') list = engines;
+    else if (activeStep === 'fuelType') list = fuelTypes;
+    else if (activeStep === 'transmission') list = transmissions;
+    else if (activeStep === 'trim') list = trims;
 
     const normalized = list.map((item) => {
       if (typeof item === 'object' && item !== null && !item.name) {
@@ -2272,7 +2272,7 @@ export default function MobileDashboard() {
 
               <View style={styles.breadCrumbItem}>
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText}>{selectedEngine || '320i'}</Text>
+                  <Text style={styles.breadCrumbMainText}>{selectedEngine || '—'}</Text>
                   <Text style={styles.breadCrumbSubText}>Motor</Text>
                 </View>
               </View>
@@ -2282,7 +2282,7 @@ export default function MobileDashboard() {
               <View style={styles.breadCrumbItem}>
                 <Ionicons name="car-outline" size={22} color="#0f172a" />
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
+                  <Text style={styles.breadCrumbMainText}>{selectedBodyType || '—'}</Text>
                   <Text style={styles.breadCrumbSubText}>Kasa Tipi</Text>
                 </View>
               </View>
@@ -2309,7 +2309,7 @@ export default function MobileDashboard() {
 
               <View style={styles.breadCrumbItem}>
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText}>{selectedEngine || '320i'}</Text>
+                  <Text style={styles.breadCrumbMainText}>{selectedEngine || '—'}</Text>
                 </View>
               </View>
 
@@ -2317,14 +2317,14 @@ export default function MobileDashboard() {
 
               <View style={styles.breadCrumbItem}>
                 <Ionicons name="color-fill-outline" size={16} color="#0f172a" />
-                <Text style={styles.breadCrumbMainText}>{selectedFuelType || 'Benzin'}</Text>
+                <Text style={styles.breadCrumbMainText}>{selectedFuelType || '—'}</Text>
               </View>
 
               <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
 
               <View style={styles.breadCrumbItem}>
                 <Ionicons name="car-outline" size={16} color="#0f172a" />
-                <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
+                <Text style={styles.breadCrumbMainText}>{selectedBodyType || '—'}</Text>
               </View>
             </View>
           )}
@@ -2348,28 +2348,28 @@ export default function MobileDashboard() {
               <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
 
               <View style={styles.breadCrumbItem}>
-                <Text style={styles.breadCrumbMainText}>{selectedEngine || '320i'}</Text>
+                <Text style={styles.breadCrumbMainText}>{selectedEngine || '—'}</Text>
               </View>
 
               <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
 
               <View style={styles.breadCrumbItem}>
                 <Ionicons name="color-fill-outline" size={14} color="#0f172a" />
-                <Text style={styles.breadCrumbMainText}>{selectedFuelType || 'Benzin'}</Text>
+                <Text style={styles.breadCrumbMainText}>{selectedFuelType || '—'}</Text>
               </View>
 
               <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
 
               <View style={styles.breadCrumbItem}>
                 <AutomaticGearIcon color="#0f172a" />
-                <Text style={styles.breadCrumbMainText}>{selectedTransmission || 'Otomatik'}</Text>
+                <Text style={styles.breadCrumbMainText}>{selectedTransmission || '—'}</Text>
               </View>
 
               <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
 
               <View style={styles.breadCrumbItem}>
                 <Ionicons name="car-outline" size={14} color="#0f172a" />
-                <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
+                <Text style={styles.breadCrumbMainText}>{selectedBodyType || '—'}</Text>
               </View>
             </View>
           )}

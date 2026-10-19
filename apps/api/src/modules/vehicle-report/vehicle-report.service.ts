@@ -318,7 +318,13 @@ export class VehicleReportService implements OnModuleInit {
           orderBy: { completedAt: 'desc' },
         });
 
-        if (existingCurrent) {
+        const repData = existingCurrent?.reportData as any;
+        const isModernReport = existingCurrent && (
+          existingCurrent.schemaVersion >= 2 ||
+          Boolean(repData?.expertDecisionSynthesis?.contemporaryTrimEvaluation || repData?.expertDecisionSynthesis?.trimPackageComparison || repData?.expertDecisionSynthesis?.motorcycleEraAnalysis)
+        );
+
+        if (existingCurrent && isModernReport) {
           VehicleReportService.ephemeralReports.set(existingCurrent.id, {
             report: existingCurrent,
             createdAt: Date.now(),
@@ -414,7 +420,7 @@ export class VehicleReportService implements OnModuleInit {
           contextHash: vehicleContextHash,
           vehicleContextHash,
           reportVersion: CURRENT_REPORT_VERSION,
-          schemaVersion: 1,
+          schemaVersion: 2,
           status: reportStatus,
           idempotencyKey: dto.idempotencyKey,
           quotaUsageId,
