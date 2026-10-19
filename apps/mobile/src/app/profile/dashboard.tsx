@@ -176,7 +176,7 @@ export default function UserDashboardScreen() {
           <View style={styles.actionsCard}>
             <TouchableOpacity
               style={styles.actionRow}
-              onPress={() => router.push('/add-vehicle' as any)}
+              onPress={() => router.push('/create-listing' as any)}
             >
               <View style={[styles.actionIconCircle, { backgroundColor: '#fff7ed' }]}>
                 <Ionicons name="add-circle" size={20} color="#ea580c" />

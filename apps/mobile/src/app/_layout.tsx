@@ -30,7 +30,6 @@ export default function RootLayout() {
         <Stack.Screen name="vehicle-report" options={{ headerShown: false }} />
         <Stack.Screen name="comparison" options={{ headerShown: false }} />
         <Stack.Screen name="create-listing" options={{ headerShown: false }} />
-        <Stack.Screen name="listings/create" options={{ title: 'İlan Ver', headerBackTitle: 'Geri' }} />
         <Stack.Screen name="listings/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="messages/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="profile/favorites" options={{ headerShown: false }} />

@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   imageDarkGradient: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
   },
   titleOverlay: {

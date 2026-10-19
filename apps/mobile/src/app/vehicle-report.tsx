@@ -906,7 +906,7 @@ export default function VehicleReportScreen() {
   const resolvedVehicleType = (
     (params.vehicleType as string) ||
     (params.category as string) ||
-    report?.vehicleType ||
+    (report as any)?.vehicleType ||
     (report?.vehicleIdentity as any)?.vehicleType ||
     (report as any)?.vehicleType ||
     (report?.expertDecisionSynthesis?.motorcycleEraAnalysis ? 'MOTORCYCLE' : '') ||

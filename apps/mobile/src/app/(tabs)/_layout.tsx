@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backdropBg: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
   },
   bubblesContainer: {

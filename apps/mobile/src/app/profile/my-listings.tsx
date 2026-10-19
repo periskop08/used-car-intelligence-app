@@ -142,7 +142,7 @@ export default function MyListingsScreen() {
         <Text style={styles.headerTitle}>İlanlarım</Text>
         <TouchableOpacity
           style={styles.addBtn}
-          onPress={() => router.push('/add-vehicle' as any)}
+          onPress={() => router.push('/create-listing' as any)}
         >
           <Ionicons name="add" size={20} color="#ffffff" />
         </TouchableOpacity>
@@ -162,7 +162,7 @@ export default function MyListingsScreen() {
           </View>
           <TouchableOpacity
             style={styles.addListingChip}
-            onPress={() => router.push('/add-vehicle' as any)}
+            onPress={() => router.push('/create-listing' as any)}
           >
             <Text style={styles.addListingChipText}>+ Yeni İlan</Text>
           </TouchableOpacity>
@@ -212,7 +212,7 @@ export default function MyListingsScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.createListingBtn}
-                onPress={() => router.push('/add-vehicle' as any)}
+                onPress={() => router.push('/create-listing' as any)}
               >
                 <Ionicons name="add-circle-outline" size={18} color="#ffffff" />
                 <Text style={styles.createListingBtnText}>Hemen İlan Ver</Text>

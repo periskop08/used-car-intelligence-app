@@ -256,7 +256,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[styles.menuRowItem, styles.lastMenuItem]}
                 activeOpacity={0.7}
-                onPress={() => router.push('/add-vehicle' as any)}
+                onPress={() => router.push('/create-listing' as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="add-circle-outline" size={18} color="#ea580c" style={styles.menuIcon} />
