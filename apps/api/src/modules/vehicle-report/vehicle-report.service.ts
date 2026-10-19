@@ -497,36 +497,6 @@ export class VehicleReportService implements OnModuleInit {
     }
   }
 
-  async getCurrentVariantReport(userId: string, variantId: string) {
-    try {
-      const ephemeral = Array.from(VehicleReportService.ephemeralReports.values()).find(
-        (e) => (e.report.variantId === variantId || e.report.modelId === variantId) && e.report.isCurrentPublished && !e.report.isDraft,
-      );
-      if (ephemeral) {
-        return this.ensureSafeReportPayload(ephemeral.report);
-      }
-
-      const report = await this.prisma.generatedVehicleReport.findFirst({
-        where: {
-          OR: [
-            { variantId },
-            { modelId: variantId },
-          ],
-          isCurrentPublished: true,
-          isDraft: false,
-          status: VehicleReportStatus.COMPLETED,
-        },
-        orderBy: { completedAt: 'desc' },
-      });
-
-      if (!report) return null;
-      return this.ensureSafeReportPayload(report);
-    } catch (e: any) {
-      this.logger.error(`getCurrentVariantReport error: ${e.message}`);
-      return null;
-    }
-  }
-
   async getCurrentListingReport(userId: string, listingId: string) {
     try {
       const ephemeral = Array.from(VehicleReportService.ephemeralReports.values()).find(

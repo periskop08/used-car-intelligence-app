@@ -731,25 +731,6 @@ export default function VehicleReportScreen() {
         ...(token ? { Authorization: `Bearer ${token}` } : { 'x-guest-token': 'guest_mobile' }),
       };
 
-      if (!force) {
-        const cacheRes = await fetch(`${API_URL}/vehicle-reports/by-variant/${finalVariantId}/current`, { headers });
-        if (cacheRes.ok) {
-          const cacheData = await cacheRes.json();
-          const parsedCache = extractReportData(cacheData);
-          const isCompleted = cacheData && cacheData.status === 'COMPLETED';
-          const isNotFallback =
-            cacheData?.provider !== 'DETERMINISTIC_FALLBACK' &&
-            cacheData?.reportData?.status !== 'SAFE_FALLBACK' &&
-            cacheData?.status !== 'SAFE_FALLBACK';
-
-          if (parsedCache && isCompleted && isNotFallback) {
-            setReport(parsedCache);
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
       const reqVehicleType = (params.category ? String(params.category) : 'AUTOMOBILE').toUpperCase();
       const isMoto = reqVehicleType === 'MOTORCYCLE';
       const effectiveSearchScope = {
@@ -961,13 +942,17 @@ export default function VehicleReportScreen() {
     || (report as any)?.technicalSpecifications?.curbWeightKg
     || (report as any)?.technicalSpecifications?.weightKg;
 
-  const topSpeedDisplay = topSpeedValue ? `${topSpeedValue} km/h` : (isMotorcycle ? (rawDisplacement && rawDisplacement <= 50 ? '60 km/h' : '140 km/h') : (hpValue && hpValue >= 200 ? '240 km/h' : '195 km/h'));
-  const isLowSpeedBike = isMotorcycle && ((topSpeedValue && topSpeedValue < 80) || (rawDisplacement && rawDisplacement <= 50));
+  const isScooter = isMotorcycle && /scooter|maxi|moped/i.test(`${params.bodyType || ''} ${params.type || ''} ${(report?.vehicleIdentity as any)?.modelName || params.model || ''}`);
+  const effectiveTopSpeed = (topSpeedValue && !(isMotorcycle && rawDisplacement && rawDisplacement > 150 && topSpeedValue < 100))
+    ? topSpeedValue
+    : (isMotorcycle ? (rawDisplacement && rawDisplacement <= 50 ? 55 : (rawDisplacement && rawDisplacement <= 125 ? 100 : (rawDisplacement && rawDisplacement <= 250 ? 135 : 165))) : (hpValue && hpValue >= 200 ? 240 : 195));
+  const topSpeedDisplay = `${effectiveTopSpeed} km/h`;
+  const isLowSpeedBike = isMotorcycle && !!rawDisplacement && rawDisplacement <= 50;
   const zeroToHundredDisplay = zeroToHundredValue 
     ? `${zeroToHundredValue} sn` 
-    : (isLowSpeedBike ? 'Şehir İçi (<80 km/h)' : (hpValue && hpValue >= 200 ? '7.2 sn' : (isMotorcycle ? '6.5 sn' : '9.5 sn')));
+    : (isLowSpeedBike ? 'Şehir İçi (<80 km/h)' : (isMotorcycle ? (rawDisplacement && rawDisplacement <= 125 ? '14.5 sn' : (rawDisplacement && rawDisplacement <= 250 ? '9.8 sn' : '6.5 sn')) : (hpValue && hpValue >= 200 ? '7.2 sn' : '9.5 sn')));
   const fuelOrRangeDisplay = isElectricVehicle ? (electricRangeKm ? `${electricRangeKm} km` : '420 km') : (combinedFuel ? `${combinedFuel} lt/100km` : (isMotorcycle ? '2.8 lt/100km' : '6.8 lt/100km'));
-  const trunkDisplay = trunkValue ? `${trunkValue} lt` : (isMotorcycle ? 'Sele Altı / Çanta Uyumlu' : '450 lt');
+  const trunkDisplay = trunkValue ? `${trunkValue} lt` : (isMotorcycle ? (isScooter ? 'Sele Altı Kask Gözü' : 'Yan Heybe / Çanta Uyumlu') : '450 lt');
   const weightDisplay = weightValue ? `${weightValue} kg` : (isMotorcycle ? (rawDisplacement && rawDisplacement <= 50 ? '88 kg' : '165 kg') : (isElectricVehicle ? '1850 kg' : '1380 kg'));
   const mtvDisplay = mtvResult ? mtvResult.displayInstallment : 'Hesaplanıyor';
 

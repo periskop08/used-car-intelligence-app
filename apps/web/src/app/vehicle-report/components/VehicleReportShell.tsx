@@ -189,12 +189,12 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
   const resolvedVehicleType = ((report.vehicleIdentity as any)?.vehicleType || (report as any).vehicleType || '').toUpperCase();
   const isMotorcycle = resolvedVehicleType === 'MOTORCYCLE' || !!(report as any).isMotorcycle;
 
-  const isLowSpeedBike = isMotorcycle && ((topSpeedValue && topSpeedValue < 80) || (effectiveDisplacement && effectiveDisplacement <= 50));
+  const isLowSpeedBike = isMotorcycle && !!effectiveDisplacement && effectiveDisplacement <= 50;
 
   const effectiveTopSpeed = topSpeedValue && !(rawPower && rawPower >= 170 && topSpeedValue <= 160 && !isMotorcycle)
-    ? topSpeedValue
+    ? (isMotorcycle && effectiveDisplacement && effectiveDisplacement > 150 && topSpeedValue < 100 ? 135 : topSpeedValue)
     : isMotorcycle
-    ? (effectiveDisplacement && effectiveDisplacement <= 50 ? 55 : (effectiveDisplacement && effectiveDisplacement <= 125 ? 95 : 120))
+    ? (effectiveDisplacement && effectiveDisplacement <= 50 ? 55 : (effectiveDisplacement && effectiveDisplacement <= 125 ? 100 : (effectiveDisplacement && effectiveDisplacement <= 250 ? 135 : 165)))
     : (rawPower ? (rawPower >= 400 ? 250 : rawPower >= 250 ? 245 : rawPower >= 180 ? 230 : rawPower >= 130 ? 205 : 185) : 190);
 
   const effectiveZeroHundred = zeroToHundredValue
@@ -202,7 +202,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
     : (isLowSpeedBike
         ? "Şehir İçi (<80 km/h)"
         : (isMotorcycle
-            ? "6.5 sn"
+            ? (effectiveDisplacement && effectiveDisplacement <= 125 ? "14.5 sn" : (effectiveDisplacement && effectiveDisplacement <= 250 ? "9.8 sn" : "6.5 sn"))
             : (rawPower
                 ? (rawPower >= 400 ? "3.9 sn" : rawPower >= 250 ? "6.2 sn" : rawPower >= 180 ? "8.1 sn" : rawPower >= 130 ? "9.6 sn" : "11.2 sn")
                 : "9.8 sn")));

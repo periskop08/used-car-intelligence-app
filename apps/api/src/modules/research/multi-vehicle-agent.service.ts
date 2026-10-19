@@ -1505,18 +1505,23 @@ Perform adversarial red-team audit. Output strict JSON.`;
       vehicleMandates = `9. MOTORCYCLE INTEGRITY MANDATES (KESİNLİKLE TİCARİ ARAÇ VE OTOMOBİL TERİMLERİ KULLANILAMAZ):
    a) ABSOLUTE BAN ON CAR & MINIVAN TERMS (SIFIR TİCARİ/BİNEK TERİMİ):
       - KESİNLİKLE "sürgülü kapı", "yükleme eşiği", "yüksek tavanlı otopark", "kabin", "arka koltuk", "bagaj kapağı", "filo ve esnaf", "palet" GİBİ BİNEK/TİCARİ ARAÇ TERİMLERİ KULLANILAMAZ!
-      - Bu bir MOTOSİKLETTİR. Motosiklet terminolojisi kullanılmalıdır (sele, gidon açısı, ayak koyma platformu, sele altı kask gözü, şasi geometrisi, amortisör, varyatör vb.).
-   b) TRANSMISSION FIDELITY (${isScooter ? 'OTOMATİK CVT VARYATÖR' : 'MANUEL VİTES'}):
-      - ${isScooter ? 'Bu araç bir SCOOTER / MOPED olup Otomatik (CVT) aktarmaya sahiptir. KESİNLİKLE "vites geçişi", "vites dişlisi", "debriyaj pedalı", "senkromeç", "5 ileri manuel" YAZILAMAZ! Kesintisiz CVT ivmelenmesi, varyatör kayışı ve santrifüj debriyaj balatası davranışı anlatılmalıdır.' : 'Bu araç manuel vitesli bir motosiklettir. Vites geçiş kemikliliği, debriyaj kolu hissiyatı ve vites oranları analiz edilmelidir.'}
+      - Bu bir MOTOSİKLETTİR. Motosiklet terminolojisi kullanılmalıdır (sele, gidon açısı, şasi geometrisi, amortisör vb.).
+   b) TRANSMISSION & ERGONOMICS FIDELITY (${isScooter ? 'OTOMATİK CVT VARYATÖR & SCOOTER GÖVDESİ' : 'MANUEL VİTES & MOTOSİKLET GÖVDESİ'}):
+      - ${isScooter ? 'Bu araç bir SCOOTER / MOPED olup Otomatik (CVT) aktarmaya sahiptir. Düz ayak koyma platformu ve sele altı kask depolama alanı mevcuttur. KESİNLİKLE "vites geçişi", "vites dişlisi", "debriyaj pedalı", "senkromeç", "5 ileri manuel" YAZILAMAZ!' : 'Bu araç vitesli bir motosiklettir (Cruiser, Chopper, Naked, Touring vb.). Sürücünün bacakları arasında yakıt deposu, ayak basamakları (cruiser modellerde ileri uzatılmış forward pegler) ve geniş gidon ergonomisi vardır. KESİNLİKLE "sele altı kask depolama" veya "ayak koyma alanı" YAZILAMAZ (bunlar sadece scooterlarda olur)! Cruiser/Chopper ise: Alçak sele yüksekliği, ileri konumlandırılmış ayak pegleri, damla yakıt deposu, geniş gidon ve yan heybe / sissy bar çanta uyumluluğu anlatılmalıdır. Vites geçiş kemikliliği, debriyaj kolu hissiyatı ve vites oranları analiz edilmelidir.'}
    c) COOLING SYSTEM FIDELITY (${isAirCooled ? 'HAVA SOĞUTMALI - RADYATÖR VE ANTİFRİZ KESİNLİKLE YOKTUR' : 'SIVI SOĞUTMALI'}):
       - ${isAirCooled ? 'Bu motor HAVA SOĞUTMALIDIR (Hava Soğutmalı / Fanlı Tek Silindir). KESİNLİKLE "radyatör", "antifriz", "termostat", "soğutma sıvısı kaçağı", "genleşme kabı" YAZILAMAZ! Aşırı ısınma durumunda yalnızca silindir soğutma kanatçıklarının temizliği ve motor yağı viskozitesi değerlendirilebilir.' : 'Bu motor sıvı soğutmalıdır; radyatör petekleri ve soğutma sıvısı seviyesi değerlendirilebilir.'}
    d) "vehicleOverview" TAM 3 BAĞIMSIZ PARAGRAF (MOTOSİKLET DİSİPLİNİ):
       - vehicleOverview KESİNLİKLE çift satır boşluğu (\\n\\n) ile ayrılmış TAM 3 BAĞIMSIZ PARAGRAF olmalıdır:
-        1. Paragraf: Motosikletin gövde ve şasi geometrisi, gidon açısı, sürüş ergonomisi (dik oturuş / ayak koyma alanı / sele konforu / sele altı kask depolama) ve şehir içi sıkışık trafik manevra kabiliyeti.
-        2. Paragraf: ${judge.finalDisplacementCc} cc motor ünitesinin ${judge.finalPowerHp} HP güç teslimatı, gaz kolu tepkisi, ${isScooter ? 'otomatik CVT varyatör aktarmasının pürüzsüz kalkış karakteri' : 'vites oranları ve debriyaj hissiyatı'} ile şehir içi sürüş dinamiği.
-        3. Paragraf: Grenaj ve plastik malzeme kalitesi, titreşim sönümleme, boya/şasi dayanıklılığı ve modelin Türkiye motosiklet pazarındaki kullanıcı kitlesi ve yeri.
-   e) REALISTIC ACCELERATION & HIGHWAY PROFILE:
-      - Küçük hacimli modellerde maksimum sürat 45-75 km/s seviyesindedir. Otoyolda süratli seyir gibi gerçek dışı iddialar yazılamaz; çevre yollarında sağ şerit dinamikleri gerçekçi aktarılmalıdır.`;
+        1. Paragraf: Motosikletin gövde ve şasi geometrisi, gidon açısı, sürüş ergonomisi (${isScooter ? 'dik oturuş / düz ayak koyma platformu / sele altı kask depolama' : 'oturuş üçgeni / sele yüksekliği / depo-sele formu / ayak basamakları / manevra kabiliyeti'}) ve şehir içi sıkışık trafik manevra kabiliyeti.
+        2. Paragraf: ${judge.finalDisplacementCc} cc motor ünitesinin ${judge.finalPowerHp} HP güç teslimatı, gaz kolu tepkisi, ${isScooter ? 'otomatik CVT varyatör aktarmasının pürüzsüz kalkış karakteri' : 'vites oranları ve debriyaj hissiyatı'} ile sürüş dinamiği.
+        3. Paragraf: Grenaj/boya dayanıklılığı, titreşim sönümleme ve modelin Türkiye motosiklet pazarındaki kullanıcı kitlesi ve yeri.
+   e) REALISTIC ACCELERATION & HIGHWAY PROFILE (MOTOR HACMİ VE GÜCÜNE GERÇEKÇİ SADAKAT):
+      - Maksimum sürat doğrudan motor hacmine (${judge.finalDisplacementCc} cc) ve gücüne (${judge.finalPowerHp} HP) göre belirlenir:
+        * 50cc moped: 45-65 km/s.
+        * 100-125cc: 90-110 km/s.
+        * 200-250cc (20-30 HP V-Twin / Tek Silindir, örn: Hyosung GV 250): Maksimum sürat 130-145 km/s aralığındadır; çevre yolu ve otoyolda 100-120 km/s hızlarda güvenle seyredebilir. KESİNLİKLE 250cc motor için "maksimum hız 75 km/s", "sağ şeritte seyreder" gibi moped hızı YAZILAMAZ!
+        * 300-500cc: 150-180 km/s.
+        * 600cc+: 180-250+ km/s.`;
     } else if (isSuvPickup) {
       vehicleMandates = `9. SUV & PICKUP INTEGRITY MANDATES:
    a) 4x4 / AWD aktarma organı, diferansiyel kilidi ve arazi şanzımanı kontrolleri.
@@ -2258,18 +2263,19 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
 
     const realisticTopSpeed =
       isMotorcycle
-        ? (baseCc <= 50 ? 50 : baseCc <= 125 ? 95 : 120)
+        ? (baseCc <= 50 ? 50 : baseCc <= 125 ? 100 : baseCc <= 250 ? 135 : baseCc <= 500 ? 165 : 200)
         : baseHp >= 400 ? 250 : baseHp >= 250 ? 245 : baseHp >= 180 ? 230 : baseHp >= 130 ? 205 : 185;
 
+    const minRealisticMotoSpeed = baseCc <= 50 ? 45 : baseCc <= 125 ? 90 : baseCc <= 250 ? 125 : 150;
     const topSpeedKmh =
       typeof writer.technicalSpecifications?.topSpeedKmh === 'number' &&
-      writer.technicalSpecifications.topSpeedKmh > (isMotorcycle ? 30 : 160)
+      writer.technicalSpecifications.topSpeedKmh >= (isMotorcycle ? minRealisticMotoSpeed : 160)
         ? writer.technicalSpecifications.topSpeedKmh
         : judge.finalTopSpeedKmh || realisticTopSpeed;
 
     const realisticZeroHundred =
       isMotorcycle
-        ? null
+        ? (baseCc <= 50 ? null : baseCc <= 125 ? 14.5 : baseCc <= 250 ? 9.8 : 5.8)
         : baseHp >= 400 ? 3.9 : baseHp >= 250 ? 6.2 : baseHp >= 180 ? 8.1 : baseHp >= 130 ? 9.6 : 11.2;
 
     const zeroToHundredKmh =
@@ -2309,8 +2315,18 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         cleanInspect = cleanInspect.replace(/^gözle (muayene|kontrol) edin\s*(ve)?\s*/i, '');
         cleanInspect = cleanInspect.charAt(0).toUpperCase() + cleanInspect.slice(1);
       }
-      if (!/obd|diyagnostik|canlı veri|live data|basınç|manometre|test|ölçüm|tolerans|kaçak/i.test(cleanInspect)) {
-        cleanInspect = `${cleanInspect}. Yetkili/uzman ekspertizde OBD cihazı ile canlı parametre sapmaları loglanmalı ve fiziki kontrol uygulanmalıdır.`.replace(/\.\./g, '.');
+      const isCarbDefect = /karbüratör|diyafram|şamandıra|jikle|manifolt|hava ayar/i.test(`${cleanTitle} ${cleanReason} ${fact.system}`);
+      if (isCarbDefect) {
+        cleanInspect = cleanInspect.replace(/obd\s*(cihazı|tarama|kontrolü)?/gi, 'vakum saati ve fiziki muayene');
+      }
+      if (!/obd|diyagnostik|canlı veri|live data|basınç|manometre|test|ölçüm|tolerans|kaçak|vakum/i.test(cleanInspect)) {
+        if (isCarbDefect) {
+          cleanInspect = `${cleanInspect}. Karbüratör vakum senkronizasyonu, diyafram esnekliği, şamandıra seviyesi ve manifold boğaz lastikleri fiziki olarak test edilmelidir.`.replace(/\.\./g, '.');
+        } else if (isMotorcycle) {
+          cleanInspect = `${cleanInspect}. Yetkili motosiklet servisinde fiziki ve mekanik kontroller uygulanmalıdır.`.replace(/\.\./g, '.');
+        } else {
+          cleanInspect = `${cleanInspect}. Yetkili/uzman ekspertizde OBD cihazı ile canlı parametre sapmaları loglanmalı ve fiziki kontrol uygulanmalıdır.`.replace(/\.\./g, '.');
+        }
       }
 
       const domainKey =

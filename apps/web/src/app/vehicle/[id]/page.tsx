@@ -358,52 +358,6 @@ export default function VehicleDetail() {
         ? { ...searchScope, vehicleType: resolvedVehicleType }
         : { vehicleType: resolvedVehicleType };
 
-      if (!force) {
-        const res = await fetch(`${API_URL}/vehicle-reports/by-variant/${variantId}/current`, {
-          headers,
-        });
-        if (res.ok) {
-          const data = await safeFetchJson(res);
-          const parsed = extractReportData(data);
-          const cachedVehicleType = (
-            (parsed as any)?.vehicleType ||
-            (parsed as any)?.vehicleIdentity?.vehicleType ||
-            (data as any)?.vehicleType ||
-            ""
-          ).toUpperCase();
-
-          const isTypeCompatible = !cachedVehicleType || cachedVehicleType === resolvedVehicleType;
-
-          if (
-            parsed && 
-            isTypeCompatible &&
-            data.status === "COMPLETED" && 
-            data.provider !== "DETERMINISTIC_FALLBACK" &&
-            (data.reportData?.status || data.status) !== "SAFE_FALLBACK"
-          ) {
-            setStructuredReport(parsed);
-            if (typeof window !== "undefined") {
-              try {
-                sessionStorage.setItem(`ts_rep_${variantId}`, JSON.stringify(parsed));
-              } catch {}
-            }
-            setLoadingStructuredReport(false);
-            setReportError("");
-            return;
-          }
-        }
-
-        // Veritabanında tamamlanmış güncel rapor bulunamadıysa:
-        // Stale client sessionStorage önbelleğini temizle ve analizi başlat
-        if (typeof window !== "undefined") {
-          try {
-            sessionStorage.removeItem(`ts_rep_${variantId}`);
-          } catch {}
-        }
-        setStructuredReport(null);
-        setPipelineStep(1);
-      }
-
       const reportPayload: any = {
         mode: "TORQUE_SCOUT_VEHICLE_REPORT",
         entryPoint: "VEHICLE_SEARCH",
@@ -471,17 +425,7 @@ export default function VehicleDetail() {
   const checkReportStatusSilently = async () => {
     if (!variantId || structuredReport) return;
     try {
-      const headers = getAuthHeaders();
-      const res = await fetch(`${API_URL}/vehicle-reports/by-variant/${variantId}/current`, { headers });
-      if (res.ok) {
-        const data = await safeFetchJson(res);
-        const parsed = extractReportData(data);
-        if (parsed) {
-          setStructuredReport(parsed);
-          setLoadingStructuredReport(false);
-          setReportError("");
-        }
-      }
+      fetchStructuredReport(false);
     } catch (e) {}
   };
 

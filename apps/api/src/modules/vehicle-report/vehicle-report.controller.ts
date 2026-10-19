@@ -22,15 +22,6 @@ export class VehicleReportController {
     return this.reportService.getReportById(this.getUserId(req), reportId);
   }
 
-  @Get('by-variant/:variantId/current')
-  async getCurrentVariantReport(@Request() req: any, @Param('variantId') variantId: string) {
-    const report = await this.reportService.getCurrentVariantReport(this.getUserId(req), variantId);
-    if (!report) {
-      return { success: true, cached: false, reportData: null };
-    }
-    return report;
-  }
-
   @Get('by-listing/:listingId/current')
   async getCurrentListingReport(@Request() req: any, @Param('listingId') listingId: string) {
     const report = await this.reportService.getCurrentListingReport(this.getUserId(req), listingId);
