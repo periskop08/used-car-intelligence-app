@@ -48,6 +48,17 @@ const cleanRangeText = (text?: string): string => {
     .trim();
 };
 
+const DOMAIN_LABELS_TR: Record<string, string> = {
+  POWERTRAIN_ENGINE: 'Motor Mekaniği & Zamanlama',
+  POWERTRAIN_TRANS: 'Şanzıman & Aktarma Organları',
+  EMISSIONS_EXHAUST: 'Emisyon & Egzoz Sistemi',
+  HV_BATTERY_SYSTEM: 'Yüksek Voltaj & Batarya Sistemi',
+  THERMAL_COOLING: 'Termal Yönetim & Soğutma',
+  ELECTRONICS_BODY: 'Gövde Elektroniği & Donanım',
+  CHASSIS_BRAKES: 'Yürüyen Aksam, Direksiyon & Fren',
+  SAFETY_RECALL: 'Resmi Geri Çağırma & Güvenlik',
+};
+
 const extractReportData = (data: any): ComprehensiveVehicleReport | null => {
   if (!data) return null;
   let payload = data.reportData !== undefined ? data.reportData : data;
@@ -59,9 +70,10 @@ const extractReportData = (data: any): ComprehensiveVehicleReport | null => {
     }
   }
   if (payload && typeof payload === 'object' && (payload.executiveSummary || payload.vehicleIdentity || payload.finalVerdict)) {
+    const detectedType = data.vehicleType || payload.vehicleType || (payload.vehicleIdentity as any)?.vehicleType || (payload.expertDecisionSynthesis?.motorcycleEraAnalysis ? 'MOTORCYCLE' : undefined);
     return {
       ...payload,
-      vehicleType: data.vehicleType || payload.vehicleType || (payload.vehicleIdentity as any)?.vehicleType,
+      vehicleType: detectedType,
       reportId: data.id || payload.reportId || payload.id,
       likeCount: data.likeCount ?? payload.likeCount ?? 0,
       dislikeCount: data.dislikeCount ?? payload.dislikeCount ?? 0,
@@ -891,8 +903,19 @@ export default function VehicleReportScreen() {
     ?? (report as any)?.technicalSpecifications?.engineDisplacementCc
     ?? (report?.performanceUsage as any)?.engineDisplacementCc
     ?? (report?.performanceUsage as any)?.displacementCc;
-  const resolvedVehicleType = ((report?.vehicleIdentity as any)?.vehicleType || (report as any)?.vehicleType || '').toUpperCase();
-  const isMotorcycle = resolvedVehicleType === 'MOTORCYCLE' || !!(report as any)?.isMotorcycle;
+  const resolvedVehicleType = (
+    (params.vehicleType as string) ||
+    (params.category as string) ||
+    report?.vehicleType ||
+    (report?.vehicleIdentity as any)?.vehicleType ||
+    (report as any)?.vehicleType ||
+    (report?.expertDecisionSynthesis?.motorcycleEraAnalysis ? 'MOTORCYCLE' : '') ||
+    ''
+  ).toUpperCase();
+  const isMotorcycle =
+    resolvedVehicleType === 'MOTORCYCLE' ||
+    Boolean((report as any)?.isMotorcycle) ||
+    Boolean(report?.expertDecisionSynthesis?.motorcycleEraAnalysis);
   const characterHeading = isMotorcycle
     ? 'Bu Araç Nasıl Bir Motosiklet?'
     : (resolvedVehicleType === 'SUV_PICKUP' || resolvedVehicleType === 'SUV'
@@ -951,9 +974,35 @@ export default function VehicleReportScreen() {
   const rawBuyability = report?.scoring?.buyabilityScore?.value ?? 73;
   const rawRisk = report?.scoring?.technicalRiskScore?.value ?? 30;
 
-  const decisionScore = report?.torqueScoutDecisionScoreV1 || report?.scoringV6?.decisionScoreV1 || (report?.scoringV6 as any)?.decisionScore;
+  const rawScoreObj = report?.torqueScoutDecisionScoreV1 || report?.scoringV6?.decisionScoreV1 || (report?.scoringV6 as any)?.decisionScore || (report as any)?.decisionScore;
+  const decisionScore = rawScoreObj ? {
+    score: typeof rawScoreObj.score === 'number' ? rawScoreObj.score : (report?.scoring?.buyabilityScore?.value ?? 80),
+    confidenceScore: typeof rawScoreObj.confidenceScore === 'number' ? rawScoreObj.confidenceScore : 90,
+    state: rawScoreObj.state || (
+      (rawScoreObj.score ?? 80) >= 90 ? 'EXCELLENT' :
+      (rawScoreObj.score ?? 80) >= 78 ? 'GOOD' :
+      (rawScoreObj.score ?? 80) >= 65 ? 'CAUTION' :
+      (rawScoreObj.score ?? 80) >= 48 ? 'HIGH_RISK' : 'AVOID'
+    ),
+    scope: rawScoreObj.scope || 'VEHICLE',
+    modelDecisionRisk: rawScoreObj.modelDecisionRisk ?? Math.max(0, 100 - (rawScoreObj.score ?? 80)),
+    explanation: rawScoreObj.explanation,
+    deductedRisks: Array.isArray(rawScoreObj.deductedRisks) ? rawScoreObj.deductedRisks : [],
+  } : null;
+
   const numScore = decisionScore?.score ?? rawBuyability;
   const scoreState = decisionScore?.state || (numScore >= 90 ? 'EXCELLENT' : numScore >= 78 ? 'GOOD' : numScore >= 65 ? 'CAUTION' : numScore >= 48 ? 'HIGH_RISK' : 'AVOID');
+  const deductedRisks = (decisionScore?.deductedRisks || []) as any[];
+  const totalRiskPenalty = deductedRisks.reduce((acc: number, r: any) => {
+    const d = typeof r.netDeduction === 'number' && r.netDeduction > 0
+      ? r.netDeduction
+      : typeof r.deduction === 'number' && r.deduction > 0
+      ? r.deduction
+      : typeof r.penalty === 'number' && r.penalty > 0
+      ? r.penalty
+      : 0;
+    return acc + d;
+  }, 0);
 
   const getStateConfig = (state?: string) => {
     switch (state) {
@@ -1223,88 +1272,6 @@ export default function VehicleReportScreen() {
             </View>
           </View>
 
-          {/* 2. PROMINENT 100-POINT SCORE INDICATORS (LIGHT THEME) */}
-          <View style={styles.scoresGridLight}>
-            {/* Alınabilirlik Skoru */}
-            <View style={[styles.scoreCardLight, { backgroundColor: stateCfg.bg, borderColor: stateCfg.border }]}>
-              <View style={styles.scoreHeaderLightRow}>
-                <Text style={[styles.scoreTitleLight, { color: stateCfg.color }]}>Alınabilirlik Skoru</Text>
-                <Ionicons name={stateCfg.icon} size={20} color={stateCfg.color} />
-              </View>
-              <Text style={[styles.scoreBigValLight, { color: stateCfg.color }]}>{numScore} / 100</Text>
-              <View style={{ alignSelf: 'flex-start', backgroundColor: stateCfg.badgeBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 2 }}>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: stateCfg.badgeText }}>{stateCfg.label}</Text>
-              </View>
-            </View>
-
-            {/* Model Karar Riski */}
-            <View style={[styles.scoreCardLight, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
-              <View style={styles.scoreHeaderLightRow}>
-                <Text style={[styles.scoreTitleLight, { color: '#c2410c' }]}>Model Karar Riski</Text>
-                <Ionicons name="warning" size={20} color="#f97316" />
-              </View>
-              <Text style={[styles.scoreBigValLight, { color: '#ea580c' }]}>
-                {decisionScore?.modelDecisionRisk !== undefined ? `${decisionScore.modelDecisionRisk} / 100` : `${rawRisk} / 100`}
-              </Text>
-              <Text style={[styles.scoreSubLight, { color: '#9a3412' }]}>
-                {(decisionScore?.modelDecisionRisk ?? rawRisk) > 40 ? '⚠️ İnceleme Gerekli' : 'Dengeli Risk Seviyesi'}
-              </Text>
-            </View>
-          </View>
-
-          {/* 2.1 HARMONIZED SHORT VERDICT BANNER */}
-          {Boolean(harmonizedVerdict) && (
-            <View style={[styles.verdictBannerLight, { backgroundColor: stateCfg.bg, borderColor: stateCfg.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <Ionicons name={stateCfg.icon} size={16} color={stateCfg.color} />
-                <Text style={[styles.verdictBannerTitle, { color: stateCfg.color }]}>Nihai Uzman Kararı</Text>
-              </View>
-              <Text style={styles.verdictBannerText}>{harmonizedVerdict}</Text>
-            </View>
-          )}
-
-          {/* 2.2 TEKNİK ÖZELLİKLER KARTLARI (8-Card Dynamic Grid - Zero-Null Guarantee) */}
-          <View style={styles.specsCardLight}>
-            <View style={styles.specsHeaderRowLight}>
-              <Ionicons name="speedometer-outline" size={18} color="#0f172a" />
-              <Text style={styles.specsHeaderTitleLight}>Teknik Özellikler</Text>
-            </View>
-            <View style={styles.specsGridWrapLight}>
-              <View style={styles.specBoxLight}>
-                <Text style={styles.specLabelLight}>Motor Gücü</Text>
-                <Text style={styles.specValueLight}>{hpDisplay || '—'}</Text>
-              </View>
-              <View style={styles.specBoxLight}>
-                <Text style={styles.specLabelLight}>{isElectricVehicle ? 'Güç Ünitesi' : 'Motor Hacmi'}</Text>
-                <Text style={styles.specValueLight}>{displacementDisplay || '—'}</Text>
-              </View>
-              <View style={[styles.specBoxLight, styles.specBoxHighlightLight]}>
-                <Text style={styles.specLabelLight}>MTV (Yıllık / Taksit)</Text>
-                <Text style={[styles.specValueLight, styles.specValueHighlightLight]}>{mtvDisplay || '—'}</Text>
-              </View>
-              <View style={styles.specBoxLight}>
-                <Text style={styles.specLabelLight}>Maksimum Hız</Text>
-                <Text style={styles.specValueLight}>{topSpeedDisplay || '—'}</Text>
-              </View>
-              <View style={styles.specBoxLight}>
-                <Text style={styles.specLabelLight}>{isLowSpeedBike ? '0-50 / Hızlanma' : '0-100 Hızlanma'}</Text>
-                <Text style={styles.specValueLight}>{zeroToHundredDisplay || '—'}</Text>
-              </View>
-              <View style={styles.specBoxLight}>
-                <Text style={styles.specLabelLight}>{isElectricVehicle ? 'Menzil (WLTP)' : 'Ort. Tüketim'}</Text>
-                <Text style={styles.specValueLight}>{fuelOrRangeDisplay || '—'}</Text>
-              </View>
-              <View style={styles.specBoxLight}>
-                <Text style={styles.specLabelLight}>{isMotorcycle ? 'Depolama / Çanta' : 'Bagaj Hacmi'}</Text>
-                <Text style={styles.specValueLight}>{trunkDisplay || '—'}</Text>
-              </View>
-              <View style={styles.specBoxLight}>
-                <Text style={styles.specLabelLight}>Boş Ağırlık</Text>
-                <Text style={styles.specValueLight}>{weightDisplay || '—'}</Text>
-              </View>
-            </View>
-          </View>
-
           {/* 3. TORQUE SCOUT EXPERT DECISION SYNTHESIS SECTIONS IN LIGHT COLLAPSIBLE CARDS */}
 
           {/* 3.1 BU ARAÇ NASIL BİR OTOMOBİL / MOTOSİKLET / TİCARİ ARAÇ? */}
@@ -1489,6 +1456,68 @@ export default function VehicleReportScreen() {
                     <Text style={styles.motoEraRecDescLight}>
                       {cleanRangeText(motoEra.recommendedEraComparison)}
                     </Text>
+                  </View>
+                )}
+
+                {/* Motosiklet Geneli Ortak Kronik Noktalar & Fırsat/Riskler */}
+                {Array.isArray(motoEra.allEraCommonIssues) && motoEra.allEraCommonIssues.length > 0 && (
+                  <View style={{ gap: 8, marginTop: 12 }}>
+                    <Text style={styles.motoSubSectionTitleLight}>⚠️ Motosiklet Geneli Ortak Kronik Noktalar & Fırsat/Riskler</Text>
+                    {motoEra.allEraCommonIssues.map((issue: any, idx: number) => {
+                      const issueDesc = issue.issueDescription || issue.symptoms || issue.risk || '';
+                      const checkAdvice = issue.checkAdvice || issue.checkNote || '';
+                      return (
+                        <View key={idx} style={styles.motoCommonIssueCardLight}>
+                          <Text style={styles.motoIssueTitleLight}>{issue.title}</Text>
+                          {Boolean(issueDesc) && (
+                            <Text style={styles.motoIssueDescLight}>{cleanRangeText(issueDesc)}</Text>
+                          )}
+                          {Boolean(checkAdvice) && (
+                            <Text style={styles.motoCheckAdviceTextLight}>
+                              🔍 Ekspertiz & Kontrol: {cleanRangeText(checkAdvice)}
+                            </Text>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {/* Döneme Özgü Mekanik ve Elektronik Ayrışmalar */}
+                {Array.isArray(motoEra.eraSpecificIssues) && motoEra.eraSpecificIssues.length > 0 && (
+                  <View style={{ gap: 8, marginTop: 12 }}>
+                    <Text style={styles.motoSubSectionTitleLight}>🔧 Döneme Özgü Mekanik ve Elektronik Ayrışmalar</Text>
+                    {motoEra.eraSpecificIssues.map((eraBlock: any, idx: number) => {
+                      const subIssues = Array.isArray(eraBlock.issues) && eraBlock.issues.length > 0
+                        ? eraBlock.issues
+                        : eraBlock.title
+                        ? [{ title: eraBlock.title, description: eraBlock.description || eraBlock.symptoms || eraBlock.risk, checkAdvice: eraBlock.checkAdvice || eraBlock.checkNote }]
+                        : [];
+
+                      return (
+                        <View key={idx} style={styles.motoEraBlockCardLight}>
+                          <View style={styles.motoEraBlockHeaderLight}>
+                            <Text style={styles.motoEraBlockTitleLight}>{eraBlock.eraName}</Text>
+                            {Boolean(eraBlock.years) && (
+                              <Text style={styles.motoEraBlockYearsLight}>({eraBlock.years})</Text>
+                            )}
+                          </View>
+                          <View style={{ gap: 6, marginTop: 4 }}>
+                            {subIssues.map((iss: any, iIdx: number) => (
+                              <View key={iIdx} style={styles.motoSubIssueBoxLight}>
+                                <Text style={styles.motoSubIssueTitleLight}>{iss.title}</Text>
+                                {Boolean(iss.description) && (
+                                  <Text style={styles.motoSubIssueDescLight}>{cleanRangeText(iss.description)}</Text>
+                                )}
+                                {Boolean(iss.checkAdvice) && (
+                                  <Text style={styles.motoSubCheckAdviceLight}>✔ {cleanRangeText(iss.checkAdvice)}</Text>
+                                )}
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      );
+                    })}
                   </View>
                 )}
               </CollapsibleLightSection>
@@ -1799,6 +1828,155 @@ export default function VehicleReportScreen() {
               ))}
             </CollapsibleLightSection>
           )}
+
+          {/* SCORE SECTION: 100-POINT DECISION SCORE & FMEA BREAKDOWN */}
+          <View style={styles.scoresGridLight}>
+            {/* Alınabilirlik Skoru */}
+            <View style={[styles.scoreCardLight, { backgroundColor: stateCfg.bg, borderColor: stateCfg.border }]}>
+              <View style={styles.scoreHeaderLightRow}>
+                <Text style={[styles.scoreTitleLight, { color: stateCfg.color }]}>Alınabilirlik Skoru</Text>
+                <Ionicons name={stateCfg.icon} size={20} color={stateCfg.color} />
+              </View>
+              <Text style={[styles.scoreBigValLight, { color: stateCfg.color }]}>{numScore} / 100</Text>
+              <View style={{ alignSelf: 'flex-start', backgroundColor: stateCfg.badgeBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 2 }}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: stateCfg.badgeText }}>{stateCfg.label}</Text>
+              </View>
+            </View>
+
+            {/* Model Karar Riski */}
+            <View style={[styles.scoreCardLight, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
+              <View style={styles.scoreHeaderLightRow}>
+                <Text style={[styles.scoreTitleLight, { color: '#c2410c' }]}>Model Karar Riski</Text>
+                <Ionicons name="warning" size={20} color="#f97316" />
+              </View>
+              <Text style={[styles.scoreBigValLight, { color: '#ea580c' }]}>
+                {decisionScore?.modelDecisionRisk !== undefined ? `${decisionScore.modelDecisionRisk} / 100` : `${rawRisk} / 100`}
+              </Text>
+              <Text style={[styles.scoreSubLight, { color: '#9a3412' }]}>
+                {(decisionScore?.modelDecisionRisk ?? rawRisk) > 40 ? '⚠️ İnceleme Gerekli' : 'Dengeli Risk Seviyesi'}
+              </Text>
+            </View>
+          </View>
+
+          {/* HARMONIZED SHORT VERDICT BANNER */}
+          {Boolean(harmonizedVerdict) && (
+            <View style={[styles.verdictBannerLight, { backgroundColor: stateCfg.bg, borderColor: stateCfg.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <Ionicons name={stateCfg.icon} size={16} color={stateCfg.color} />
+                <Text style={[styles.verdictBannerTitle, { color: stateCfg.color }]}>Nihai Uzman Kararı</Text>
+              </View>
+              <Text style={styles.verdictBannerText}>{harmonizedVerdict}</Text>
+            </View>
+          )}
+
+          {/* NEDEN PUAN KIRILDI? (FMEA KESİNTİLERİ LİSTESİ) */}
+          {deductedRisks.length > 0 && (
+            <View style={styles.fmeaContainerLight}>
+              <View style={styles.fmeaHeaderRowLight}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="alert-circle" size={16} color="#dc2626" />
+                    <Text style={styles.fmeaTitleLight}>Neden Puan Kırıldı?</Text>
+                  </View>
+                  <Text style={styles.fmeaSubtitleLight}>
+                    Otomotiv dünyasında geçerli kabul görmüş FMEA ve güvenilirlik mühendisliği ilkelerine dayalı formül hesaplaması yapılmıştır:
+                  </Text>
+                </View>
+                <View style={styles.fmeaPenaltyBadgeLight}>
+                  <Text style={styles.fmeaPenaltyBadgeTextLight}>-{totalRiskPenalty} Puan</Text>
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#b91c1c' }}>(Teknik Kesinti)</Text>
+                </View>
+              </View>
+
+              <View style={{ gap: 8, marginTop: 4 }}>
+                {deductedRisks.map((dRisk: any, idx: number) => {
+                  const dTitle = (dRisk.title || 'Doğrulanmış Teknik Kusur').replace(/\s*\(-?\d+\s*Puan\)/gi, '').trim();
+                  const dReason = dRisk.reason || dRisk.description || '';
+                  const deduction = typeof dRisk.netDeduction === 'number' && dRisk.netDeduction > 0
+                    ? dRisk.netDeduction
+                    : typeof dRisk.deduction === 'number' && dRisk.deduction > 0
+                    ? dRisk.deduction
+                    : typeof dRisk.penalty === 'number' && dRisk.penalty > 0
+                    ? dRisk.penalty
+                    : null;
+                  const domainKey = (dRisk.domain || '').toUpperCase();
+                  const domainLabel = DOMAIN_LABELS_TR[domainKey] || 'Mekanik Sistem';
+                  const cleanInspection = dRisk.inspectionInstruction || '';
+
+                  return (
+                    <View key={idx} style={styles.fmeaCardLight}>
+                      <View style={styles.fmeaCardHeaderLight}>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <View style={styles.fmeaDomainBadgeLight}>
+                            <Text style={styles.fmeaDomainBadgeTextLight}>{domainLabel}</Text>
+                          </View>
+                          <Text style={styles.fmeaDefectTitleLight}>{dTitle}</Text>
+                        </View>
+                        {deduction && deduction > 0 ? (
+                          <View style={styles.fmeaDefectPillLight}>
+                            <Text style={styles.fmeaDefectPillTextLight}>-{deduction} Puan</Text>
+                          </View>
+                        ) : null}
+                      </View>
+
+                      {Boolean(dReason) && (
+                        <Text style={styles.fmeaDefectReasonLight}>{cleanRangeText(dReason)}</Text>
+                      )}
+
+                      {Boolean(cleanInspection) && (
+                        <View style={styles.fmeaInspectionBoxLight}>
+                          <Text style={styles.fmeaInspectionTitleLight}>🔍 SATIN ALMADAN ÖNCE EKSPERTİZ KONTROLÜ:</Text>
+                          <Text style={styles.fmeaInspectionTextLight}>{cleanRangeText(cleanInspection)}</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* TEKNİK ÖZELLİKLER KARTLARI (8-Card Dynamic Grid - Zero-Null Guarantee) */}
+          <View style={styles.specsCardLight}>
+            <View style={styles.specsHeaderRowLight}>
+              <Ionicons name="speedometer-outline" size={18} color="#0f172a" />
+              <Text style={styles.specsHeaderTitleLight}>Teknik Özellikler</Text>
+            </View>
+            <View style={styles.specsGridWrapLight}>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>Motor Gücü</Text>
+                <Text style={styles.specValueLight}>{hpDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>{isElectricVehicle ? 'Güç Ünitesi' : 'Motor Hacmi'}</Text>
+                <Text style={styles.specValueLight}>{displacementDisplay || '—'}</Text>
+              </View>
+              <View style={[styles.specBoxLight, styles.specBoxHighlightLight]}>
+                <Text style={styles.specLabelLight}>MTV (Yıllık / Taksit)</Text>
+                <Text style={[styles.specValueLight, styles.specValueHighlightLight]}>{mtvDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>Maksimum Hız</Text>
+                <Text style={styles.specValueLight}>{topSpeedDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>{isLowSpeedBike ? '0-50 / Hızlanma' : '0-100 Hızlanma'}</Text>
+                <Text style={styles.specValueLight}>{zeroToHundredDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>{isElectricVehicle ? 'Menzil (WLTP)' : 'Ort. Tüketim'}</Text>
+                <Text style={styles.specValueLight}>{fuelOrRangeDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>{isMotorcycle ? 'Depolama / Çanta' : 'Bagaj Hacmi'}</Text>
+                <Text style={styles.specValueLight}>{trunkDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>Boş Ağırlık</Text>
+                <Text style={styles.specValueLight}>{weightDisplay || '—'}</Text>
+              </View>
+            </View>
+          </View>
 
           {/* 4. SATICIYA SORULACAK KRİTİK SORULAR */}
           {Array.isArray(sellerQuestions) && sellerQuestions.length > 0 && (
@@ -3333,6 +3511,211 @@ const styles = StyleSheet.create({
   motoEraRecDescLight: {
     fontSize: 11,
     color: '#0e7490',
+    lineHeight: 16,
+  },
+  motoSubSectionTitleLight: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  motoCommonIssueCardLight: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 10,
+    padding: 10,
+    gap: 4,
+  },
+  motoIssueTitleLight: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#92400e',
+  },
+  motoIssueDescLight: {
+    fontSize: 11,
+    color: '#78350f',
+    lineHeight: 16,
+  },
+  motoCheckAdviceTextLight: {
+    fontSize: 11,
+    color: '#15803d',
+    fontWeight: '700',
+    borderTopWidth: 1,
+    borderTopColor: '#fef3c7',
+    paddingTop: 4,
+    marginTop: 2,
+  },
+  motoEraBlockCardLight: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    padding: 10,
+    gap: 6,
+  },
+  motoEraBlockHeaderLight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 4,
+  },
+  motoEraBlockTitleLight: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0e7490',
+  },
+  motoEraBlockYearsLight: {
+    fontSize: 11,
+    color: '#64748b',
+  },
+  motoSubIssueBoxLight: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 8,
+    gap: 2,
+  },
+  motoSubIssueTitleLight: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  motoSubIssueDescLight: {
+    fontSize: 11,
+    color: '#475569',
+    lineHeight: 15,
+  },
+  motoSubCheckAdviceLight: {
+    fontSize: 10,
+    color: '#15803d',
+    fontWeight: '700',
+  },
+
+  // FMEA Risk Deduction Styles (Neden Puan Kırıldı?)
+  fmeaContainerLight: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+    gap: 10,
+  },
+  fmeaHeaderRowLight: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 10,
+  },
+  fmeaTitleLight: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#0f172a',
+    textTransform: 'uppercase',
+  },
+  fmeaSubtitleLight: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  fmeaPenaltyBadgeLight: {
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  fmeaPenaltyBadgeTextLight: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#b91c1c',
+  },
+  fmeaCardLight: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
+  },
+  fmeaCardHeaderLight: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  fmeaDomainBadgeLight: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 2,
+  },
+  fmeaDomainBadgeTextLight: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1d4ed8',
+    textTransform: 'uppercase',
+  },
+  fmeaDefectTitleLight: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  fmeaDefectPillLight: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  fmeaDefectPillTextLight: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#b91c1c',
+  },
+  fmeaDefectReasonLight: {
+    fontSize: 12,
+    color: '#334155',
+    lineHeight: 17,
+  },
+  fmeaInspectionBoxLight: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 2,
+    gap: 2,
+  },
+  fmeaInspectionTitleLight: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#92400e',
+    textTransform: 'uppercase',
+  },
+  fmeaInspectionTextLight: {
+    fontSize: 11,
+    color: '#78350f',
     lineHeight: 16,
   },
 
