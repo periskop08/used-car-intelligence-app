@@ -59,6 +59,39 @@ const DOMAIN_LABELS_TR: Record<string, string> = {
   SAFETY_RECALL: 'Resmi Geri Çağırma & Güvenlik',
 };
 
+const REPORT_PIPELINE_STEPS = [
+  {
+    id: 1,
+    title: '1. Teknik Veri ve Katalog Doğrulaması',
+    desc: 'Motor, şanzıman, güç (HP), tork ve donanım paketleri resmi üretici kataloglarıyla eşleştiriliyor.',
+    icon: 'server-outline' as const,
+  },
+  {
+    id: 2,
+    title: '2. Kronik Arıza & Mekanik Risk Analizi',
+    desc: 'Motor bloğu, şanzıman mekatroniği, yakıt sistemi, yürüyen aksam ve elektronik arıza kayıtları taranıyor.',
+    icon: 'search-outline' as const,
+  },
+  {
+    id: 3,
+    title: '3. Global Geri Çağırma (Recall) Bültenleri',
+    desc: 'Üretici servis aksiyonları, bültenler ve küresel güvenlik geri çağırmaları inceleniyor.',
+    icon: 'shield-checkmark-outline' as const,
+  },
+  {
+    id: 4,
+    title: '4. Türkiye Pazarı ve İşletme Maliyeti',
+    desc: 'Resmi MTV dilimi, gerçek tüketim ortalamaları ve periyodik parça/bakım projeksiyonu hesaplanıyor.',
+    icon: 'document-text-outline' as const,
+  },
+  {
+    id: 5,
+    title: '5. AI Uzman Karar Sentezi & Ekspertiz Rehberi',
+    desc: 'Satın alma tavsiyeleri, ekspertiz öncelikli kontrol noktaları ve nihai rapor üretiliyor.',
+    icon: 'sparkles-outline' as const,
+  },
+];
+
 const extractReportData = (data: any): ComprehensiveVehicleReport | null => {
   if (!data) return null;
   let payload = data.reportData !== undefined ? data.reportData : data;
@@ -315,6 +348,8 @@ export default function VehicleReportScreen() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [activeModalData, setActiveModalData] = useState<ModalDetailData | null>(null);
+  const [pipelineStep, setPipelineStep] = useState(1);
+  const skeletonOpacity = useRef(new Animated.Value(0.4)).current;
 
   // AI Chatbot States & Live Rights Integration
   const [isChatModalVisible, setIsChatModalVisible] = useState(false);
@@ -378,6 +413,36 @@ export default function VehicleReportScreen() {
     initReportLoad();
     fetchUserRights();
   }, [rawVariantId]);
+
+  // Pulse animation for skeleton
+  useEffect(() => {
+    if (!loading && report) return;
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(skeletonOpacity, {
+          toValue: 0.95,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+        Animated.timing(skeletonOpacity, {
+          toValue: 0.35,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [loading, report, skeletonOpacity]);
+
+  // Advance pipeline step while report is loading
+  useEffect(() => {
+    if (report) return;
+    const stepTimer = setInterval(() => {
+      setPipelineStep((prev) => (prev < 5 ? prev + 1 : 5));
+    }, 2800);
+    return () => clearInterval(stepTimer);
+  }, [report]);
 
   const fetchUserRights = async () => {
     try {
@@ -836,27 +901,86 @@ export default function VehicleReportScreen() {
     }
   };
 
-  if (countdown !== null) {
-    return (
-      <View style={styles.loadingContainerLight}>
-        <View style={styles.countdownBoxLight}>
-          <ActivityIndicator size="large" color="#ea580c" />
-          <Text style={styles.countdownNumLight}>{countdown}</Text>
-        </View>
-        <Text style={styles.loadingTitleLight}>Analiz Hazırlanıyor...</Text>
-        <Text style={styles.loadingStatusLight}>{statusMessages[statusIndex]}</Text>
-        <Text style={styles.loadingDescLight}>
-          Bu araç varyantı platformda ilk defa analiz ediliyor. Web taraması, kronik hata arşivleri ve geri çağırma listeleri taranıyor.
-        </Text>
-      </View>
-    );
-  }
+  if (countdown !== null || (loading && !report)) {
+    const pipelineStages = [
+      { step: 1, title: 'Katalog & Varyant Doğrulama', desc: 'Resmi fabrika teknik verileri ve donanım paketi tespit ediliyor.' },
+      { step: 2, title: 'Mekanik & Kronik Risk Taraması', desc: 'FMEA arıza kayıtları, şanzıman ve motor dayanıklılığı inceleniyor.' },
+      { step: 3, title: 'Piyasa Değeri & Satış Likiditesi', desc: 'Türkiye ikinci el piyasa verileri ve değer kaybı simüle ediliyor.' },
+      { step: 4, title: 'Adversarial Güvenlik & Doğruluk Denetimi', desc: 'Tutarsız iddialar filtreleniyor ve satın alma skoru kalibre ediliyor.' },
+      { step: 5, title: 'Uzman Raporu Sentezleniyor', desc: 'Tüm analizler konsolide edilerek nihai karar raporu oluşturuluyor.' },
+    ];
 
-  if (loading && !report) {
     return (
       <View style={styles.loadingContainerLight}>
-        <ActivityIndicator size="large" color="#ea580c" />
-        <Text style={[styles.loadingTitleLight, { marginTop: 12 }]}>Rapor Yükleniyor...</Text>
+        <ScrollView contentContainerStyle={styles.loadingContentScroll} showsVerticalScrollIndicator={false}>
+          <View style={styles.loadingHeaderBox}>
+            {countdown !== null ? (
+              <View style={styles.countdownCircle}>
+                <Text style={styles.countdownNumLight}>{countdown}</Text>
+              </View>
+            ) : (
+              <ActivityIndicator size="large" color="#ea580c" style={{ marginBottom: 12 }} />
+            )}
+            <Text style={styles.loadingTitleLight}>
+              {countdown !== null ? 'Analiz Hazırlanıyor...' : 'Rapor Hazırlanıyor...'}
+            </Text>
+            <Text style={styles.loadingStatusLight}>{statusMessages[statusIndex]}</Text>
+          </View>
+
+          {/* 5-Step Pipeline Card */}
+          <View style={styles.pipelineCardLight}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a', marginBottom: 12 }}>
+              🧠 TorqueScout 3-Ajanlı Analiz Süreci
+            </Text>
+            {pipelineStages.map((st) => {
+              const isDone = pipelineStep > st.step;
+              const isActive = pipelineStep === st.step;
+              return (
+                <View key={st.step} style={styles.pipelineStepRow}>
+                  <View
+                    style={[
+                      styles.pipelineStepDot,
+                      isDone && styles.pipelineStepDotDone,
+                      isActive && styles.pipelineStepDotActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.pipelineStepDotText,
+                        (isDone || isActive) && styles.pipelineStepDotTextActive,
+                      ]}
+                    >
+                      {isDone ? '✓' : st.step}
+                    </Text>
+                  </View>
+                  <View style={styles.pipelineStepContent}>
+                    <Text
+                      style={[
+                        styles.pipelineStepTitle,
+                        isActive && styles.pipelineStepTitleActive,
+                      ]}
+                    >
+                      {st.title}
+                    </Text>
+                    <Text style={styles.pipelineStepDesc}>{st.desc}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Pulsing Skeleton Preview */}
+          <Animated.View style={[styles.skeletonCardLight, { opacity: skeletonOpacity }]}>
+            <View style={[styles.skeletonBar, { width: '60%', height: 18 }]} />
+            <View style={[styles.skeletonBar, { width: '40%', height: 12 }]} />
+            <View style={styles.skeletonGridRow}>
+              <View style={styles.skeletonGridBox} />
+              <View style={styles.skeletonGridBox} />
+              <View style={styles.skeletonGridBox} />
+              <View style={styles.skeletonGridBox} />
+            </View>
+          </Animated.View>
+        </ScrollView>
       </View>
     );
   }
@@ -3222,43 +3346,132 @@ const styles = StyleSheet.create({
 
   loadingContainerLight: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: '#f8fafc',
-    padding: 24,
   },
-  countdownBoxLight: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  loadingContentScroll: {
+    padding: 20,
+    paddingTop: 54,
+    alignItems: 'center',
+  },
+  loadingHeaderBox: {
+    alignItems: 'center',
+    marginBottom: 20,
+    width: '100%',
+  },
+  countdownCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: '#fff7ed',
+    borderWidth: 2,
+    borderColor: '#fed7aa',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   countdownNumLight: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
     color: '#ea580c',
-    position: 'absolute',
   },
   loadingTitleLight: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
     color: '#0f172a',
+    textAlign: 'center',
   },
   loadingStatusLight: {
     fontSize: 13,
     color: '#ea580c',
     fontWeight: '700',
     marginTop: 6,
-  },
-  loadingDescLight: {
-    fontSize: 12,
-    color: '#64748b',
     textAlign: 'center',
+  },
+  pipelineCardLight: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  pipelineStepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  pipelineStepDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    marginTop: 2,
+  },
+  pipelineStepDotActive: {
+    backgroundColor: '#ea580c',
+  },
+  pipelineStepDotDone: {
+    backgroundColor: '#10b981',
+  },
+  pipelineStepDotText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+  pipelineStepDotTextActive: {
+    color: '#ffffff',
+  },
+  pipelineStepContent: {
+    flex: 1,
+  },
+  pipelineStepTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  pipelineStepTitleActive: {
+    color: '#ea580c',
+  },
+  pipelineStepDesc: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  skeletonCardLight: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 16,
+  },
+  skeletonBar: {
+    backgroundColor: '#e2e8f0',
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  skeletonGridRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     marginTop: 8,
-    lineHeight: 18,
+  },
+  skeletonGridBox: {
+    flexBasis: '48%',
+    height: 52,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
   },
 
   // Modal Styles

@@ -52,6 +52,14 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
     }
   }, [currentReportId]);
 
+  // Silently trigger background update if legacy report is loaded (zero buttons)
+  useEffect(() => {
+    const isLegacy = !report.expertDecisionSynthesis || ((report as any).schemaVersion || 1) < 2;
+    if (isLegacy && onRefresh) {
+      onRefresh();
+    }
+  }, [currentReportId, report.expertDecisionSynthesis, (report as any).schemaVersion, onRefresh]);
+
   const handleVote = async (type: "LIKE" | "DISLIKE") => {
     if (!currentReportId || isVoting) return;
     if (userVote === type) return;
@@ -322,38 +330,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
       </div>
 
 
-      {/* Legacy Schema Version Warning & Free Upgrade Banner */}
-      {(!report.expertDecisionSynthesis || (report.schemaVersion || 1) < 2) && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-amber-300">
-          <div className="flex items-center gap-2 font-medium">
-            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-            <span>
-              <strong>Bu rapor eski formatta hazırlanmıştır.</strong> Derin otomotiv uzman karar sentezini görmek için raporunuzu ücretsiz güncelleyebilirsiniz.
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={async () => {
-              const token = localStorage.getItem("accessToken") || localStorage.getItem("token");
-              if (!token) return;
-              try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/vehicle-reports/${report.reportId}/upgrade-version`, {
-                  method: "POST",
-                  headers: { Authorization: `Bearer ${token}` },
-                });
-                if (res.ok && onRefresh) {
-                  onRefresh();
-                }
-              } catch (e) {
-                console.error("Upgrade error", e);
-              }
-            }}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-md transition shrink-0 cursor-pointer"
-          >
-            Sürüm Yükselt (Ücretsiz)
-          </button>
-        </div>
-      )}
+
 
       {/* DERİN UZMAN KARAR SENTEZİ BÖLÜMÜ (Expert Decision Synthesis) */}
       {report.expertDecisionSynthesis && (

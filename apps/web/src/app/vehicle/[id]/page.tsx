@@ -389,6 +389,12 @@ export default function VehicleDetail() {
             const detailData = await safeFetchJson(detailRes);
             const parsedDetail = extractReportData(detailData);
             if (parsedDetail) {
+              const hasSynthesis = Boolean(parsedDetail.expertDecisionSynthesis);
+              const isModern = hasSynthesis && ((parsedDetail as any).schemaVersion || 1) >= 2;
+              if (!isModern && !force) {
+                // Silently auto-refresh in background without user click/button
+                return fetchStructuredReport(true);
+              }
               setStructuredReport(parsedDetail);
               if (typeof window !== "undefined") {
                 try {
@@ -725,6 +731,7 @@ export default function VehicleDetail() {
             {structuredReport ? (
               <VehicleReportShell 
                 report={structuredReport} 
+                onRefresh={() => fetchStructuredReport(true)}
               />
             ) : (
               <div className="bg-gradient-to-b from-slate-900/90 via-slate-900/70 to-slate-950/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-md space-y-6">
