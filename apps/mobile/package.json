@@ -7,6 +7,7 @@
     "start": "expo start",
     "tunnel": "git pull origin main && expo start --tunnel -c",
     "sync": "node ../../scripts/git-auto-sync.js",
+    "deploy:update": "eas update --branch main",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
