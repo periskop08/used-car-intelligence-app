@@ -1117,8 +1117,6 @@ export default function VehicleReportScreen() {
     deductedRisks: Array.isArray(rawScoreObj.deductedRisks) ? rawScoreObj.deductedRisks : [],
   } : null;
 
-  const numScore = decisionScore?.score ?? rawBuyability;
-  const scoreState = decisionScore?.state || (numScore >= 90 ? 'EXCELLENT' : numScore >= 78 ? 'GOOD' : numScore >= 65 ? 'CAUTION' : numScore >= 48 ? 'HIGH_RISK' : 'AVOID');
   const deductedRisks = (decisionScore?.deductedRisks || []) as any[];
   const totalRiskPenalty = deductedRisks.reduce((acc: number, r: any) => {
     const d = typeof r.netDeduction === 'number' && r.netDeduction > 0
@@ -1130,6 +1128,19 @@ export default function VehicleReportScreen() {
       : 0;
     return acc + d;
   }, 0);
+
+  const isInsufficient = Boolean(
+    decisionScore && (decisionScore.confidenceScore < 40 || decisionScore.score === null || decisionScore.state === 'INSUFFICIENT_DATA')
+  );
+
+  const displayedScore = isInsufficient
+    ? '—'
+    : totalRiskPenalty > 0
+    ? Math.max(0, 100 - totalRiskPenalty)
+    : (decisionScore?.score ?? rawBuyability);
+
+  const numScore = typeof displayedScore === 'number' ? displayedScore : (decisionScore?.score ?? rawBuyability);
+  const scoreState = decisionScore?.state || (numScore >= 90 ? 'EXCELLENT' : numScore >= 78 ? 'GOOD' : numScore >= 65 ? 'CAUTION' : numScore >= 48 ? 'HIGH_RISK' : 'AVOID');
 
   const getStateConfig = (state?: string) => {
     switch (state) {
@@ -1180,7 +1191,7 @@ export default function VehicleReportScreen() {
         };
       default:
         return {
-          label: 'Dengeli Tercih',
+          label: 'Puanlama İçin Yeterli Doğrulanmış Veri Bulunamadı',
           color: '#1e40af',
           bg: '#eff6ff',
           border: '#bfdbfe',
@@ -1193,9 +1204,15 @@ export default function VehicleReportScreen() {
   };
 
   const stateCfg = getStateConfig(scoreState);
-  const harmonizedVerdict = (numScore >= 90 || scoreState === 'EXCELLENT')
+  const harmonizedVerdict = isInsufficient
+    ? 'Bu araç hakkında çeşitli arıza ve kullanıcı bildirimleri bulunabilir; ancak bunların sıklığını ve bu araç varyantına uygulanabilirliğini güvenilir şekilde doğrulayamadığımız için yanıltıcı bir puan vermiyoruz.'
+    : (numScore >= 90 || scoreState === 'EXCELLENT')
     ? 'Sınıfında referans kondisyonda, kontrolleri teyit edilerek doğrudan değerlendirilebilir.'
-    : ((report?.finalVerdict as any)?.shortVerdict || (report as any)?.finalConditionalVerdict?.shortVerdict || report?.expertDecisionSynthesis?.finalConditionalVerdict?.shortVerdict || stateCfg.verdict);
+    : (numScore >= 70 || scoreState === 'GOOD')
+    ? 'Dengeli kondisyonda, belirli kontrollerin sağlanması ve ekspertiz teyidi şartıyla değerlendirilebilir.'
+    : (numScore >= 50 || scoreState === 'CAUTION')
+    ? 'Riskli kondisyonda, kapsamlı ekspertiz ve mekanik kontroller sağlanmadan karar verilmemelidir.'
+    : 'Ağır riskli kondisyonda, yüksek maliyetli kronik arıza riskleri nedeniyle uzak durulması önerilir.';
 
   const reportCode = `TS-${report?.vehicleIdentity?.modelYear || new Date().getFullYear()}-${String(report?.vehicleIdentity?.brand || 'CAR').substring(0, 3).toUpperCase()}-${report?.vehicleIdentity?.engineCode || 'SPEC'}`;
 
@@ -1969,45 +1986,30 @@ export default function VehicleReportScreen() {
             </CollapsibleLightSection>
           )}
 
-          {/* SCORE SECTION: 100-POINT DECISION SCORE & FMEA BREAKDOWN */}
-          <View style={styles.scoresGridLight}>
-            {/* Alınabilirlik Skoru */}
-            <View style={[styles.scoreCardLight, { backgroundColor: stateCfg.bg, borderColor: stateCfg.border }]}>
-              <View style={styles.scoreHeaderLightRow}>
-                <Text style={[styles.scoreTitleLight, { color: stateCfg.color }]}>Alınabilirlik Skoru</Text>
-                <Ionicons name={stateCfg.icon} size={20} color={stateCfg.color} />
+          {/* SCORE SECTION: ALINABİLİRLİK SKORU (Web ile %100 Birebir Eşleşme) */}
+          <View style={[styles.scoreHeroCardLight, { backgroundColor: '#ffffff', borderColor: stateCfg.border }]}>
+            <View style={styles.scoreHeroTopRow}>
+              {/* Sol: Alınabilirlik Skoru Kutusu */}
+              <View style={[styles.scoreBoxCompactLight, { backgroundColor: stateCfg.bg, borderColor: stateCfg.border }]}>
+                <Text style={[styles.scoreBoxCompactLabel, { color: stateCfg.color }]}>ALINABİLİRLİK SKORU</Text>
+                <Text style={[styles.scoreBoxCompactVal, { color: stateCfg.color }]}>
+                  {isInsufficient ? '—' : `${numScore} / 100`}
+                </Text>
               </View>
-              <Text style={[styles.scoreBigValLight, { color: stateCfg.color }]}>{numScore} / 100</Text>
-              <View style={{ alignSelf: 'flex-start', backgroundColor: stateCfg.badgeBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 2 }}>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: stateCfg.badgeText }}>{stateCfg.label}</Text>
-              </View>
-            </View>
 
-            {/* Model Karar Riski */}
-            <View style={[styles.scoreCardLight, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
-              <View style={styles.scoreHeaderLightRow}>
-                <Text style={[styles.scoreTitleLight, { color: '#c2410c' }]}>Model Karar Riski</Text>
-                <Ionicons name="warning" size={20} color="#f97316" />
+              {/* Sağ: Rozet & Uyumlu Karar Cümlesi */}
+              <View style={styles.scoreHeroRightCol}>
+                <View style={[styles.scoreHeroBadgeLight, { backgroundColor: stateCfg.badgeBg, borderColor: stateCfg.border }]}>
+                  <Text style={[styles.scoreHeroBadgeTextLight, { color: stateCfg.badgeText }]}>
+                    {stateCfg.label}
+                  </Text>
+                </View>
+                <Text style={styles.scoreHeroVerdictTextLight}>
+                  {harmonizedVerdict}
+                </Text>
               </View>
-              <Text style={[styles.scoreBigValLight, { color: '#ea580c' }]}>
-                {decisionScore?.modelDecisionRisk !== undefined ? `${decisionScore.modelDecisionRisk} / 100` : `${rawRisk} / 100`}
-              </Text>
-              <Text style={[styles.scoreSubLight, { color: '#9a3412' }]}>
-                {(decisionScore?.modelDecisionRisk ?? rawRisk) > 40 ? '⚠️ İnceleme Gerekli' : 'Dengeli Risk Seviyesi'}
-              </Text>
             </View>
           </View>
-
-          {/* HARMONIZED SHORT VERDICT BANNER */}
-          {Boolean(harmonizedVerdict) && (
-            <View style={[styles.verdictBannerLight, { backgroundColor: stateCfg.bg, borderColor: stateCfg.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <Ionicons name={stateCfg.icon} size={16} color={stateCfg.color} />
-                <Text style={[styles.verdictBannerTitle, { color: stateCfg.color }]}>Nihai Uzman Kararı</Text>
-              </View>
-              <Text style={styles.verdictBannerText}>{harmonizedVerdict}</Text>
-            </View>
-          )}
 
           {/* NEDEN PUAN KIRILDI? (FMEA KESİNTİLERİ LİSTESİ) */}
           {deductedRisks.length > 0 && (
@@ -2594,45 +2596,60 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  scoreCardLight: {
-    flex: 1,
+  // Web-Matching Score Hero Card
+  scoreHeroCardLight: {
     borderWidth: 1,
     borderRadius: 18,
-    padding: 14,
-    gap: 4,
-    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
   },
-  scoreHeaderLightRow: {
+  scoreHeroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 14,
   },
-  scoreTitleLight: {
-    fontSize: 11,
+  scoreBoxCompactLight: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 110,
+  },
+  scoreBoxCompactLabel: {
+    fontSize: 9,
     fontWeight: '800',
-    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
-  scoreBigValLight: {
+  scoreBoxCompactVal: {
     fontSize: 22,
     fontWeight: '900',
-    marginVertical: 4,
   },
-  scoreSubLight: {
-    fontSize: 10,
-    fontWeight: '700',
+  scoreHeroRightCol: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 6,
   },
-  verdictBannerLight: {
+  scoreHeroBadgeLight: {
+    alignSelf: 'flex-start',
     borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
-    marginVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  verdictBannerTitle: {
+  scoreHeroBadgeTextLight: {
     fontSize: 11,
     fontWeight: '800',
-    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
-  verdictBannerText: {
+  scoreHeroVerdictTextLight: {
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '600',
