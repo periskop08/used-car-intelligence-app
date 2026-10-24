@@ -43,4 +43,6 @@ jobs:
 
       - name: 📱 Publish EAS Update
         working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: npx eas-cli update --branch main --message "Auto-deploy via GitHub Actions" --non-interactive
