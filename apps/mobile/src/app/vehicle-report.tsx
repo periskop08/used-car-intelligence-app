@@ -31,7 +31,7 @@ import {
 } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
-const API_URL = 'https://used-car-api-hzmu.onrender.com';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://used-car-api-hzmu.onrender.com';
 
 const cleanRangeText = (text?: string): string => {
   if (!text) return '';
@@ -108,9 +108,12 @@ const extractReportData = (data: any): ComprehensiveVehicleReport | null => {
     return {
       ...payload,
       vehicleType: detectedType,
-      reportId: data.id || payload.reportId || payload.id,
+      reportId: data.id || data.reportId || payload.reportId || payload.id,
+      id: data.id || data.reportId || payload.reportId || payload.id,
       likeCount: data.likeCount ?? payload.likeCount ?? 0,
       dislikeCount: data.dislikeCount ?? payload.dislikeCount ?? 0,
+      createdAt: data.createdAt || payload.createdAt,
+      generatedAt: data.createdAt || data.generatedAt || payload.generatedAt || payload.createdAt,
     } as ComprehensiveVehicleReport;
   }
   return null;
@@ -359,6 +362,84 @@ export default function VehicleReportScreen() {
       await fetchReport(activeVariantId, true);
     } finally {
       setRefreshing(false);
+    }
+  };
+  // User Like / Dislike Feedback State (Web ile %100 Uyumlu)
+  const [resolvedReportId, setResolvedReportId] = useState<string | null>(null);
+  const currentReportId = resolvedReportId || (report as any)?.reportId || (report as any)?.id || (params?.reportId as string) || null;
+  const [likes, setLikes] = useState<number>(0);
+  const [dislikes, setDislikes] = useState<number>(0);
+  const [userVote, setUserVote] = useState<'LIKE' | 'DISLIKE' | null>(null);
+  const [isVoting, setIsVoting] = useState(false);
+
+  useEffect(() => {
+    if (report) {
+      setLikes((report as any).likeCount ?? 0);
+      setDislikes((report as any).dislikeCount ?? 0);
+      const repId = (report as any)?.reportId || (report as any)?.id;
+      if (repId) setResolvedReportId(repId);
+    }
+  }, [(report as any)?.likeCount, (report as any)?.dislikeCount, (report as any)?.reportId, (report as any)?.id]);
+
+  useEffect(() => {
+    if (currentReportId) {
+      AsyncStorage.getItem(`report_vote_${currentReportId}`).then((stored) => {
+        if (stored === 'LIKE' || stored === 'DISLIKE') {
+          setUserVote(stored as 'LIKE' | 'DISLIKE');
+        } else {
+          setUserVote(null);
+        }
+      }).catch(() => {});
+    }
+  }, [currentReportId]);
+
+  const handleVote = async (type: 'LIKE' | 'DISLIKE') => {
+    if (!currentReportId || isVoting) return;
+    if (userVote === type) return;
+
+    setIsVoting(true);
+    const prevVote = userVote;
+    const prevLikes = likes;
+    const prevDislikes = dislikes;
+
+    if (type === 'LIKE') {
+      setLikes((l) => l + 1);
+      if (prevVote === 'DISLIKE') setDislikes((d) => Math.max(0, d - 1));
+    } else {
+      setDislikes((d) => d + 1);
+      if (prevVote === 'LIKE') setLikes((l) => Math.max(0, l - 1));
+    }
+    setUserVote(type);
+
+    try {
+      let voterToken = await AsyncStorage.getItem('ts_voter_token');
+      if (!voterToken) {
+        voterToken = 'vt_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+        await AsyncStorage.setItem('ts_voter_token', voterToken);
+      }
+
+      const res = await fetch(`${API_URL}/vehicle-reports/${currentReportId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vote: type, voterToken }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setLikes(data.likeCount ?? 0);
+        setDislikes(data.dislikeCount ?? 0);
+        await AsyncStorage.setItem(`report_vote_${currentReportId}`, type);
+      } else {
+        setLikes(prevLikes);
+        setDislikes(prevDislikes);
+        setUserVote(prevVote);
+      }
+    } catch {
+      setLikes(prevLikes);
+      setDislikes(prevDislikes);
+      setUserVote(prevVote);
+    } finally {
+      setIsVoting(false);
     }
   };
 
@@ -1227,6 +1308,15 @@ export default function VehicleReportScreen() {
 
   const reportCode = `TS-${report?.vehicleIdentity?.modelYear || new Date().getFullYear()}-${String(report?.vehicleIdentity?.brand || 'CAR').substring(0, 3).toUpperCase()}-${report?.vehicleIdentity?.engineCode || 'SPEC'}`;
 
+  const reportDateStr = (() => {
+    try {
+      const d = (report as any)?.generatedAt || (report as any)?.createdAt;
+      return d ? new Date(d).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR');
+    } catch {
+      return new Date().toLocaleDateString('tr-TR');
+    }
+  })();
+
   const rawPurchase = (report?.expertDecisionSynthesis as any)?.purchaseConditions || (report?.finalVerdict as any)?.proceedIf || [];
   const purchaseConditions = (Array.isArray(rawPurchase) ? rawPurchase : [rawPurchase])
     .map((item: any) => {
@@ -1376,6 +1466,69 @@ export default function VehicleReportScreen() {
 
           {/* 1. TOP HERO VEHICLE IDENTITY CARD WITH BRAND LOGO */}
           <View style={styles.heroCardLight}>
+            {/* Top Badge & Date + Like/Dislike Voting Widget (Web ile %100 Birebir) */}
+            <View style={styles.heroTopBadgeRow}>
+              <View style={styles.heroBadgeAndDate}>
+                <View style={styles.reportTypeBadge}>
+                  <Text style={styles.reportTypeBadgeText}>Araç Sorgulama Raporu</Text>
+                </View>
+                <Text style={styles.reportDateText}>Rapor Tarihi: {reportDateStr}</Text>
+              </View>
+
+              {/* Subtle Like / Dislike Voting Widget */}
+              <View style={styles.voteWidgetLight}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleVote('LIKE')}
+                  disabled={isVoting || !currentReportId}
+                  style={[
+                    styles.voteBtnLight,
+                    userVote === 'LIKE' && styles.voteBtnLikeActive,
+                  ]}
+                >
+                  <Ionicons
+                    name={userVote === 'LIKE' ? 'thumbs-up' : 'thumbs-up-outline'}
+                    size={13}
+                    color={userVote === 'LIKE' ? '#059669' : '#64748b'}
+                  />
+                  <Text
+                    style={[
+                      styles.voteCountTextLight,
+                      userVote === 'LIKE' && styles.voteCountLikeActive,
+                    ]}
+                  >
+                    {likes}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.voteDividerLight} />
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleVote('DISLIKE')}
+                  disabled={isVoting || !currentReportId}
+                  style={[
+                    styles.voteBtnLight,
+                    userVote === 'DISLIKE' && styles.voteBtnDislikeActive,
+                  ]}
+                >
+                  <Ionicons
+                    name={userVote === 'DISLIKE' ? 'thumbs-down' : 'thumbs-down-outline'}
+                    size={13}
+                    color={userVote === 'DISLIKE' ? '#e11d48' : '#64748b'}
+                  />
+                  <Text
+                    style={[
+                      styles.voteCountTextLight,
+                      userVote === 'DISLIKE' && styles.voteCountDislikeActive,
+                    ]}
+                  >
+                    {dislikes}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <View style={styles.heroTopRow}>
               {/* Brand Logo Container */}
               <BrandLogoContainer brandName={report.vehicleIdentity.brand} isMotorcycle={isMotorcycle} />
@@ -1442,12 +1595,14 @@ export default function VehicleReportScreen() {
               )}
             </View>
 
-            {/* Footer Row */}
+            {/* Footer Row: Rapor ID */}
             <View style={styles.heroFooterRow}>
-              <Text style={styles.reportCodeText}>Rapor ID: {reportCode}</Text>
-              <TouchableOpacity onPress={() => Alert.alert('Kopyalandı', 'Rapor ID kopyalandı.')}>
-                <Ionicons name="copy-outline" size={14} color="#64748b" />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.reportCodeText}>Rapor ID: {reportCode}</Text>
+                <TouchableOpacity onPress={() => Alert.alert('Kopyalandı', 'Rapor ID kopyalandı.')}>
+                  <Ionicons name="copy-outline" size={13} color="#64748b" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
@@ -2194,6 +2349,66 @@ export default function VehicleReportScreen() {
             subtitle={`${report.vehicleIdentity.brand} ${report.vehicleIdentity.model} için onaylı yetkili/özel servisler ve ekspertiz noktaları`}
           />
 
+          {/* FEEDBACK & HELPFULNESS CARD (Alt Geri Bildirim Bölümü) */}
+          <View style={styles.feedbackCardLight}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.feedbackCardTitleLight}>Rapor Faydalı Oldu mu?</Text>
+              <Text style={styles.feedbackCardDescLight}>Değerlendirmeniz algoritmanın gelişmesine katkı sağlar.</Text>
+            </View>
+
+            <View style={styles.voteWidgetLight}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleVote('LIKE')}
+                disabled={isVoting || !currentReportId}
+                style={[
+                  styles.voteBtnLight,
+                  userVote === 'LIKE' && styles.voteBtnLikeActive,
+                ]}
+              >
+                <Ionicons
+                  name={userVote === 'LIKE' ? 'thumbs-up' : 'thumbs-up-outline'}
+                  size={14}
+                  color={userVote === 'LIKE' ? '#059669' : '#64748b'}
+                />
+                <Text
+                  style={[
+                    styles.voteCountTextLight,
+                    userVote === 'LIKE' && styles.voteCountLikeActive,
+                  ]}
+                >
+                  {likes}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.voteDividerLight} />
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleVote('DISLIKE')}
+                disabled={isVoting || !currentReportId}
+                style={[
+                  styles.voteBtnLight,
+                  userVote === 'DISLIKE' && styles.voteBtnDislikeActive,
+                ]}
+              >
+                <Ionicons
+                  name={userVote === 'DISLIKE' ? 'thumbs-down' : 'thumbs-down-outline'}
+                  size={14}
+                  color={userVote === 'DISLIKE' ? '#e11d48' : '#64748b'}
+                />
+                <Text
+                  style={[
+                    styles.voteCountTextLight,
+                    userVote === 'DISLIKE' && styles.voteCountDislikeActive,
+                  ]}
+                >
+                  {dislikes}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Bottom Disclaimer Banner */}
           <View style={styles.bottomBannerLight}>
             <Ionicons name="information-circle" size={20} color="#2563eb" />
@@ -2599,6 +2814,42 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0369a1',
   },
+  // Hero Top Badge Row & Date
+  heroTopBadgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    gap: 8,
+  },
+  heroBadgeAndDate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    flex: 1,
+  },
+  reportTypeBadge: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+  },
+  reportTypeBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#2563eb',
+  },
+  reportDateText: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+
   heroFooterRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2611,6 +2862,70 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#64748b',
     fontWeight: '600',
+  },
+
+  // Subtle Like / Dislike Voting Widget (Web ile Birebir)
+  voteWidgetLight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 3,
+    paddingVertical: 2,
+    gap: 2,
+  },
+  voteBtnLight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  voteBtnLikeActive: {
+    backgroundColor: '#dcfce7',
+  },
+  voteBtnDislikeActive: {
+    backgroundColor: '#ffe4e6',
+  },
+  voteCountTextLight: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  voteCountLikeActive: {
+    color: '#059669',
+  },
+  voteCountDislikeActive: {
+    color: '#e11d48',
+  },
+  voteDividerLight: {
+    width: 1,
+    height: 12,
+    backgroundColor: '#cbd5e1',
+  },
+  feedbackCardLight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 14,
+    marginTop: 10,
+    gap: 12,
+  },
+  feedbackCardTitleLight: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  feedbackCardDescLight: {
+    fontSize: 11,
+    color: '#64748b',
   },
 
   // 100-Point Scores Grid
