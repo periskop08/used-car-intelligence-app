@@ -15,6 +15,7 @@ import {
   Platform,
   Animated,
   PanResponder,
+  RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -345,11 +346,21 @@ export default function VehicleReportScreen() {
   const [activeVariantId, setActiveVariantId] = useState<string | null>(rawVariantId);
   const [report, setReport] = useState<ComprehensiveVehicleReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [activeModalData, setActiveModalData] = useState<ModalDetailData | null>(null);
   const [pipelineStep, setPipelineStep] = useState(1);
   const skeletonOpacity = useRef(new Animated.Value(0.4)).current;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchReport(activeVariantId, true);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // AI Chatbot States & Live Rights Integration
   const [isChatModalVisible, setIsChatModalVisible] = useState(false);
@@ -832,7 +843,7 @@ export default function VehicleReportScreen() {
         reportPayload.variantId = finalVariantId;
       }
 
-      const res = await fetch(`${API_URL}/vehicle-reports`, {
+      const res = await fetch(`${API_URL}/vehicle-reports?_t=${Date.now()}`, {
         method: 'POST',
         headers,
         body: JSON.stringify(reportPayload),
@@ -1320,7 +1331,18 @@ export default function VehicleReportScreen() {
       </View>
 
       {report ? (
-        <ScrollView contentContainerStyle={styles.scrollContentLight} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContentLight}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#2563eb"
+              colors={['#2563eb']}
+            />
+          }
+        >
           {/* Action Bar */}
           <View style={styles.topActionBarLight}>
             <TouchableOpacity style={styles.actionBtnLight} onPress={toggleFavorite}>

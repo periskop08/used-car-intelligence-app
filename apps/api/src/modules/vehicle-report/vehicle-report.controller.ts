@@ -13,7 +13,16 @@ export class VehicleReportController {
   }
 
   @Post()
-  async createReport(@Request() req: any, @Body() dto: CreateVehicleReportDto) {
+  async createReport(
+    @Request() req: any,
+    @Body() dto: CreateVehicleReportDto,
+    @Res({ passthrough: true }) res: any,
+  ) {
+    if (res?.setHeader) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
     return this.reportService.createVehicleReport(this.getUserId(req), dto);
   }
 
