@@ -32,10 +32,14 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+          packager: npm
 
       - name: 📦 Install Root & Workspace Dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
+
+      - name: 🔨 Build Shared Package
+        run: npm --prefix packages/shared run build
 
       - name: 📱 Publish EAS Update
         working-directory: apps/mobile
-        run: eas update --auto --non-interactive
+        run: npx eas-cli update --branch main --message "Auto-deploy via GitHub Actions" --non-interactive
