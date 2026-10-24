@@ -18,6 +18,9 @@
     }
   },
   "update": {
+    "main": {
+      "branch": "main"
+    },
     "preview": {
       "branch": "preview"
     },
