@@ -12,6 +12,12 @@
     "android": {
       "package": "com.torquescout.mobile"
     },
+    "updates": {
+      "url": "https://u.expo.dev/891b84e5-c90a-448d-be5a-6e87d7784d50"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "plugins": [
       "expo-router",
       "expo-font",
