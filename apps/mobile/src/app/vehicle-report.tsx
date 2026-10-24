@@ -297,7 +297,7 @@ function CollapsibleLightSection({
   iconBgColor,
   borderColor = '#e2e8f0',
   titleColor = '#0f172a',
-  defaultOpen = true,
+  defaultOpen = false,
   children,
 }: CollapsibleLightProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -1745,7 +1745,7 @@ export default function VehicleReportScreen() {
                 iconBgColor="#ecfeff"
                 borderColor="#a5f3fc"
                 titleColor="#0e7490"
-                defaultOpen={true}
+                defaultOpen={false}
               >
                 {Boolean(motoEra.modelHistory) && (
                   <Text style={styles.bodyTextLight}>
@@ -1872,7 +1872,7 @@ export default function VehicleReportScreen() {
                 iconBgColor="#eff6ff"
                 borderColor="#bfdbfe"
                 titleColor="#1d4ed8"
-                defaultOpen={true}
+                defaultOpen={false}
               >
                 {Boolean(commAnalysis.applicationSummary) && (
                   <Text style={styles.bodyTextLight}>
@@ -1937,7 +1937,7 @@ export default function VehicleReportScreen() {
                 iconBgColor="#f0fdf4"
                 borderColor="#bbf7d0"
                 titleColor="#15803d"
-                defaultOpen={true}
+                defaultOpen={false}
               >
                 {reasons.map((item, idx) => (
                   <TouchableOpacity
@@ -1979,7 +1979,7 @@ export default function VehicleReportScreen() {
                 iconBgColor="#fff7ed"
                 borderColor="#fed7aa"
                 titleColor="#c2410c"
-                defaultOpen={true}
+                defaultOpen={false}
               >
                 {compromises.map((item, idx) => (
                   <TouchableOpacity
@@ -2019,7 +2019,7 @@ export default function VehicleReportScreen() {
               iconBgColor="#eff6ff"
               borderColor="#bfdbfe"
               titleColor="#1d4ed8"
-              defaultOpen={true}
+              defaultOpen={false}
             >
               <View style={styles.grid2ColLight}>
                 {Boolean(suitableFor && suitableFor.length > 0) && (
@@ -2097,7 +2097,7 @@ export default function VehicleReportScreen() {
               iconBgColor="#f0fdf4"
               borderColor="#bbf7d0"
               titleColor="#15803d"
-              defaultOpen={true}
+              defaultOpen={false}
             >
               {purchaseConditions.map((cond, idx) => (
                 <TouchableOpacity
@@ -2135,7 +2135,7 @@ export default function VehicleReportScreen() {
               iconBgColor="#fef2f2"
               borderColor="#fecaca"
               titleColor="#b91c1c"
-              defaultOpen={true}
+              defaultOpen={false}
             >
               {walkAwayConditions.map((cond, idx) => (
                 <TouchableOpacity
@@ -2307,7 +2307,7 @@ export default function VehicleReportScreen() {
               iconBgColor="#f5f3ff"
               borderColor="#ddd6fe"
               titleColor="#6d28d9"
-              defaultOpen={true}
+              defaultOpen={false}
             >
               {sellerQuestions.map((q, idx) => (
                 <TouchableOpacity
