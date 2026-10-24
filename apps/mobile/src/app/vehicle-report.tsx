@@ -1618,7 +1618,7 @@ export default function VehicleReportScreen() {
               iconBgColor="#fff7ed"
               borderColor="#fed7aa"
               titleColor="#c2410c"
-              defaultOpen={true}
+              defaultOpen={false}
             >
               {Boolean(synthesis.vehicleCharacter.headline) && (
                 <Text style={styles.characterHeadlineLight}>{replacePsWithHp(synthesis.vehicleCharacter.headline)}</Text>
