@@ -33,6 +33,7 @@ import {
 } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
+import { exportVehicleReportPdf } from '../utils/vehicleReportPdfGenerator';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://used-car-api-hzmu.onrender.com';
 
@@ -440,6 +441,7 @@ export default function VehicleReportScreen() {
     used?: number;
   } | null>(null);
   const [isQuotaModalVisible, setIsQuotaModalVisible] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const chatScrollRef = useRef<ScrollView>(null);
 
   // Swipe-Down-To-Dismiss PanResponder
@@ -971,6 +973,22 @@ export default function VehicleReportScreen() {
     }
   };
 
+  const handleExportPdf = async () => {
+    if (!report || isExportingPdf) return;
+    try {
+      setIsExportingPdf(true);
+      await exportVehicleReportPdf(report);
+    } catch (error) {
+      console.error('PDF export error:', error);
+      Alert.alert(
+        'PDF Oluşturulamadı',
+        'Rapor PDF formatına dönüştürülürken bir hata oluştu. Lütfen tekrar deneyin.'
+      );
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   if (countdown !== null || (loading && !report)) {
     const pipelineStages = [
       { step: 1, title: 'Katalog & Varyant Doğrulama', desc: 'Resmi fabrika teknik verileri ve donanım paketi tespit ediliyor.' },
@@ -1409,14 +1427,58 @@ export default function VehicleReportScreen() {
         >
           {/* Action Bar */}
           <View style={styles.topActionBarLight}>
-            <TouchableOpacity style={styles.actionBtnLight} onPress={toggleFavorite}>
-              <Ionicons name={isFavorited ? 'heart' : 'heart-outline'} size={18} color={isFavorited ? '#ef4444' : '#64748b'} />
-              <Text style={styles.actionBtnTextLight}>{isFavorited ? 'Favorilerde' : 'Favorilere Ekle'}</Text>
+            <TouchableOpacity
+              style={styles.actionBtnLight}
+              onPress={toggleFavorite}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={isFavorited ? 'heart' : 'heart-outline'}
+                size={16}
+                color={isFavorited ? '#ef4444' : '#64748b'}
+              />
+              <Text
+                style={[styles.actionBtnTextLight, isFavorited && { color: '#ef4444' }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {isFavorited ? 'Favorilerde' : 'Favorilere Ekle'}
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtnLight} onPress={handleShare}>
-              <Ionicons name="share-social-outline" size={18} color="#64748b" />
-              <Text style={styles.actionBtnTextLight}>Paylaş</Text>
+            <TouchableOpacity
+              style={[styles.actionBtnLight, isExportingPdf && { opacity: 0.7 }]}
+              onPress={handleExportPdf}
+              disabled={isExportingPdf}
+              activeOpacity={0.7}
+            >
+              {isExportingPdf ? (
+                <ActivityIndicator size="small" color="#2563eb" />
+              ) : (
+                <Ionicons name="document-text-outline" size={16} color="#2563eb" />
+              )}
+              <Text
+                style={[styles.actionBtnTextLight, { color: '#2563eb' }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {isExportingPdf ? 'Hazırlanıyor' : 'PDF İndir'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionBtnLight}
+              onPress={handleShare}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="share-social-outline" size={16} color="#64748b" />
+              <Text
+                style={styles.actionBtnTextLight}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                Paylaş
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -2708,24 +2770,30 @@ const styles = StyleSheet.create({
 
   topActionBarLight: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 2,
+    gap: 8,
   },
   actionBtnLight: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 9,
+    gap: 5,
   },
   actionBtnTextLight: {
     color: '#475569',
     fontSize: 12,
     fontWeight: '700',
+    flexShrink: 1,
   },
 
   // Hero Card

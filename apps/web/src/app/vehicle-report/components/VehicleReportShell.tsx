@@ -19,6 +19,7 @@ import {
   Wrench,
   ThumbsUp,
   ThumbsDown,
+  Printer,
 } from "lucide-react";
 import { API_BASE_URL } from "@/utils/apiConfig";
 
@@ -291,7 +292,18 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           })()}
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end no-print">
+          {/* PDF / Yazdır Button */}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 text-xs font-semibold transition-all shadow-sm"
+            title="Raporu PDF olarak kaydet veya yazdır"
+          >
+            <Printer className="w-3.5 h-3.5 text-blue-400" />
+            <span>PDF / Yazdır</span>
+          </button>
+
           {/* Subtle Like / Dislike Voting Widget */}
           <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800/90 rounded-xl px-2 py-1 shadow-sm select-none">
             <button
