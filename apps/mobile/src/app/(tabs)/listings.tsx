@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { TURKEY_81_PROVINCES } from '@used-car-intelligence/shared';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
@@ -26,30 +27,9 @@ const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
 const TURKISH_CITIES = [
   'Tümü',
-  'İstanbul',
-  'Ankara',
-  'İzmir',
-  'Bursa',
-  'Antalya',
-  'Adana',
-  'Konya',
-  'Gaziantep',
-  'Kayseri',
-  'Kocaeli',
-  'Samsun',
-  'Mersin',
-  'Eskişehir',
-  'Trabzon',
-  'Diyarbakır',
-  'Muğla',
-  'Denizli',
-  'Sakarya',
-  'Tekirdağ',
-  'Balıkesir',
-  'Manisa',
-  'Aydın',
-  'Hatay',
+  ...TURKEY_81_PROVINCES,
 ];
+
 
 const FUEL_TYPES = [
   { label: 'Benzin', val: 'PETROL' },
@@ -289,6 +269,15 @@ export default function ListingsScreen() {
   const [brandPickerVisible, setBrandPickerVisible] = useState(false);
   const [modelPickerVisible, setModelPickerVisible] = useState(false);
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
+  const [citySearchQuery, setCitySearchQuery] = useState('');
+
+  const filteredCities = useMemo(() => {
+    const q = citySearchQuery.trim().toLocaleLowerCase('tr-TR');
+    if (!q) return TURKISH_CITIES;
+    return TURKISH_CITIES.filter((c) =>
+      c.toLocaleLowerCase('tr-TR').includes(q)
+    );
+  }, [citySearchQuery]);
 
   useEffect(() => {
     fetchBrands();
@@ -898,7 +887,7 @@ export default function ListingsScreen() {
             )}
             {city && city !== 'Tümü' && (
               <TouchableOpacity style={styles.filterTagPill} onPress={() => setCity('')}>
-                <Text style={styles.filterTagPillText}>{city}</Text>
+                <Text style={styles.filterTagPillText} numberOfLines={1} ellipsizeMode="tail">{city}</Text>
                 <Ionicons name="close" size={12} color="#ea580c" />
               </TouchableOpacity>
             )}
@@ -1699,24 +1688,66 @@ export default function ListingsScreen() {
         visible={cityPickerVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setCityPickerVisible(false)}
+        onRequestClose={() => {
+          setCityPickerVisible(false);
+          setCitySearchQuery('');
+        }}
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.pickerSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>İl Seçin</Text>
+              <Text style={styles.modalTitle}>İl Seçin ({TURKEY_81_PROVINCES.length} İl)</Text>
               <TouchableOpacity
                 style={styles.modalCloseCircle}
-                onPress={() => setCityPickerVisible(false)}
+                onPress={() => {
+                  setCityPickerVisible(false);
+                  setCitySearchQuery('');
+                }}
               >
                 <Ionicons name="close" size={18} color="#64748b" />
               </TouchableOpacity>
             </View>
+
+            {/* Arama Kutusu */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#f1f5f9',
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              marginHorizontal: 14,
+              marginTop: 6,
+              marginBottom: 4,
+              gap: 8,
+            }}>
+              <Ionicons name="search" size={16} color="#94a3b8" />
+              <TextInput
+                style={{
+                  flex: 1,
+                  fontSize: 13,
+                  color: '#0f172a',
+                  paddingVertical: 0,
+                }}
+                placeholder="İl ara... (Örn: Adana, Bursa)"
+                placeholderTextColor="#94a3b8"
+                value={citySearchQuery}
+                onChangeText={setCitySearchQuery}
+                autoCorrect={false}
+              />
+              {citySearchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setCitySearchQuery('')}>
+                  <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
             <ScrollView
               style={{ maxHeight: 420 }}
               contentContainerStyle={{ padding: 14, gap: 8 }}
+              keyboardShouldPersistTaps="handled"
             >
-              {TURKISH_CITIES.map((c) => {
+              {filteredCities.map((c) => {
                 const isSelected = city === c || (!city && c === 'Tümü');
                 return (
                   <TouchableOpacity
@@ -1725,13 +1756,17 @@ export default function ListingsScreen() {
                     onPress={() => {
                       setCity(c === 'Tümü' ? '' : c);
                       setCityPickerVisible(false);
+                      setCitySearchQuery('');
                     }}
                   >
                     <Text
                       style={[
                         styles.pickerItemText,
                         isSelected && styles.pickerItemTextSelected,
+                        { flexShrink: 1 },
                       ]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
                     >
                       {c}
                     </Text>
@@ -1741,6 +1776,11 @@ export default function ListingsScreen() {
                   </TouchableOpacity>
                 );
               })}
+              {filteredCities.length === 0 && (
+                <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, color: '#94a3b8' }}>Eşleşen il bulunamadı.</Text>
+                </View>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -1954,6 +1994,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#c2410c',
+    maxWidth: 140,
   },
   centerLoading: {
     flex: 1,

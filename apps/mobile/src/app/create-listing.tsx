@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { TURKEY_81_PROVINCES, getDistrictsForCity } from '@used-car-intelligence/shared';
 import UrgentBadge from '../components/UrgentBadge';
 import ShowcaseBadge from '../components/ShowcaseBadge';
 
@@ -40,31 +41,7 @@ const parseNumberInput = (val: string): string => {
   return val.replace(/\D/g, '');
 };
 
-const TURKISH_CITIES = [
-  'İstanbul',
-  'Ankara',
-  'İzmir',
-  'Bursa',
-  'Antalya',
-  'Adana',
-  'Konya',
-  'Gaziantep',
-  'Kayseri',
-  'Kocaeli',
-  'Samsun',
-  'Mersin',
-  'Eskişehir',
-  'Trabzon',
-  'Diyarbakır',
-  'Muğla',
-  'Denizli',
-  'Sakarya',
-  'Tekirdağ',
-  'Balıkesir',
-  'Manisa',
-  'Aydın',
-  'Hatay',
-];
+const TURKISH_CITIES = TURKEY_81_PROVINCES;
 
 const BODY_TYPE_LABELS: Record<string, string> = {
   SEDAN: 'Sedan',
@@ -321,6 +298,7 @@ export default function CreateListingScreen() {
     | 'transmission'
     | 'trim'
     | 'city'
+    | 'district'
     | null
   >(null);
   const [pickerSearch, setPickerSearch] = useState('');
@@ -1032,8 +1010,12 @@ export default function CreateListingScreen() {
       title = 'Donanım Paketi Seçin';
       list = trims;
     } else if (activePicker === 'city') {
-      title = 'Şehir Seçin';
+      title = 'Şehir Seçin (81 İl)';
       list = TURKISH_CITIES.map((c) => ({ label: c, value: c }));
+    } else if (activePicker === 'district') {
+      title = city ? `${city} İlçeleri` : 'İlçe Seçin';
+      const districts = getDistrictsForCity(city);
+      list = districts.map((d) => ({ label: d, value: d }));
     }
 
     if (pickerSearch.trim()) {
@@ -1054,6 +1036,7 @@ export default function CreateListingScreen() {
     transmissions,
     trims,
     selectedBrand,
+    city,
   ]);
 
   const handleSelectPickerOption = (val: string) => {
@@ -1079,6 +1062,9 @@ export default function CreateListingScreen() {
       handleTrimChange(val);
     } else if (currentPicker === 'city') {
       setCity(val);
+      setDistrict('');
+    } else if (currentPicker === 'district') {
+      setDistrict(val);
     }
   };
 
@@ -1490,7 +1476,7 @@ export default function CreateListingScreen() {
             {/* Şehir & İlçe */}
             <View style={styles.rowTwoCols}>
               <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.inputLabel}>Şehir *</Text>
+                <Text style={styles.inputLabel}>Şehir (81 İl) *</Text>
                 <TouchableOpacity
                   style={styles.selectorBtn}
                   onPress={() => {
@@ -1498,7 +1484,11 @@ export default function CreateListingScreen() {
                     setActivePicker('city');
                   }}
                 >
-                  <Text style={[styles.selectorBtnText, !!city && styles.selectorSelectedText]}>
+                  <Text
+                    style={[styles.selectorBtnText, !!city && styles.selectorSelectedText]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
                     {city || 'Şehir Seçin'}
                   </Text>
                   <Ionicons name="chevron-down" size={16} color="#94a3b8" />
@@ -1506,13 +1496,23 @@ export default function CreateListingScreen() {
               </View>
               <View style={[styles.inputGroup, { flex: 1 }]}>
                 <Text style={styles.inputLabel}>İlçe (Opsiyonel)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Örn: Kadıköy"
-                  placeholderTextColor="#94a3b8"
-                  value={district}
-                  onChangeText={setDistrict}
-                />
+                <TouchableOpacity
+                  style={[styles.selectorBtn, !city && { opacity: 0.6 }]}
+                  disabled={!city}
+                  onPress={() => {
+                    setPickerSearch('');
+                    setActivePicker('district');
+                  }}
+                >
+                  <Text
+                    style={[styles.selectorBtnText, !!district && styles.selectorSelectedText]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {district || (city ? 'İlçe Seçin' : 'Önce İl Seçin')}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -1961,7 +1961,8 @@ export default function CreateListingScreen() {
                       (activePicker === 'fuelType' && selectedFuelType === item.value) ||
                       (activePicker === 'transmission' && selectedTransmission === item.value) ||
                       (activePicker === 'trim' && selectedTrim === item.value) ||
-                      (activePicker === 'city' && city === item.value);
+                      (activePicker === 'city' && city === item.value) ||
+                      (activePicker === 'district' && district === item.value);
 
                     return (
                       <TouchableOpacity

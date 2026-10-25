@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   KeyboardAvoidingView,
   Switch,
@@ -16,6 +17,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { TURKEY_81_PROVINCES, getDistrictsForCity } from '@used-car-intelligence/shared';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -30,11 +32,7 @@ const parseNumberInput = (val: string): string => {
   return val.replace(/\D/g, '');
 };
 
-const TURKISH_CITIES = [
-  'İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Antalya', 'Adana', 'Konya',
-  'Gaziantep', 'Kayseri', 'Kocaeli', 'Samsun', 'Mersin', 'Eskişehir',
-  'Trabzon', 'Diyarbakır', 'Muğla', 'Denizli', 'Sakarya', 'Tekirdağ',
-];
+const TURKISH_CITIES = TURKEY_81_PROVINCES;
 
 export default function EditListingScreen() {
   const router = useRouter();
@@ -57,6 +55,41 @@ export default function EditListingScreen() {
   const [exchangeable, setExchangeable] = useState(false);
   const [hasWarranty, setHasWarranty] = useState(false);
   const [status, setStatus] = useState<'ACTIVE' | 'PASSIVE'>('ACTIVE');
+
+  // Picker Modal State (City & District)
+  const [activePicker, setActivePicker] = useState<'city' | 'district' | null>(null);
+  const [pickerSearch, setPickerSearch] = useState('');
+
+  const pickerData = useMemo(() => {
+    let title = '';
+    let list: string[] = [];
+
+    if (activePicker === 'city') {
+      title = 'Şehir Seçin (81 İl)';
+      list = TURKISH_CITIES;
+    } else if (activePicker === 'district') {
+      title = city ? `${city} İlçeleri` : 'İlçe Seçin';
+      list = city ? getDistrictsForCity(city) : [];
+    }
+
+    if (pickerSearch.trim()) {
+      const q = pickerSearch.trim().toLocaleLowerCase('tr-TR');
+      list = list.filter((item) => item.toLocaleLowerCase('tr-TR').includes(q));
+    }
+
+    return { title, list };
+  }, [activePicker, pickerSearch, city]);
+
+  const handleSelectPicker = (val: string) => {
+    if (activePicker === 'city') {
+      setCity(val);
+      setDistrict('');
+    } else if (activePicker === 'district') {
+      setDistrict(val);
+    }
+    setActivePicker(null);
+    setPickerSearch('');
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -340,25 +373,44 @@ export default function EditListingScreen() {
             <View style={styles.cardBox}>
               <View style={styles.rowInputs}>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.inputLabel}>Şehir</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={city}
-                    onChangeText={setCity}
-                    placeholder="Örn: İstanbul"
-                    placeholderTextColor="#94a3b8"
-                  />
+                  <Text style={styles.inputLabel}>Şehir (81 İl)</Text>
+                  <TouchableOpacity
+                    style={styles.selectorBtn}
+                    onPress={() => {
+                      setPickerSearch('');
+                      setActivePicker('city');
+                    }}
+                  >
+                    <Text
+                      style={[styles.selectorBtnText, !!city && styles.selectorSelectedText]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {city || 'Şehir Seçin'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+                  </TouchableOpacity>
                 </View>
 
                 <View style={[styles.inputGroup, { flex: 1 }]}>
                   <Text style={styles.inputLabel}>İlçe</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={district}
-                    onChangeText={setDistrict}
-                    placeholder="Örn: Kadıköy"
-                    placeholderTextColor="#94a3b8"
-                  />
+                  <TouchableOpacity
+                    style={[styles.selectorBtn, !city && { opacity: 0.6 }]}
+                    disabled={!city}
+                    onPress={() => {
+                      setPickerSearch('');
+                      setActivePicker('district');
+                    }}
+                  >
+                    <Text
+                      style={[styles.selectorBtnText, !!district && styles.selectorSelectedText]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {district || (city ? 'İlçe Seçin' : 'Önce İl Seçin')}
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -470,6 +522,96 @@ export default function EditListingScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* PICKER MODAL SHEET */}
+      <Modal
+        visible={!!activePicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          setActivePicker(null);
+          setPickerSearch('');
+        }}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.pickerSheet}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{pickerData.title}</Text>
+              <TouchableOpacity
+                style={styles.modalCloseCircle}
+                onPress={() => {
+                  setActivePicker(null);
+                  setPickerSearch('');
+                }}
+              >
+                <Ionicons name="close" size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Bar */}
+            <View style={styles.modalSearchBox}>
+              <Ionicons name="search" size={16} color="#94a3b8" />
+              <TextInput
+                style={styles.modalSearchInput}
+                placeholder="Ara..."
+                placeholderTextColor="#94a3b8"
+                value={pickerSearch}
+                onChangeText={setPickerSearch}
+                autoCorrect={false}
+              />
+              {pickerSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setPickerSearch('')}>
+                  <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Option List */}
+            <ScrollView
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 8 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {pickerData.list.length > 0 ? (
+                pickerData.list.map((item) => {
+                  const isSelected =
+                    (activePicker === 'city' && city === item) ||
+                    (activePicker === 'district' && district === item);
+
+                  return (
+                    <TouchableOpacity
+                      key={item}
+                      style={[styles.pickerOption, isSelected && styles.pickerOptionActive]}
+                      onPress={() => handleSelectPicker(item)}
+                    >
+                      <Text
+                        style={[
+                          styles.pickerOptionText,
+                          isSelected && styles.pickerOptionTextActive,
+                          { flexShrink: 1 },
+                        ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {item}
+                      </Text>
+                      {isSelected && (
+                        <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <View style={{ paddingVertical: 32, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, color: '#94a3b8' }}>Sonuç bulunamadı.</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -711,5 +853,103 @@ const styles = StyleSheet.create({
     color: '#dc2626',
     fontSize: 14,
     fontWeight: '800',
+  },
+  selectorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 44,
+  },
+  selectorBtnText: {
+    fontSize: 13,
+    color: '#94a3b8',
+    flexShrink: 1,
+  },
+  selectorSelectedText: {
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 16,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  modalCloseCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  modalSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0f172a',
+    paddingVertical: 0,
+  },
+  pickerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  pickerOptionActive: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#ea580c',
+  },
+  pickerOptionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  pickerOptionTextActive: {
+    color: '#ea580c',
+    fontWeight: '700',
   },
 });
