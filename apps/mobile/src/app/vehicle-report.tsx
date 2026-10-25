@@ -32,6 +32,7 @@ import {
   getBrandMonogram,
 } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
+import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://used-car-api-hzmu.onrender.com';
 
@@ -438,6 +439,7 @@ export default function VehicleReportScreen() {
     totalLimit?: number;
     used?: number;
   } | null>(null);
+  const [isQuotaModalVisible, setIsQuotaModalVisible] = useState(false);
   const chatScrollRef = useRef<ScrollView>(null);
 
   // Swipe-Down-To-Dismiss PanResponder
@@ -588,14 +590,7 @@ export default function VehicleReportScreen() {
 
       // Pre-check quota locally if loaded and not unlimited
       if (userRights && !userRights.isUnlimited && (userRights.remaining ?? 0) <= 0) {
-        Alert.alert(
-          'Soru Hakkınız Doldu',
-          'Mevcut AI Chatbot soru limitinizi doldurdunuz. Ek soru hakkı almak veya paketinizi yükseltmek için paketler sayfasını ziyaret edin.',
-          [
-            { text: 'Kapat', style: 'cancel' },
-            { text: 'Paketleri İncele', onPress: () => router.push('/(tabs)/packages') },
-          ]
-        );
+        setIsQuotaModalVisible(true);
         return;
       }
 
@@ -623,10 +618,7 @@ export default function VehicleReportScreen() {
         const errMsg = errJson.message || 'Yapay zeka yanıt veremedi. Lütfen tekrar deneyin.';
         setChatError(errMsg);
         if (res.status === 403) {
-          Alert.alert('Limit Uyarısı', errMsg, [
-            { text: 'Kapat', style: 'cancel' },
-            { text: 'Paketleri İncele', onPress: () => router.push('/(tabs)/packages') },
-          ]);
+          setIsQuotaModalVisible(true);
         }
       } else {
         const data = await res.json();
@@ -2510,8 +2502,7 @@ export default function VehicleReportScreen() {
                 </Text>
                 <TouchableOpacity
                   onPress={() => {
-                    setIsChatModalVisible(false);
-                    router.push('/(tabs)/packages');
+                    setIsQuotaModalVisible(true);
                   }}
                   style={styles.chatQuotaPackageBtn}
                 >
@@ -2657,6 +2648,12 @@ export default function VehicleReportScreen() {
           </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Centered Quota Exhaustion Modal (Alıcı Mini Banner) */}
+      <QuotaExhaustionModal
+        visible={isQuotaModalVisible}
+        onClose={() => setIsQuotaModalVisible(false)}
+      />
     </View>
   );
 }

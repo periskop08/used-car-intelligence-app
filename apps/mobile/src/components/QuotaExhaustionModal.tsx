@@ -96,12 +96,12 @@ export default function QuotaExhaustionModal({
 
               <View style={styles.pricingRow}>
                 <View style={styles.pricingLeft}>
-                  <Text style={styles.packageName}>Alıcı Mini Paketi</Text>
-                  <Text style={styles.packageSub}>Karar aşamasındaki araçlar için ideal</Text>
+                  <Text style={styles.packageName} numberOfLines={1} ellipsizeMode="tail">Alıcı Mini Paketi</Text>
+                  <Text style={styles.packageSub} numberOfLines={1} ellipsizeMode="tail">Karar aşamasındaki araçlar için ideal</Text>
                 </View>
                 <View style={styles.pricingRight}>
-                  <Text style={styles.priceAmount}>149 TL</Text>
-                  <Text style={styles.pricePeriod}>Taahhütsüz</Text>
+                  <Text style={styles.priceAmount} numberOfLines={1}>149 TL</Text>
+                  <Text style={styles.pricePeriod} numberOfLines={1}>Taahhütsüz</Text>
                 </View>
               </View>
 
@@ -109,22 +109,22 @@ export default function QuotaExhaustionModal({
               <View style={styles.featuresList}>
                 <View style={styles.featureItem}>
                   <Ionicons name="checkmark-circle" size={16} color="#10b981" style={styles.featureIcon} />
-                  <Text style={styles.featureItemBold}>5 Kapsamlı AI Araç Analiz Raporu</Text>
+                  <Text style={styles.featureItemBold} numberOfLines={1} ellipsizeMode="tail">5 Kapsamlı AI Araç Analiz Raporu</Text>
                 </View>
 
                 <View style={styles.featureItem}>
                   <Ionicons name="checkmark-circle" size={16} color="#10b981" style={styles.featureIcon} />
-                  <Text style={styles.featureItemBold}>15 Uzman Danışman Chatbot Mesajı</Text>
+                  <Text style={styles.featureItemBold} numberOfLines={1} ellipsizeMode="tail">15 Uzman Danışman Chatbot Mesajı</Text>
                 </View>
 
                 <View style={styles.featureItem}>
                   <Ionicons name="checkmark-circle" size={16} color="#10b981" style={styles.featureIcon} />
-                  <Text style={styles.featureItemText}>Satıcıya Özel Kontrol & Pazarlık Soruları</Text>
+                  <Text style={styles.featureItemText} numberOfLines={1} ellipsizeMode="tail">Satıcıya Özel Kontrol & Pazarlık Soruları</Text>
                 </View>
 
                 <View style={styles.featureItem}>
                   <Ionicons name="checkmark-circle" size={16} color="#10b981" style={styles.featureIcon} />
-                  <Text style={styles.featureItemText}>30 Gün Boyunca Geçerli Kullanım</Text>
+                  <Text style={styles.featureItemText} numberOfLines={1} ellipsizeMode="tail">30 Gün Boyunca Geçerli Kullanım</Text>
                 </View>
               </View>
 
@@ -134,14 +134,18 @@ export default function QuotaExhaustionModal({
                 onPress={handleSelectMini}
                 activeOpacity={0.85}
               >
-                <Text style={styles.primaryBtnText}>Alıcı Mini Paketini Seç (149 TL) →</Text>
+                <Text style={styles.primaryBtnText} numberOfLines={1} ellipsizeMode="tail">
+                  Alıcı Mini Paketini Seç (149 TL) →
+                </Text>
               </TouchableOpacity>
             </View>
 
             {/* Secondary Option */}
             <View style={styles.footerRow}>
               <TouchableOpacity onPress={handleViewAllPackages} activeOpacity={0.7}>
-                <Text style={styles.secondaryLinkText}>Tüm Paketleri ve Abonelikleri İncele</Text>
+                <Text style={styles.secondaryLinkText} numberOfLines={1} ellipsizeMode="tail">
+                  Tüm Paketleri ve Abonelikleri İncele
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

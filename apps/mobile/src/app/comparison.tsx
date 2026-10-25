@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
+import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -367,6 +368,7 @@ export default function ComparisonScreen() {
   const [comparisonResponse, setComparisonResponse] = useState<any>(null);
 
   const [cachedBrands, setCachedBrands] = useState<string[]>([]);
+  const [isQuotaModalVisible, setIsQuotaModalVisible] = useState<boolean>(false);
 
   useEffect(() => {
     fetchQuota();
@@ -529,10 +531,7 @@ export default function ComparisonScreen() {
 
   const addSlot = () => {
     if (slots.length >= vehicleLimit) {
-      Alert.alert(
-        'Limit Doldu',
-        `Paketiniz kapsamında en fazla ${vehicleLimit} araç karşılaştırabilirsiniz.`
-      );
+      setIsQuotaModalVisible(true);
       return;
     }
     const newSlotId = Date.now();
@@ -845,7 +844,11 @@ export default function ComparisonScreen() {
         setActiveResultTab('matrix');
       } else {
         const errData = await res.json().catch(() => ({}));
-        Alert.alert('Karşılaştırma Uyarısı', errData.message || 'Karşılaştırma işlemi gerçekleştirilemedi.');
+        if (res.status === 403 || (errData.message && errData.message.toLowerCase().includes('kota'))) {
+          setIsQuotaModalVisible(true);
+        } else {
+          Alert.alert('Karşılaştırma Uyarısı', errData.message || 'Karşılaştırma işlemi gerçekleştirilemedi.');
+        }
       }
     } catch (e: any) {
       console.error(e);
@@ -1979,6 +1982,12 @@ export default function ComparisonScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Centered Quota Exhaustion Modal (Alıcı Mini Banner) */}
+      <QuotaExhaustionModal
+        visible={isQuotaModalVisible}
+        onClose={() => setIsQuotaModalVisible(false)}
+      />
     </View>
   );
 }
