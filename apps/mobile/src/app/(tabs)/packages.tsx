@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -155,10 +155,19 @@ const BUYER_PACKAGES: BuyerPackage[] = [
 
 export default function PackagesScreen() {
   const router = useRouter();
-  const [selectedSection, setSelectedSection] = useState<'MONTHLY' | 'BUYER'>('MONTHLY');
+  const params = useLocalSearchParams();
+  const [selectedSection, setSelectedSection] = useState<'MONTHLY' | 'BUYER'>(
+    params.initialTab === 'buyer' ? 'BUYER' : 'MONTHLY'
+  );
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (params.initialTab === 'buyer') {
+      setSelectedSection('BUYER');
+    }
+  }, [params.initialTab]);
 
   useEffect(() => {
     fetchProfile();

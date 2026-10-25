@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import QuotaExhaustionModal from '../../components/QuotaExhaustionModal';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -39,6 +40,7 @@ export default function PackageRightsScreen() {
   const [summary, setSummary] = useState<SubscriptionSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isBuyerModalVisible, setIsBuyerModalVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -237,8 +239,35 @@ export default function PackageRightsScreen() {
               </View>
             );
           })}
+
+          {/* Quick Buy Extra Packages Banner */}
+          <View style={styles.buyExtraSection}>
+            <TouchableOpacity
+              style={styles.buyExtraBtn}
+              onPress={() => setIsBuyerModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="flash" size={18} color="#ffffff" />
+              <Text style={styles.buyExtraBtnText} numberOfLines={1} ellipsizeMode="tail">
+                + Ek Araç Raporu & Mesaj Paketi Al
+              </Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       )}
+
+      {/* Quota Exhaustion / Buyer Packages Modal */}
+      <QuotaExhaustionModal
+        visible={isBuyerModalVisible}
+        onClose={() => setIsBuyerModalVisible(false)}
+        onSelectBuyerMini={() => {
+          setIsBuyerModalVisible(false);
+          router.push({
+            pathname: '/(tabs)/packages',
+            params: { initialTab: 'buyer', preselect: 'ALICI_MINI' },
+          } as any);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -247,6 +276,31 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  buyExtraSection: {
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  buyExtraBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2563eb',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 8,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  buyExtraBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
+    flexShrink: 1,
   },
   center: {
     flex: 1,

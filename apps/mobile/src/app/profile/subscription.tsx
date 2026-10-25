@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import QuotaExhaustionModal from '../../components/QuotaExhaustionModal';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -46,6 +47,7 @@ export default function SubscriptionScreen() {
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [buyerCredits, setBuyerCredits] = useState<any>(null);
+  const [isBuyerModalVisible, setIsBuyerModalVisible] = useState(false);
 
   useEffect(() => {
     fetchProfileAndCredits();
@@ -378,22 +380,36 @@ export default function SubscriptionScreen() {
               <Text style={styles.activeCreditsText}>
                 Tanımlı Ek Kredileriniz: {buyerCredits.totalRemainingReports || 0} Ek Rapor, {buyerCredits.totalRemainingChat || 0} Ek Mesaj
               </Text>
+              <TouchableOpacity
+                style={[styles.buyExtraCreditsBtn, { marginTop: 10 }]}
+                onPress={() => setIsBuyerModalVisible(true)}
+              >
+                <Text style={styles.buyExtraCreditsBtnText}>+ Yeni Ek Alıcı Paketi Yükle</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity
               style={styles.buyExtraCreditsBtn}
-              onPress={() =>
-                Alert.alert(
-                  'Ek Alıcı Paketi',
-                  'Ek AI rapor hakları satın almak için web sitemizi ziyaret edebilirsiniz.'
-                )
-              }
+              onPress={() => setIsBuyerModalVisible(true)}
             >
               <Text style={styles.buyExtraCreditsBtnText}>+ Ek Alıcı Paketi Satın Al</Text>
             </TouchableOpacity>
           )}
         </View>
       </ScrollView>
+
+      {/* Quota Exhaustion / Buyer Packages Modal */}
+      <QuotaExhaustionModal
+        visible={isBuyerModalVisible}
+        onClose={() => setIsBuyerModalVisible(false)}
+        onSelectBuyerMini={() => {
+          setIsBuyerModalVisible(false);
+          router.push({
+            pathname: '/(tabs)/packages',
+            params: { initialTab: 'buyer', preselect: 'ALICI_MINI' },
+          } as any);
+        }}
+      />
     </SafeAreaView>
   );
 }
