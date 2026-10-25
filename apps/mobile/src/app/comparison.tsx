@@ -15,12 +15,47 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BrandLogo from '../components/BrandLogo';
-import { getBrandLogoUrl } from '../constants/brandLogos';
-import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
+import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
+function getBrandLogoUrl(brandName?: string, vehicleType?: string): string {
+  return getCanonicalBrandLogoUrl(brandName, vehicleType);
+}
+
+function BrandLogo({ brandName, vehicleType }: { brandName?: string; vehicleType?: string }) {
+  const [hasError, setHasError] = useState(false);
+  const logoUrl = getCanonicalBrandLogoUrl(brandName, vehicleType);
+  const monogram = getBrandMonogram(brandName);
+
+  return (
+    <View style={styles.brandLogoBox}>
+      {!hasError ? (
+        <Image
+          source={{ uri: logoUrl }}
+          style={styles.brandLogoImg}
+          resizeMode="contain"
+          onError={() => setHasError(true)}
+        />
+      ) : (
+        <View
+          style={[
+            styles.monogramBadgeBox,
+            { backgroundColor: monogram.bgColor, borderColor: monogram.borderColor },
+          ]}
+        >
+          <Text
+            style={[styles.monogramBadgeText, { color: monogram.textColor }]}
+            numberOfLines={1}
+            ellipsizeMode="clip"
+          >
+            {monogram.initials}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
 
 function renderStars(stars: number | null, size: 'sm' | 'md' | 'lg' = 'md') {
   if (stars === null || stars === undefined) return null;
@@ -330,7 +365,6 @@ export default function ComparisonScreen() {
   // Comparison execution states
   const [loadingComparison, setLoadingComparison] = useState<boolean>(false);
   const [comparisonResponse, setComparisonResponse] = useState<any>(null);
-  const [isQuotaModalVisible, setIsQuotaModalVisible] = useState<boolean>(false);
 
   const [cachedBrands, setCachedBrands] = useState<string[]>([]);
 
@@ -495,7 +529,10 @@ export default function ComparisonScreen() {
 
   const addSlot = () => {
     if (slots.length >= vehicleLimit) {
-      setIsQuotaModalVisible(true);
+      Alert.alert(
+        'Limit Doldu',
+        `Paketiniz kapsamında en fazla ${vehicleLimit} araç karşılaştırabilirsiniz.`
+      );
       return;
     }
     const newSlotId = Date.now();
@@ -808,11 +845,7 @@ export default function ComparisonScreen() {
         setActiveResultTab('matrix');
       } else {
         const errData = await res.json().catch(() => ({}));
-        if (res.status === 403 || errData.code === 'QUOTA_EXCEEDED' || errData.message?.includes('hak') || errData.message?.includes('limit') || errData.message?.includes('kota')) {
-          setIsQuotaModalVisible(true);
-        } else {
-          Alert.alert('Karşılaştırma Uyarısı', errData.message || 'Karşılaştırma işlemi gerçekleştirilemedi.');
-        }
+        Alert.alert('Karşılaştırma Uyarısı', errData.message || 'Karşılaştırma işlemi gerçekleştirilemedi.');
       }
     } catch (e: any) {
       console.error(e);
@@ -1946,12 +1979,6 @@ export default function ComparisonScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Quota Exhaustion Centered Banner Modal */}
-      <QuotaExhaustionModal
-        visible={isQuotaModalVisible}
-        onClose={() => setIsQuotaModalVisible(false)}
-      />
     </View>
   );
 }
@@ -2142,16 +2169,31 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
   },
+  monogramBadgeBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  monogramBadgeText: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
   slotTitle: {
     fontSize: 12,
     fontWeight: '800',
     color: '#0f172a',
     textAlign: 'center',
+    maxWidth: '100%',
   },
   slotSub: {
     fontSize: 10,
     color: '#64748b',
     textAlign: 'center',
+    maxWidth: '100%',
   },
   slotEditBadge: {
     flexDirection: 'row',

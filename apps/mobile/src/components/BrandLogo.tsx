@@ -24,7 +24,7 @@ export function BrandLogo({
   lightTheme = false,
 }: BrandLogoProps) {
   const [hasError, setHasError] = useState(false);
-  const logoUrl = getBrandLogoUrl(brandName);
+  const logoUrl = getBrandLogoUrl(brandName, isMotorcycle ? 'MOTORCYCLE' : 'CAR');
   const monogram = getBrandMonogram(brandName);
 
   if (logoUrl && !hasError) {

@@ -1,3 +1,5 @@
+import { getCanonicalBrandLogoUrl } from '@used-car-intelligence/shared';
+
 /**
  * High-resolution verified automotive & motorcycle brand logo CDN mappings
  * Uses raw.githubusercontent optimized vector-derived PNGs & Wikimedia official renders.
@@ -138,7 +140,7 @@ export function getBrandMonogram(brandName?: string): string {
 /**
  * Resolves high-resolution transparent brand logo URL with intelligent fallback
  */
-export function getBrandLogoUrl(brandName?: string): string | null {
+export function getBrandLogoUrl(brandName?: string, vehicleType?: string): string | null {
   if (!brandName) return null;
   const rawKey = brandName.trim().toLowerCase();
   if (VERIFIED_BRAND_LOGOS[rawKey]) {
@@ -150,7 +152,7 @@ export function getBrandLogoUrl(brandName?: string): string | null {
     return VERIFIED_BRAND_LOGOS[slug];
   }
 
-  return `https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/optimized/${slug}.png`;
+  return getCanonicalBrandLogoUrl(brandName, vehicleType);
 }
 
 /**

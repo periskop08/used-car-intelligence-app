@@ -996,4 +996,5 @@ export * from './utils/resolveVehicleRange';
 export * from './utils/automotiveEngineTaxonomy';
 export * from './utils/automotiveTransmissionTaxonomy';
 export * from './types/feed-contract';
+export * from './utils/brandLogos';
 

@@ -20,8 +20,6 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BrandLogo from '../components/BrandLogo';
-import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
 import {
   ComprehensiveVehicleReport,
   calculateVehicleMtv,
@@ -30,6 +28,8 @@ import {
   formatVehicleAssessmentParagraphs,
   formatCleanTransmissionName,
   resolveVehicleRangeKm,
+  getCanonicalBrandLogoUrl,
+  getBrandMonogram,
 } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
@@ -208,15 +208,41 @@ function ItemDetailModal({
   );
 }
 
+function getBrandLogoUrl(brandName?: string, isMotorcycle?: boolean): string {
+  return getCanonicalBrandLogoUrl(brandName, isMotorcycle ? 'MOTORCYCLE' : 'CAR');
+}
+
 function BrandLogoContainer({ brandName, isMotorcycle }: { brandName?: string; isMotorcycle?: boolean }) {
+  const [hasError, setHasError] = useState(false);
+  const logoUrl = getCanonicalBrandLogoUrl(brandName, isMotorcycle ? 'MOTORCYCLE' : 'CAR');
+  const monogram = getBrandMonogram(brandName);
+
   return (
-    <BrandLogo
-      brandName={brandName}
-      isMotorcycle={isMotorcycle}
-      size={44}
-      lightTheme={true}
-      boxStyle={styles.brandLogoBoxLight}
-    />
+    <View style={styles.brandLogoBoxLight}>
+      {!hasError ? (
+        <Image
+          source={{ uri: logoUrl }}
+          style={styles.brandLogoImage}
+          resizeMode="contain"
+          onError={() => setHasError(true)}
+        />
+      ) : (
+        <View
+          style={[
+            styles.monogramBadgeBox,
+            { backgroundColor: monogram.bgColor, borderColor: monogram.borderColor },
+          ]}
+        >
+          <Text
+            style={[styles.monogramBadgeText, { color: monogram.textColor }]}
+            numberOfLines={1}
+            ellipsizeMode="clip"
+          >
+            {monogram.initials}
+          </Text>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -311,7 +337,6 @@ export default function VehicleReportScreen() {
   const [activeModalData, setActiveModalData] = useState<ModalDetailData | null>(null);
   const [pipelineStep, setPipelineStep] = useState(1);
   const skeletonOpacity = useRef(new Animated.Value(0.4)).current;
-  const [isQuotaModalVisible, setIsQuotaModalVisible] = useState(false);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -563,7 +588,14 @@ export default function VehicleReportScreen() {
 
       // Pre-check quota locally if loaded and not unlimited
       if (userRights && !userRights.isUnlimited && (userRights.remaining ?? 0) <= 0) {
-        setIsQuotaModalVisible(true);
+        Alert.alert(
+          'Soru Hakkınız Doldu',
+          'Mevcut AI Chatbot soru limitinizi doldurdunuz. Ek soru hakkı almak veya paketinizi yükseltmek için paketler sayfasını ziyaret edin.',
+          [
+            { text: 'Kapat', style: 'cancel' },
+            { text: 'Paketleri İncele', onPress: () => router.push('/(tabs)/packages') },
+          ]
+        );
         return;
       }
 
@@ -590,8 +622,11 @@ export default function VehicleReportScreen() {
         const errJson = await res.json().catch(() => ({}));
         const errMsg = errJson.message || 'Yapay zeka yanıt veremedi. Lütfen tekrar deneyin.';
         setChatError(errMsg);
-        if (res.status === 403 || errJson.code === 'QUOTA_EXCEEDED' || errMsg.includes('hak') || errMsg.includes('limit')) {
-          setIsQuotaModalVisible(true);
+        if (res.status === 403) {
+          Alert.alert('Limit Uyarısı', errMsg, [
+            { text: 'Kapat', style: 'cancel' },
+            { text: 'Paketleri İncele', onPress: () => router.push('/(tabs)/packages') },
+          ]);
         }
       } else {
         const data = await res.json();
@@ -911,14 +946,10 @@ export default function VehicleReportScreen() {
       } else {
         const errJson = await res.json().catch(() => ({}));
         console.error('Report creation failed:', res.status, errJson);
-        if (res.status === 403 || errJson.code === 'QUOTA_EXCEEDED' || errJson.message?.includes('hak') || errJson.message?.includes('kota') || errJson.message?.includes('limit')) {
-          setIsQuotaModalVisible(true);
-        } else {
-          Alert.alert(
-            'TorqueScout Araç Danışmanı',
-            errJson.message || 'TorqueScout Araç Danışmanı şu an raporu üretemedi lütfen tekrar deneyin veya geri bildirim gönderin.'
-          );
-        }
+        Alert.alert(
+          'TorqueScout Araç Danışmanı',
+          errJson.message || 'TorqueScout Araç Danışmanı şu an raporu üretemedi lütfen tekrar deneyin veya geri bildirim gönderin.'
+        );
         setLoading(false);
         return;
       }
@@ -1419,11 +1450,15 @@ export default function VehicleReportScreen() {
           <View style={styles.heroCardLight}>
             {/* Top Badge & Date + Like/Dislike Voting Widget (Web ile %100 Birebir) */}
             <View style={styles.heroTopBadgeRow}>
-              <View style={styles.heroBadgeAndDate}>
+              <View style={[styles.heroBadgeAndDate, { flex: 1, minWidth: 0 }]}>
                 <View style={styles.reportTypeBadge}>
-                  <Text style={styles.reportTypeBadgeText}>Araç Sorgulama Raporu</Text>
+                  <Text style={styles.reportTypeBadgeText} numberOfLines={1} ellipsizeMode="tail">
+                    Araç Sorgulama Raporu
+                  </Text>
                 </View>
-                <Text style={styles.reportDateText}>Rapor Tarihi: {reportDateStr}</Text>
+                <Text style={styles.reportDateText} numberOfLines={1} ellipsizeMode="tail">
+                  Rapor Tarihi: {reportDateStr}
+                </Text>
               </View>
 
               {/* Subtle Like / Dislike Voting Widget */}
@@ -1485,8 +1520,8 @@ export default function VehicleReportScreen() {
               <BrandLogoContainer brandName={report.vehicleIdentity.brand} isMotorcycle={isMotorcycle} />
 
               {/* Title & Subtitle */}
-              <View style={{ flex: 1, gap: 3 }}>
-                <Text style={styles.heroCarNameTextLight} numberOfLines={1}>
+              <View style={{ flex: 1, gap: 3, minWidth: 0, flexShrink: 1 }}>
+                <Text style={styles.heroCarNameTextLight} numberOfLines={1} ellipsizeMode="tail">
                   {typeof report.vehicleIdentity.modelYear === 'number' ? `${report.vehicleIdentity.modelYear} ` : ''}{report.vehicleIdentity.brand} {report.vehicleIdentity.model}
                 </Text>
 
@@ -1501,10 +1536,14 @@ export default function VehicleReportScreen() {
                   const consLabel = fuelOrRangeDisplay;
                   const line2Parts = [transLabel, fuelLabel, consLabel].filter(Boolean);
                   return (
-                    <View style={{ gap: 2, marginTop: 1 }}>
-                      {Boolean(line1) && <Text style={styles.heroSubTextLight} numberOfLines={1}>{line1}</Text>}
+                    <View style={{ gap: 2, marginTop: 1, minWidth: 0, flexShrink: 1 }}>
+                      {Boolean(line1) && (
+                        <Text style={styles.heroSubTextLight} numberOfLines={1} ellipsizeMode="tail">
+                          {line1}
+                        </Text>
+                      )}
                       {line2Parts.length > 0 && (
-                        <Text style={[styles.heroSubTextLight, { fontSize: 11, color: '#64748b' }]} numberOfLines={1}>
+                        <Text style={[styles.heroSubTextLight, { fontSize: 11, color: '#64748b' }]} numberOfLines={1} ellipsizeMode="tail">
                           {line2Parts.join(' • ')}
                         </Text>
                       )}
@@ -1519,29 +1558,29 @@ export default function VehicleReportScreen() {
               {!isMotorcycle && (
                 <View style={styles.specChipLight}>
                   <Ionicons name="calendar-outline" size={13} color="#0284c7" />
-                  <Text style={styles.specChipTextLight}>{report.vehicleIdentity.modelYear}</Text>
+                  <Text style={styles.specChipTextLight} numberOfLines={1} ellipsizeMode="tail">{report.vehicleIdentity.modelYear}</Text>
                 </View>
               )}
 
               <View style={styles.specChipLight}>
                 <Ionicons name="funnel-outline" size={13} color="#0284c7" />
-                <Text style={styles.specChipTextLight}>{formatFuelTypeTr(report.vehicleIdentity.fuelType)}</Text>
+                <Text style={styles.specChipTextLight} numberOfLines={1} ellipsizeMode="tail">{formatFuelTypeTr(report.vehicleIdentity.fuelType)}</Text>
               </View>
 
               <View style={styles.specChipLight}>
                 <Ionicons name="options-outline" size={13} color="#0284c7" />
-                <Text style={styles.specChipTextLight}>{formatCleanTransmissionName(report.vehicleIdentity.transmissionName) || (isMotorcycle ? 'Manuel' : 'Otomatik')}</Text>
+                <Text style={styles.specChipTextLight} numberOfLines={1} ellipsizeMode="tail">{formatCleanTransmissionName(report.vehicleIdentity.transmissionName) || (isMotorcycle ? 'Manuel' : 'Otomatik')}</Text>
               </View>
 
               <View style={styles.specChipLight}>
                 <Ionicons name={isMotorcycle ? 'bicycle-outline' : 'car-outline'} size={13} color="#0284c7" />
-                <Text style={styles.specChipTextLight}>{isMotorcycle ? 'Motosiklet' : (params.bodyType ? String(params.bodyType) : ((report.vehicleIdentity as any)?.bodyType || 'Binek'))}</Text>
+                <Text style={styles.specChipTextLight} numberOfLines={1} ellipsizeMode="tail">{isMotorcycle ? 'Motosiklet' : (params.bodyType ? String(params.bodyType) : ((report.vehicleIdentity as any)?.bodyType || 'Binek'))}</Text>
               </View>
 
               {hpDisplay !== '—' && (
                 <View style={[styles.specChipLight, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
                   <Ionicons name="flash-outline" size={13} color="#ea580c" />
-                  <Text style={[styles.specChipTextLight, { color: '#c2410c' }]}>{hpDisplay}</Text>
+                  <Text style={[styles.specChipTextLight, { color: '#c2410c' }]} numberOfLines={1} ellipsizeMode="tail">{hpDisplay}</Text>
                 </View>
               )}
             </View>
@@ -2618,12 +2657,6 @@ export default function VehicleReportScreen() {
           </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
-
-      {/* Quota Exhaustion Centered Banner Modal */}
-      <QuotaExhaustionModal
-        visible={isQuotaModalVisible}
-        onClose={() => setIsQuotaModalVisible(false)}
-      />
     </View>
   );
 }
@@ -2737,6 +2770,19 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
   },
+  monogramBadgeBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  monogramBadgeText: {
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
   heroCarNameTextLight: {
     fontSize: 16,
     fontWeight: '900',
@@ -2765,11 +2811,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     gap: 5,
+    maxWidth: '100%',
+    flexShrink: 1,
   },
   specChipTextLight: {
     fontSize: 11,
     fontWeight: '800',
     color: '#0369a1',
+    flexShrink: 1,
   },
   // Hero Top Badge Row & Date
   heroTopBadgeRow: {
@@ -2787,6 +2836,8 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: 'wrap',
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   reportTypeBadge: {
     backgroundColor: '#eff6ff',
@@ -2795,6 +2846,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2.5,
+    flexShrink: 1,
   },
   reportTypeBadgeText: {
     fontSize: 10.5,
@@ -2805,6 +2857,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748b',
     fontWeight: '500',
+    flexShrink: 1,
   },
 
   heroFooterRow: {

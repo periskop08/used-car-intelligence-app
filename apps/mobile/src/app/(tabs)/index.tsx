@@ -22,8 +22,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
-import BrandLogo from '../../components/BrandLogo';
-import { BRAND_LOGOS } from '../../constants/brandLogos';
+import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
 
 const { width: windowWidth } = Dimensions.get('window');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -193,7 +192,50 @@ const DEFAULT_VITRIN_ITEMS: ShowcaseItem[] = [
   },
 ];
 
-// BRAND LOGO MAP FOR POPULAR BRANDS & ALL BRANDS is imported dynamically from constants/brandLogos
+// BRAND LOGO MAP FOR POPULAR BRANDS & ALL BRANDS
+const BRAND_LOGOS: Record<string, string> = {
+  Volkswagen: 'https://www.carlogos.org/car-logos/volkswagen-logo.png',
+  BMW: 'https://www.carlogos.org/car-logos/bmw-logo.png',
+  'Mercedes-Benz': 'https://www.carlogos.org/car-logos/mercedes-benz-logo.png',
+  Mercedes: 'https://www.carlogos.org/car-logos/mercedes-benz-logo.png',
+  Renault: 'https://www.carlogos.org/car-logos/renault-logo.png',
+  Audi: 'https://www.carlogos.org/car-logos/audi-logo.png',
+  Ford: 'https://www.carlogos.org/car-logos/ford-logo.png',
+  Fiat: 'https://www.carlogos.org/car-logos/fiat-logo.png',
+  Toyota: 'https://www.carlogos.org/car-logos/toyota-logo.png',
+  Hyundai: 'https://www.carlogos.org/car-logos/hyundai-logo.png',
+  Peugeot: 'https://www.carlogos.org/car-logos/peugeot-logo.png',
+  Honda: 'https://www.carlogos.org/car-logos/honda-logo.png',
+  Opel: 'https://www.carlogos.org/car-logos/opel-logo.png',
+  Nissan: 'https://www.carlogos.org/car-logos/nissan-logo.png',
+  Citroën: 'https://www.carlogos.org/car-logos/citroen-logo.png',
+  Citroen: 'https://www.carlogos.org/car-logos/citroen-logo.png',
+  SEAT: 'https://www.carlogos.org/car-logos/seat-logo.png',
+  Seat: 'https://www.carlogos.org/car-logos/seat-logo.png',
+  Škoda: 'https://www.carlogos.org/car-logos/skoda-logo.png',
+  Skoda: 'https://www.carlogos.org/car-logos/skoda-logo.png',
+  Volvo: 'https://www.carlogos.org/car-logos/volvo-logo.png',
+  'Alfa Romeo': 'https://www.carlogos.org/car-logos/alfa-romeo-logo.png',
+  Abarth: 'https://www.carlogos.org/car-logos/abarth-logo.png',
+  BYD: 'https://www.carlogos.org/car-logos/byd-logo.png',
+  Cadillac: 'https://www.carlogos.org/car-logos/cadillac-logo.png',
+  Chery: 'https://www.carlogos.org/car-logos/chery-logo.png',
+  Chevrolet: 'https://www.carlogos.org/car-logos/chevrolet-logo.png',
+  Cupra: 'https://www.carlogos.org/car-logos/cupra-logo.png',
+  Dacia: 'https://www.carlogos.org/car-logos/dacia-logo.png',
+  Kia: 'https://www.carlogos.org/car-logos/kia-logo.png',
+  'Land Rover': 'https://www.carlogos.org/car-logos/land-rover-logo.png',
+  MINI: 'https://www.carlogos.org/car-logos/mini-logo.png',
+  Mini: 'https://www.carlogos.org/car-logos/mini-logo.png',
+  Porsche: 'https://www.carlogos.org/car-logos/porsche-logo.png',
+  Tesla: 'https://www.carlogos.org/car-logos/tesla-logo.png',
+};
+
+const getHomeBrandLogo = (brandName?: string, category?: string | null): string => {
+  if (!brandName) return '';
+  const vehicleType = category === 'MOTORCYCLE' ? 'MOTORCYCLE' : 'CAR';
+  return BRAND_LOGOS[brandName] || getCanonicalBrandLogoUrl(brandName, vehicleType);
+};
 
 const POPULAR_BRAND_NAMES = ['Volkswagen', 'BMW', 'Mercedes-Benz', 'Renault', 'Audi'];
 const ALPHABET_INDEX = ['#', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'Y', 'Z'];
@@ -2117,12 +2159,12 @@ export default function MobileDashboard() {
           {selectedBrand && activeStep === 'model' && (
             <View style={styles.selectedBrandBadgeCard}>
               <View style={styles.selectedBrandBadgeLeft}>
-                {BRAND_LOGOS[selectedBrand.name] ? (
-                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.selectedBrandBadgeLogo} resizeMode="contain" />
+                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.selectedBrandBadgeLogo} resizeMode="contain" />
                 ) : (
                   <Ionicons name="car-sport" size={24} color="#0f172a" />
                 )}
-                <Text style={styles.selectedBrandBadgeName}>{selectedBrand.name}</Text>
+                <Text style={styles.selectedBrandBadgeName} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
               </View>
               <Ionicons name="checkmark" size={20} color="#ea580c" />
             </View>
@@ -2132,19 +2174,19 @@ export default function MobileDashboard() {
           {selectedBrand && selectedModel && activeStep === 'year' && (
             <View style={styles.selectedSummaryBadgeCard}>
               <View style={styles.selectedSummaryBadgeItem}>
-                {BRAND_LOGOS[selectedBrand.name] ? (
-                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.selectedSummaryLogo} resizeMode="contain" />
+                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.selectedSummaryLogo} resizeMode="contain" />
                 ) : (
                   <Ionicons name="car-sport" size={22} color="#0f172a" />
                 )}
-                <Text style={styles.selectedSummaryText}>{selectedBrand.name}</Text>
+                <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
                 <Ionicons name="checkmark" size={16} color="#ea580c" />
               </View>
 
               <View style={styles.selectedSummaryDivider} />
 
               <View style={styles.selectedSummaryBadgeItem}>
-                <Text style={styles.selectedSummaryText}>{selectedModel.name}</Text>
+                <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
                 <Ionicons name="checkmark" size={16} color="#ea580c" />
               </View>
             </View>
@@ -2154,26 +2196,26 @@ export default function MobileDashboard() {
           {selectedBrand && selectedModel && selectedYear && activeStep === 'bodyType' && (
             <View style={styles.selectedSummaryBadgeCard}>
               <View style={styles.selectedSummaryBadgeItem}>
-                {BRAND_LOGOS[selectedBrand.name] ? (
-                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.selectedSummaryLogo} resizeMode="contain" />
+                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.selectedSummaryLogo} resizeMode="contain" />
                 ) : (
                   <Ionicons name="car-sport" size={20} color="#0f172a" />
                 )}
-                <Text style={styles.selectedSummaryText}>{selectedBrand.name}</Text>
+                <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
                 <Ionicons name="checkmark" size={15} color="#ea580c" />
               </View>
 
               <View style={styles.selectedSummaryDivider} />
 
               <View style={styles.selectedSummaryBadgeItem}>
-                <Text style={styles.selectedSummaryText}>{selectedModel.name}</Text>
+                <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
                 <Ionicons name="checkmark" size={15} color="#ea580c" />
               </View>
 
               <View style={styles.selectedSummaryDivider} />
 
               <View style={styles.selectedSummaryBadgeItem}>
-                <Text style={styles.selectedSummaryText}>{selectedYear}</Text>
+                <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
                 <Ionicons name="checkmark" size={15} color="#ea580c" />
               </View>
             </View>
@@ -2183,15 +2225,15 @@ export default function MobileDashboard() {
           {selectedBrand && selectedModel && selectedYear && activeStep === 'engine' && (
             <View style={styles.breadCrumbSummaryCard}>
               <View style={styles.breadCrumbItem}>
-                {BRAND_LOGOS[selectedBrand.name] ? (
-                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
                 ) : (
                   <Ionicons name="car-sport" size={20} color="#0f172a" />
                 )}
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
-                  <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
-                  <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
+                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
+                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
+                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
                 </View>
               </View>
 
@@ -2200,7 +2242,7 @@ export default function MobileDashboard() {
               <View style={styles.breadCrumbItem}>
                 <Ionicons name="car-outline" size={22} color="#0f172a" />
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
+                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedBodyType || 'Sedan'}</Text>
                   <Text style={styles.breadCrumbSubText}>Kasa Tipi</Text>
                 </View>
               </View>
@@ -2210,7 +2252,7 @@ export default function MobileDashboard() {
               <View style={styles.breadCrumbItem}>
                 <Ionicons name="color-fill-outline" size={20} color="#0f172a" />
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText}>{selectedFuelType || 'Benzin'}</Text>
+                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedFuelType || 'Benzin'}</Text>
                   <Text style={styles.breadCrumbSubText}>Yakıt</Text>
                 </View>
               </View>
@@ -2221,15 +2263,15 @@ export default function MobileDashboard() {
           {selectedBrand && selectedModel && selectedYear && activeStep === 'fuelType' && (
             <View style={styles.breadCrumbSummaryCard}>
               <View style={styles.breadCrumbItem}>
-                {BRAND_LOGOS[selectedBrand.name] ? (
-                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
                 ) : (
                   <Ionicons name="car-sport" size={20} color="#0f172a" />
                 )}
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
-                  <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
-                  <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
+                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
+                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
+                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
                 </View>
               </View>
 
@@ -2237,7 +2279,7 @@ export default function MobileDashboard() {
 
               <View style={styles.breadCrumbItem}>
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText}>{selectedEngine || '—'}</Text>
+                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedEngine || '—'}</Text>
                   <Text style={styles.breadCrumbSubText}>Motor</Text>
                 </View>
               </View>
@@ -2247,7 +2289,7 @@ export default function MobileDashboard() {
               <View style={styles.breadCrumbItem}>
                 <Ionicons name="car-outline" size={22} color="#0f172a" />
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText}>{selectedBodyType || '—'}</Text>
+                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedBodyType || '—'}</Text>
                   <Text style={styles.breadCrumbSubText}>Kasa Tipi</Text>
                 </View>
               </View>
@@ -2258,15 +2300,15 @@ export default function MobileDashboard() {
           {selectedBrand && selectedModel && selectedYear && activeStep === 'transmission' && (
             <View style={styles.breadCrumbSummaryCard}>
               <View style={styles.breadCrumbItem}>
-                {BRAND_LOGOS[selectedBrand.name] ? (
-                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
                 ) : (
                   <Ionicons name="car-sport" size={20} color="#0f172a" />
                 )}
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
-                  <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
-                  <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
+                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
+                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
+                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
                 </View>
               </View>
 
@@ -2274,7 +2316,7 @@ export default function MobileDashboard() {
 
               <View style={styles.breadCrumbItem}>
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText}>{selectedEngine || '—'}</Text>
+                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedEngine || '—'}</Text>
                 </View>
               </View>
 
@@ -2282,14 +2324,14 @@ export default function MobileDashboard() {
 
               <View style={styles.breadCrumbItem}>
                 <Ionicons name="color-fill-outline" size={16} color="#0f172a" />
-                <Text style={styles.breadCrumbMainText}>{selectedFuelType || '—'}</Text>
+                <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedFuelType || '—'}</Text>
               </View>
 
               <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
 
               <View style={styles.breadCrumbItem}>
                 <Ionicons name="car-outline" size={16} color="#0f172a" />
-                <Text style={styles.breadCrumbMainText}>{selectedBodyType || '—'}</Text>
+                <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedBodyType || '—'}</Text>
               </View>
             </View>
           )}
@@ -2298,15 +2340,15 @@ export default function MobileDashboard() {
           {selectedBrand && selectedModel && selectedYear && activeStep === 'trim' && (
             <View style={styles.breadCrumbSummaryCard}>
               <View style={styles.breadCrumbItem}>
-                {BRAND_LOGOS[selectedBrand.name] ? (
-                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
                 ) : (
                   <Ionicons name="car-sport" size={20} color="#0f172a" />
                 )}
                 <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
-                  <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
-                  <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
+                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
+                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
+                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
                 </View>
               </View>
 
@@ -2375,6 +2417,7 @@ export default function MobileDashboard() {
                         { id: 'pop-5', name: 'Audi' },
                       ]
                     ).map((pBrand) => {
+                      const logoUri = getHomeBrandLogo(pBrand.name, selectedCategory);
                       return (
                         <TouchableOpacity
                           key={pBrand.id || pBrand.name}
@@ -2382,14 +2425,14 @@ export default function MobileDashboard() {
                           activeOpacity={0.8}
                           onPress={() => selectOption(pBrand)}
                         >
-                          <BrandLogo
-                            brandName={pBrand.name}
-                            isMotorcycle={selectedCategory === 'MOTORCYCLE'}
-                            size={44}
-                            lightTheme={true}
-                            boxStyle={styles.popularLogoContainer}
-                          />
-                          <Text style={styles.popularBrandTitle} numberOfLines={1}>
+                          <View style={styles.popularLogoContainer}>
+                            {logoUri ? (
+                              <Image source={{ uri: logoUri }} style={styles.popularLogoImage} resizeMode="contain" />
+                            ) : (
+                              <Ionicons name="car-sport" size={26} color="#0f172a" />
+                            )}
+                          </View>
+                          <Text style={styles.popularBrandTitle} numberOfLines={1} ellipsizeMode="tail">
                             {pBrand.name}
                           </Text>
                         </TouchableOpacity>
@@ -2470,6 +2513,7 @@ export default function MobileDashboard() {
                     <Text style={styles.brandGroupLetter}>{group.key}</Text>
                     <View style={styles.brandGroupCard}>
                       {group.data.map((item, idx) => {
+                        const logoUri = getHomeBrandLogo(item.name, selectedCategory);
                         return (
                           <TouchableOpacity
                             key={item.id || item.name}
@@ -2481,14 +2525,14 @@ export default function MobileDashboard() {
                             onPress={() => selectOption(item)}
                           >
                             <View style={styles.brandRowLeft}>
-                              <BrandLogo
-                                brandName={item.name}
-                                isMotorcycle={selectedCategory === 'MOTORCYCLE'}
-                                size={32}
-                                lightTheme={true}
-                                boxStyle={{ marginRight: 10 }}
-                              />
-                              <Text style={styles.brandRowName}>{item.name}</Text>
+                              <View style={styles.brandLogoBox}>
+                                {logoUri ? (
+                                  <Image source={{ uri: logoUri }} style={styles.brandRowLogoImage} resizeMode="contain" />
+                                ) : (
+                                  <Ionicons name="car-outline" size={20} color="#0f172a" />
+                                )}
+                              </View>
+                              <Text style={styles.brandRowName} numberOfLines={1} ellipsizeMode="tail">{item.name}</Text>
                             </View>
 
                             <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
