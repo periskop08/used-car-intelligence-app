@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import QuotaBadge from "@/components/QuotaBadge";
+import QuotaExhaustionModal from "@/components/QuotaExhaustionModal";
 import VehicleReportShell from "../../vehicle-report/components/VehicleReportShell";
 import IsiCepteListingRecommendationWidget from "@/app/listings/components/IsiCepteListingRecommendationWidget";
 import VehicleExactListingsWidget from "@/app/listings/components/VehicleExactListingsWidget";
@@ -128,6 +129,7 @@ export default function VehicleDetail() {
   
   // Auth state
   const [user, setUser] = useState<any>(null);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
 
   // Favorites states
   const [isFavorited, setIsFavorited] = useState(false);
@@ -409,7 +411,9 @@ export default function VehicleDetail() {
         }
       } else {
         const errData = await safeFetchJson(genRes);
-        if (errData?.message && errData?.statusCode !== 404) {
+        if (genRes.status === 403 || errData?.code === 'QUOTA_EXCEEDED' || errData?.message?.includes('hak') || errData?.message?.includes('kota') || errData?.message?.includes('limit')) {
+          setShowQuotaModal(true);
+        } else if (errData?.message && errData?.statusCode !== 404) {
           setReportError(errData.message);
         }
       }
@@ -546,7 +550,7 @@ export default function VehicleDetail() {
     }
 
     if (!chatQuota.isUnlimited && chatQuota.remaining <= 0) {
-      setChatError("Mesaj hakkınız tükendi. Lütfen ek paket satın alın.");
+      setShowQuotaModal(true);
       return;
     }
 
@@ -567,6 +571,9 @@ export default function VehicleDetail() {
     })
       .then(res => {
         if (!res.ok) {
+          if (res.status === 403) {
+            setShowQuotaModal(true);
+          }
           return res.json().then(err => {
             throw new Error(err.message || "Yapay zeka yanıt veremedi.");
           });
@@ -1264,6 +1271,11 @@ export default function VehicleDetail() {
       {/* SAĞ GOOGLE ADS REKLAM KOLONU (1280px ve üzeri ekranlarda temiz boşluk olarak kalır) */}
       <div className="hidden xl:block w-[160px] min-[1600px]:w-[200px] min-[1920px]:w-[280px] shrink-0 static h-[600px]" />
 
+      {/* Quota Exhaustion Centered Banner Modal */}
+      <QuotaExhaustionModal
+        isOpen={showQuotaModal}
+        onClose={() => setShowQuotaModal(false)}
+      />
     </div>
   );
 }

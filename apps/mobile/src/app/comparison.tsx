@@ -15,64 +15,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BrandLogo from '../components/BrandLogo';
+import { getBrandLogoUrl } from '../constants/brandLogos';
+import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
-function getBrandLogoUrl(brandName?: string): string {
-  if (!brandName) return 'https://img.icons8.com/color/96/car.png';
-  const b = brandName.trim().toLowerCase();
-
-  const logoMap: Record<string, string> = {
-    audi: 'https://img.icons8.com/color/96/audi.png',
-    bmw: 'https://img.icons8.com/color/96/bmw.png',
-    volkswagen: 'https://img.icons8.com/color/96/volkswagen.png',
-    vw: 'https://img.icons8.com/color/96/volkswagen.png',
-    'mercedes-benz': 'https://img.icons8.com/color/96/mercedes-benz.png',
-    mercedes: 'https://img.icons8.com/color/96/mercedes-benz.png',
-    ford: 'https://img.icons8.com/color/96/ford.png',
-    fiat: 'https://img.icons8.com/color/96/fiat.png',
-    renault: 'https://img.icons8.com/color/96/renault.png',
-    peugeot: 'https://img.icons8.com/color/96/peugeot.png',
-    toyota: 'https://img.icons8.com/color/96/toyota.png',
-    honda: 'https://img.icons8.com/color/96/honda.png',
-    hyundai: 'https://img.icons8.com/color/96/hyundai.png',
-    kia: 'https://img.icons8.com/color/96/kia.png',
-    nissan: 'https://img.icons8.com/color/96/nissan.png',
-    opel: 'https://img.icons8.com/color/96/opel.png',
-    seat: 'https://img.icons8.com/color/96/seat.png',
-    skoda: 'https://img.icons8.com/color/96/skoda.png',
-    volvo: 'https://img.icons8.com/color/96/volvo.png',
-    porsche: 'https://img.icons8.com/color/96/porsche.png',
-    citroen: 'https://img.icons8.com/color/96/citroen.png',
-    'alfa romeo': 'https://img.icons8.com/color/96/alfa-romeo.png',
-    mini: 'https://img.icons8.com/color/96/mini.png',
-    jeep: 'https://img.icons8.com/color/96/jeep.png',
-    tesla: 'https://img.icons8.com/color/96/tesla.png',
-    'land rover': 'https://img.icons8.com/color/96/land-rover.png',
-  };
-
-  return logoMap[b] || `https://img.icons8.com/color/96/${b}.png`;
-}
-
-function BrandLogo({ brandName }: { brandName?: string }) {
-  const [hasError, setHasError] = useState(false);
-  const logoUrl = getBrandLogoUrl(brandName);
-
-  return (
-    <View style={styles.brandLogoBox}>
-      {!hasError ? (
-        <Image
-          source={{ uri: logoUrl }}
-          style={styles.brandLogoImg}
-          resizeMode="contain"
-          onError={() => setHasError(true)}
-        />
-      ) : (
-        <Ionicons name="car-sport" size={24} color="#0f172a" />
-      )}
-    </View>
-  );
-}
 
 function renderStars(stars: number | null, size: 'sm' | 'md' | 'lg' = 'md') {
   if (stars === null || stars === undefined) return null;
@@ -382,6 +330,7 @@ export default function ComparisonScreen() {
   // Comparison execution states
   const [loadingComparison, setLoadingComparison] = useState<boolean>(false);
   const [comparisonResponse, setComparisonResponse] = useState<any>(null);
+  const [isQuotaModalVisible, setIsQuotaModalVisible] = useState<boolean>(false);
 
   const [cachedBrands, setCachedBrands] = useState<string[]>([]);
 
@@ -546,10 +495,7 @@ export default function ComparisonScreen() {
 
   const addSlot = () => {
     if (slots.length >= vehicleLimit) {
-      Alert.alert(
-        'Limit Doldu',
-        `Paketiniz kapsamında en fazla ${vehicleLimit} araç karşılaştırabilirsiniz.`
-      );
+      setIsQuotaModalVisible(true);
       return;
     }
     const newSlotId = Date.now();
@@ -862,7 +808,11 @@ export default function ComparisonScreen() {
         setActiveResultTab('matrix');
       } else {
         const errData = await res.json().catch(() => ({}));
-        Alert.alert('Karşılaştırma Uyarısı', errData.message || 'Karşılaştırma işlemi gerçekleştirilemedi.');
+        if (res.status === 403 || errData.code === 'QUOTA_EXCEEDED' || errData.message?.includes('hak') || errData.message?.includes('limit') || errData.message?.includes('kota')) {
+          setIsQuotaModalVisible(true);
+        } else {
+          Alert.alert('Karşılaştırma Uyarısı', errData.message || 'Karşılaştırma işlemi gerçekleştirilemedi.');
+        }
       }
     } catch (e: any) {
       console.error(e);
@@ -1996,6 +1946,12 @@ export default function ComparisonScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Quota Exhaustion Centered Banner Modal */}
+      <QuotaExhaustionModal
+        visible={isQuotaModalVisible}
+        onClose={() => setIsQuotaModalVisible(false)}
+      />
     </View>
   );
 }

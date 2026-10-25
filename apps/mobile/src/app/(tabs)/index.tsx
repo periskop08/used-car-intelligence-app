@@ -22,6 +22,8 @@ import { Image as ExpoImage } from 'expo-image';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
+import BrandLogo from '../../components/BrandLogo';
+import { BRAND_LOGOS } from '../../constants/brandLogos';
 
 const { width: windowWidth } = Dimensions.get('window');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -191,44 +193,7 @@ const DEFAULT_VITRIN_ITEMS: ShowcaseItem[] = [
   },
 ];
 
-// BRAND LOGO MAP FOR POPULAR BRANDS & ALL BRANDS
-const BRAND_LOGOS: Record<string, string> = {
-  Volkswagen: 'https://www.carlogos.org/car-logos/volkswagen-logo.png',
-  BMW: 'https://www.carlogos.org/car-logos/bmw-logo.png',
-  'Mercedes-Benz': 'https://www.carlogos.org/car-logos/mercedes-benz-logo.png',
-  Mercedes: 'https://www.carlogos.org/car-logos/mercedes-benz-logo.png',
-  Renault: 'https://www.carlogos.org/car-logos/renault-logo.png',
-  Audi: 'https://www.carlogos.org/car-logos/audi-logo.png',
-  Ford: 'https://www.carlogos.org/car-logos/ford-logo.png',
-  Fiat: 'https://www.carlogos.org/car-logos/fiat-logo.png',
-  Toyota: 'https://www.carlogos.org/car-logos/toyota-logo.png',
-  Hyundai: 'https://www.carlogos.org/car-logos/hyundai-logo.png',
-  Peugeot: 'https://www.carlogos.org/car-logos/peugeot-logo.png',
-  Honda: 'https://www.carlogos.org/car-logos/honda-logo.png',
-  Opel: 'https://www.carlogos.org/car-logos/opel-logo.png',
-  Nissan: 'https://www.carlogos.org/car-logos/nissan-logo.png',
-  Citroën: 'https://www.carlogos.org/car-logos/citroen-logo.png',
-  Citroen: 'https://www.carlogos.org/car-logos/citroen-logo.png',
-  SEAT: 'https://www.carlogos.org/car-logos/seat-logo.png',
-  Seat: 'https://www.carlogos.org/car-logos/seat-logo.png',
-  Škoda: 'https://www.carlogos.org/car-logos/skoda-logo.png',
-  Skoda: 'https://www.carlogos.org/car-logos/skoda-logo.png',
-  Volvo: 'https://www.carlogos.org/car-logos/volvo-logo.png',
-  'Alfa Romeo': 'https://www.carlogos.org/car-logos/alfa-romeo-logo.png',
-  Abarth: 'https://www.carlogos.org/car-logos/abarth-logo.png',
-  BYD: 'https://www.carlogos.org/car-logos/byd-logo.png',
-  Cadillac: 'https://www.carlogos.org/car-logos/cadillac-logo.png',
-  Chery: 'https://www.carlogos.org/car-logos/chery-logo.png',
-  Chevrolet: 'https://www.carlogos.org/car-logos/chevrolet-logo.png',
-  Cupra: 'https://www.carlogos.org/car-logos/cupra-logo.png',
-  Dacia: 'https://www.carlogos.org/car-logos/dacia-logo.png',
-  Kia: 'https://www.carlogos.org/car-logos/kia-logo.png',
-  'Land Rover': 'https://www.carlogos.org/car-logos/land-rover-logo.png',
-  MINI: 'https://www.carlogos.org/car-logos/mini-logo.png',
-  Mini: 'https://www.carlogos.org/car-logos/mini-logo.png',
-  Porsche: 'https://www.carlogos.org/car-logos/porsche-logo.png',
-  Tesla: 'https://www.carlogos.org/car-logos/tesla-logo.png',
-};
+// BRAND LOGO MAP FOR POPULAR BRANDS & ALL BRANDS is imported dynamically from constants/brandLogos
 
 const POPULAR_BRAND_NAMES = ['Volkswagen', 'BMW', 'Mercedes-Benz', 'Renault', 'Audi'];
 const ALPHABET_INDEX = ['#', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'Y', 'Z'];
@@ -2410,7 +2375,6 @@ export default function MobileDashboard() {
                         { id: 'pop-5', name: 'Audi' },
                       ]
                     ).map((pBrand) => {
-                      const logoUri = BRAND_LOGOS[pBrand.name];
                       return (
                         <TouchableOpacity
                           key={pBrand.id || pBrand.name}
@@ -2418,13 +2382,13 @@ export default function MobileDashboard() {
                           activeOpacity={0.8}
                           onPress={() => selectOption(pBrand)}
                         >
-                          <View style={styles.popularLogoContainer}>
-                            {logoUri ? (
-                              <Image source={{ uri: logoUri }} style={styles.popularLogoImage} resizeMode="contain" />
-                            ) : (
-                              <Ionicons name="car-sport" size={26} color="#0f172a" />
-                            )}
-                          </View>
+                          <BrandLogo
+                            brandName={pBrand.name}
+                            isMotorcycle={selectedCategory === 'MOTORCYCLE'}
+                            size={44}
+                            lightTheme={true}
+                            boxStyle={styles.popularLogoContainer}
+                          />
                           <Text style={styles.popularBrandTitle} numberOfLines={1}>
                             {pBrand.name}
                           </Text>
@@ -2506,7 +2470,6 @@ export default function MobileDashboard() {
                     <Text style={styles.brandGroupLetter}>{group.key}</Text>
                     <View style={styles.brandGroupCard}>
                       {group.data.map((item, idx) => {
-                        const logoUri = BRAND_LOGOS[item.name];
                         return (
                           <TouchableOpacity
                             key={item.id || item.name}
@@ -2518,13 +2481,13 @@ export default function MobileDashboard() {
                             onPress={() => selectOption(item)}
                           >
                             <View style={styles.brandRowLeft}>
-                              <View style={styles.brandLogoBox}>
-                                {logoUri ? (
-                                  <Image source={{ uri: logoUri }} style={styles.brandRowLogoImage} resizeMode="contain" />
-                                ) : (
-                                  <Ionicons name="car-outline" size={20} color="#0f172a" />
-                                )}
-                              </View>
+                              <BrandLogo
+                                brandName={item.name}
+                                isMotorcycle={selectedCategory === 'MOTORCYCLE'}
+                                size={32}
+                                lightTheme={true}
+                                boxStyle={{ marginRight: 10 }}
+                              />
                               <Text style={styles.brandRowName}>{item.name}</Text>
                             </View>
 

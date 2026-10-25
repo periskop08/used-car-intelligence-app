@@ -20,6 +20,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BrandLogo from '../components/BrandLogo';
+import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
 import {
   ComprehensiveVehicleReport,
   calculateVehicleMtv,
@@ -206,61 +208,15 @@ function ItemDetailModal({
   );
 }
 
-function getBrandLogoUrl(brandName?: string): string {
-  if (!brandName) return 'https://img.icons8.com/color/96/audi.png';
-  const b = brandName.trim().toLowerCase();
-
-  const logoMap: Record<string, string> = {
-    audi: 'https://img.icons8.com/color/96/audi.png',
-    bmw: 'https://img.icons8.com/color/96/bmw.png',
-    volkswagen: 'https://img.icons8.com/color/96/volkswagen.png',
-    vw: 'https://img.icons8.com/color/96/volkswagen.png',
-    'mercedes-benz': 'https://img.icons8.com/color/96/mercedes-benz.png',
-    mercedes: 'https://img.icons8.com/color/96/mercedes-benz.png',
-    ford: 'https://img.icons8.com/color/96/ford.png',
-    fiat: 'https://img.icons8.com/color/96/fiat.png',
-    renault: 'https://img.icons8.com/color/96/renault.png',
-    peugeot: 'https://img.icons8.com/color/96/peugeot.png',
-    toyota: 'https://img.icons8.com/color/96/toyota.png',
-    honda: 'https://img.icons8.com/color/96/honda.png',
-    hyundai: 'https://img.icons8.com/color/96/hyundai.png',
-    kia: 'https://img.icons8.com/color/96/kia.png',
-    nissan: 'https://img.icons8.com/color/96/nissan.png',
-    opel: 'https://img.icons8.com/color/96/opel.png',
-    seat: 'https://img.icons8.com/color/96/seat.png',
-    skoda: 'https://img.icons8.com/color/96/skoda.png',
-    volvo: 'https://img.icons8.com/color/96/volvo.png',
-    porsche: 'https://img.icons8.com/color/96/porsche.png',
-    citroen: 'https://img.icons8.com/color/96/citroen.png',
-    'alfa romeo': 'https://img.icons8.com/color/96/alfa-romeo.png',
-    mini: 'https://img.icons8.com/color/96/mini.png',
-    jeep: 'https://img.icons8.com/color/96/jeep.png',
-    cupra: 'https://img.icons8.com/color/96/car.png',
-    chery: 'https://img.icons8.com/color/96/car.png',
-    tesla: 'https://img.icons8.com/color/96/tesla.png',
-    'land rover': 'https://img.icons8.com/color/96/land-rover.png',
-  };
-
-  return logoMap[b] || `https://img.icons8.com/color/96/${b}.png`;
-}
-
 function BrandLogoContainer({ brandName, isMotorcycle }: { brandName?: string; isMotorcycle?: boolean }) {
-  const [hasError, setHasError] = useState(false);
-  const logoUrl = getBrandLogoUrl(brandName);
-
   return (
-    <View style={styles.brandLogoBoxLight}>
-      {!hasError ? (
-        <Image
-          source={{ uri: logoUrl }}
-          style={styles.brandLogoImage}
-          resizeMode="contain"
-          onError={() => setHasError(true)}
-        />
-      ) : (
-        <Ionicons name={isMotorcycle ? 'bicycle' : 'car-sport'} size={28} color={isMotorcycle ? '#ea580c' : '#0f172a'} />
-      )}
-    </View>
+    <BrandLogo
+      brandName={brandName}
+      isMotorcycle={isMotorcycle}
+      size={44}
+      lightTheme={true}
+      boxStyle={styles.brandLogoBoxLight}
+    />
   );
 }
 
@@ -355,6 +311,7 @@ export default function VehicleReportScreen() {
   const [activeModalData, setActiveModalData] = useState<ModalDetailData | null>(null);
   const [pipelineStep, setPipelineStep] = useState(1);
   const skeletonOpacity = useRef(new Animated.Value(0.4)).current;
+  const [isQuotaModalVisible, setIsQuotaModalVisible] = useState(false);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -606,14 +563,7 @@ export default function VehicleReportScreen() {
 
       // Pre-check quota locally if loaded and not unlimited
       if (userRights && !userRights.isUnlimited && (userRights.remaining ?? 0) <= 0) {
-        Alert.alert(
-          'Soru Hakkınız Doldu',
-          'Mevcut AI Chatbot soru limitinizi doldurdunuz. Ek soru hakkı almak veya paketinizi yükseltmek için paketler sayfasını ziyaret edin.',
-          [
-            { text: 'Kapat', style: 'cancel' },
-            { text: 'Paketleri İncele', onPress: () => router.push('/(tabs)/packages') },
-          ]
-        );
+        setIsQuotaModalVisible(true);
         return;
       }
 
@@ -640,11 +590,8 @@ export default function VehicleReportScreen() {
         const errJson = await res.json().catch(() => ({}));
         const errMsg = errJson.message || 'Yapay zeka yanıt veremedi. Lütfen tekrar deneyin.';
         setChatError(errMsg);
-        if (res.status === 403) {
-          Alert.alert('Limit Uyarısı', errMsg, [
-            { text: 'Kapat', style: 'cancel' },
-            { text: 'Paketleri İncele', onPress: () => router.push('/(tabs)/packages') },
-          ]);
+        if (res.status === 403 || errJson.code === 'QUOTA_EXCEEDED' || errMsg.includes('hak') || errMsg.includes('limit')) {
+          setIsQuotaModalVisible(true);
         }
       } else {
         const data = await res.json();
@@ -964,10 +911,14 @@ export default function VehicleReportScreen() {
       } else {
         const errJson = await res.json().catch(() => ({}));
         console.error('Report creation failed:', res.status, errJson);
-        Alert.alert(
-          'TorqueScout Araç Danışmanı',
-          errJson.message || 'TorqueScout Araç Danışmanı şu an raporu üretemedi lütfen tekrar deneyin veya geri bildirim gönderin.'
-        );
+        if (res.status === 403 || errJson.code === 'QUOTA_EXCEEDED' || errJson.message?.includes('hak') || errJson.message?.includes('kota') || errJson.message?.includes('limit')) {
+          setIsQuotaModalVisible(true);
+        } else {
+          Alert.alert(
+            'TorqueScout Araç Danışmanı',
+            errJson.message || 'TorqueScout Araç Danışmanı şu an raporu üretemedi lütfen tekrar deneyin veya geri bildirim gönderin.'
+          );
+        }
         setLoading(false);
         return;
       }
@@ -2667,6 +2618,12 @@ export default function VehicleReportScreen() {
           </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Quota Exhaustion Centered Banner Modal */}
+      <QuotaExhaustionModal
+        visible={isQuotaModalVisible}
+        onClose={() => setIsQuotaModalVisible(false)}
+      />
     </View>
   );
 }
