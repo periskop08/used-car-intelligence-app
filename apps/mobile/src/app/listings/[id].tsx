@@ -492,10 +492,10 @@ export default function ListingDetailScreen() {
           </TouchableOpacity>
 
           {/* Promotional Badges: Urgent & Showcase */}
-          {(listing.isUrgent || listing.isShowcaseFeedActive) && (
+          {(listing.isUrgent || listing.urgentListing || listing.isShowcaseFeedActive || listing.showcaseListing) && (
             <View style={styles.promoBadgesWrap}>
-              {listing.isUrgent && <UrgentBadge size="medium" />}
-              {listing.isShowcaseFeedActive && <ShowcaseBadge size="medium" />}
+              {(listing.isUrgent || listing.urgentListing) && <UrgentBadge size="medium" />}
+              {(listing.isShowcaseFeedActive || listing.showcaseListing) && <ShowcaseBadge size="medium" />}
             </View>
           )}
         </View>
