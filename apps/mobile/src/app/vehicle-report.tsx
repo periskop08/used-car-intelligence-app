@@ -286,6 +286,10 @@ function CollapsibleLightSection({
 }: CollapsibleLightProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
+  useEffect(() => {
+    setIsOpen(defaultOpen);
+  }, [defaultOpen]);
+
   return (
     <View style={[styles.lightCardWrapper, { borderColor }]}>
       <TouchableOpacity
@@ -1662,7 +1666,7 @@ export default function VehicleReportScreen() {
               iconBgColor="#fff7ed"
               borderColor="#fed7aa"
               titleColor="#c2410c"
-              defaultOpen={false}
+              defaultOpen={true}
             >
               {Boolean(synthesis.vehicleCharacter.headline) && (
                 <Text style={styles.characterHeadlineLight}>{replacePsWithHp(synthesis.vehicleCharacter.headline)}</Text>
