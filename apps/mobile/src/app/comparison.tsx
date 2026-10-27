@@ -16,17 +16,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
+import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
 import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
 function getBrandLogoUrl(brandName?: string, vehicleType?: string): string {
-  return getCanonicalBrandLogoUrl(brandName, vehicleType);
+  return resolveBrandLogo(brandName, vehicleType) || getCanonicalBrandLogoUrl(brandName, vehicleType) || '';
 }
 
 function BrandLogo({ brandName, vehicleType }: { brandName?: string; vehicleType?: string }) {
   const [hasError, setHasError] = useState(false);
-  const logoUrl = getCanonicalBrandLogoUrl(brandName, vehicleType);
+  const logoUrl = resolveBrandLogo(brandName, vehicleType) || getCanonicalBrandLogoUrl(brandName, vehicleType) || '';
   const monogram = getBrandMonogram(brandName);
 
   return (

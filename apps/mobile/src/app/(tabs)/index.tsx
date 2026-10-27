@@ -192,49 +192,12 @@ const DEFAULT_VITRIN_ITEMS: ShowcaseItem[] = [
   },
 ];
 
-// BRAND LOGO MAP FOR POPULAR BRANDS & ALL BRANDS
-const BRAND_LOGOS: Record<string, string> = {
-  Volkswagen: 'https://www.carlogos.org/car-logos/volkswagen-logo.png',
-  BMW: 'https://www.carlogos.org/car-logos/bmw-logo.png',
-  'Mercedes-Benz': 'https://www.carlogos.org/car-logos/mercedes-benz-logo.png',
-  Mercedes: 'https://www.carlogos.org/car-logos/mercedes-benz-logo.png',
-  Renault: 'https://www.carlogos.org/car-logos/renault-logo.png',
-  Audi: 'https://www.carlogos.org/car-logos/audi-logo.png',
-  Ford: 'https://www.carlogos.org/car-logos/ford-logo.png',
-  Fiat: 'https://www.carlogos.org/car-logos/fiat-logo.png',
-  Toyota: 'https://www.carlogos.org/car-logos/toyota-logo.png',
-  Hyundai: 'https://www.carlogos.org/car-logos/hyundai-logo.png',
-  Peugeot: 'https://www.carlogos.org/car-logos/peugeot-logo.png',
-  Honda: 'https://www.carlogos.org/car-logos/honda-logo.png',
-  Opel: 'https://www.carlogos.org/car-logos/opel-logo.png',
-  Nissan: 'https://www.carlogos.org/car-logos/nissan-logo.png',
-  Citroën: 'https://www.carlogos.org/car-logos/citroen-logo.png',
-  Citroen: 'https://www.carlogos.org/car-logos/citroen-logo.png',
-  SEAT: 'https://www.carlogos.org/car-logos/seat-logo.png',
-  Seat: 'https://www.carlogos.org/car-logos/seat-logo.png',
-  Škoda: 'https://www.carlogos.org/car-logos/skoda-logo.png',
-  Skoda: 'https://www.carlogos.org/car-logos/skoda-logo.png',
-  Volvo: 'https://www.carlogos.org/car-logos/volvo-logo.png',
-  'Alfa Romeo': 'https://www.carlogos.org/car-logos/alfa-romeo-logo.png',
-  Abarth: 'https://www.carlogos.org/car-logos/abarth-logo.png',
-  BYD: 'https://www.carlogos.org/car-logos/byd-logo.png',
-  Cadillac: 'https://www.carlogos.org/car-logos/cadillac-logo.png',
-  Chery: 'https://www.carlogos.org/car-logos/chery-logo.png',
-  Chevrolet: 'https://www.carlogos.org/car-logos/chevrolet-logo.png',
-  Cupra: 'https://www.carlogos.org/car-logos/cupra-logo.png',
-  Dacia: 'https://www.carlogos.org/car-logos/dacia-logo.png',
-  Kia: 'https://www.carlogos.org/car-logos/kia-logo.png',
-  'Land Rover': 'https://www.carlogos.org/car-logos/land-rover-logo.png',
-  MINI: 'https://www.carlogos.org/car-logos/mini-logo.png',
-  Mini: 'https://www.carlogos.org/car-logos/mini-logo.png',
-  Porsche: 'https://www.carlogos.org/car-logos/porsche-logo.png',
-  Tesla: 'https://www.carlogos.org/car-logos/tesla-logo.png',
-};
+import { getBrandLogoUrl } from '../../constants/brandLogos';
 
 const getHomeBrandLogo = (brandName?: string, category?: string | null): string => {
   if (!brandName) return '';
   const vehicleType = category === 'MOTORCYCLE' ? 'MOTORCYCLE' : 'CAR';
-  return BRAND_LOGOS[brandName] || getCanonicalBrandLogoUrl(brandName, vehicleType);
+  return getBrandLogoUrl(brandName, vehicleType) || getCanonicalBrandLogoUrl(brandName, vehicleType) || '';
 };
 
 const POPULAR_BRAND_NAMES = ['Volkswagen', 'BMW', 'Mercedes-Benz', 'Renault', 'Audi'];

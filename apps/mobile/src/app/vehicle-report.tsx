@@ -31,6 +31,7 @@ import {
   getCanonicalBrandLogoUrl,
   getBrandMonogram,
 } from '@used-car-intelligence/shared';
+import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
 import { exportVehicleReportPdf } from '../utils/vehicleReportPdfGenerator';
@@ -211,12 +212,14 @@ function ItemDetailModal({
 }
 
 function getBrandLogoUrl(brandName?: string, isMotorcycle?: boolean): string {
-  return getCanonicalBrandLogoUrl(brandName, isMotorcycle ? 'MOTORCYCLE' : 'CAR');
+  const type = isMotorcycle ? 'MOTORCYCLE' : 'CAR';
+  return resolveBrandLogo(brandName, type) || getCanonicalBrandLogoUrl(brandName, type) || '';
 }
 
 function BrandLogoContainer({ brandName, isMotorcycle }: { brandName?: string; isMotorcycle?: boolean }) {
   const [hasError, setHasError] = useState(false);
-  const logoUrl = getCanonicalBrandLogoUrl(brandName, isMotorcycle ? 'MOTORCYCLE' : 'CAR');
+  const type = isMotorcycle ? 'MOTORCYCLE' : 'CAR';
+  const logoUrl = resolveBrandLogo(brandName, type) || getCanonicalBrandLogoUrl(brandName, type) || '';
   const monogram = getBrandMonogram(brandName);
 
   return (
