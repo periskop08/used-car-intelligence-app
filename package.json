@@ -11,6 +11,8 @@
     "dev:api": "npm run start:dev --workspace=apps/api",
     "dev:admin": "npm run dev --workspace=apps/admin",
     "dev:web": "npm run dev --workspace=apps/web",
+    "dev:mobile": "npm run start --workspace=apps/mobile",
+    "tunnel:mobile": "npm run tunnel --workspace=apps/mobile",
     "build": "npm --prefix packages/shared run build && npm --prefix apps/web run build",
     "build:all": "npm --prefix packages/shared run build && npm --prefix apps/api run build && npm --prefix apps/web run build",
     "build:api": "npm --prefix packages/shared run build && npm --prefix apps/api run build",
