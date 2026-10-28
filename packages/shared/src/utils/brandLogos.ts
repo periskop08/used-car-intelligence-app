@@ -107,6 +107,11 @@ export const BRAND_ALIASES: Record<string, string> = {
   "royal alloy": "royal-alloy",
   "rmg moto gusto": "rmg-moto-gusto",
   "moto gusto": "rmg-moto-gusto",
+  "truva": "kral",
+  "truva motor": "kral",
+  "ski doo": "ski-doo",
+  "ski-doo": "ski-doo",
+  "solex": "velosolex",
 };
 
 // Curated high-precision CDN URLs for Turkish market automotive and motorcycle brands
@@ -296,6 +301,17 @@ export const BRAND_SPECIFIC_URLS: Record<string, string> = {
   sym: "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/SYM_logo_of_Sanyang_Motor_20180408.svg/500px-SYM_logo_of_Sanyang_Motor_20180408.svg.png",
   "royal-enfield": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8f/Royal_Enfield_logo.svg/500px-Royal_Enfield_logo.svg.png",
   husqvarna: "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6c/Husqvarna_Logo.png/500px-Husqvarna_Logo.png",
+  buell: "https://raw.githubusercontent.com/periskop08/used-car-intelligence-app/main/apps/web/public/brand-logos/buell.png",
+  bsa: "https://raw.githubusercontent.com/periskop08/used-car-intelligence-app/main/apps/web/public/brand-logos/bsa.png",
+  nsu: "https://raw.githubusercontent.com/periskop08/used-car-intelligence-app/main/apps/web/public/brand-logos/nsu.png",
+  ajp: "https://raw.githubusercontent.com/periskop08/used-car-intelligence-app/main/apps/web/public/brand-logos/ajp.png",
+  "ski-doo": "https://raw.githubusercontent.com/periskop08/used-car-intelligence-app/main/apps/web/public/brand-logos/ski-doo.png",
+  lynx: "https://raw.githubusercontent.com/periskop08/used-car-intelligence-app/main/apps/web/public/brand-logos/lynx.png",
+  simson: "https://raw.githubusercontent.com/periskop08/used-car-intelligence-app/main/apps/web/public/brand-logos/simson.png",
+  puch: "https://raw.githubusercontent.com/periskop08/used-car-intelligence-app/main/apps/web/public/brand-logos/puch.png",
+  romet: "https://raw.githubusercontent.com/periskop08/used-car-intelligence-app/main/apps/web/public/brand-logos/romet.png",
+  modenas: "https://raw.githubusercontent.com/periskop08/used-car-intelligence-app/main/apps/web/public/brand-logos/modenas.png",
+  velosolex: "https://raw.githubusercontent.com/periskop08/used-car-intelligence-app/main/apps/web/public/brand-logos/velosolex.png",
 };
 
 /**
