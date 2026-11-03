@@ -11,9 +11,12 @@ import {
   FlatList,
   TextInput,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+
+const ISICEPTE_LOGO = require('../../assets/images/isicepte-logo.png');
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -134,7 +137,7 @@ export default function IsiCepteRecommendationWidget({
       <View style={styles.headerTop}>
         <View style={styles.badgeRow}>
           <View style={styles.isiCepteBadge}>
-            <Ionicons name="shield-checkmark" size={14} color="#ea580c" />
+            <Image source={ISICEPTE_LOGO} style={{ width: 16, height: 16, borderRadius: 4 }} resizeMode="contain" />
             <Text style={styles.isiCepteBadgeText}>İŞİ CEPTE ÖNERİYOR</Text>
           </View>
           <View style={styles.guaranteeBadge}>
@@ -405,9 +408,11 @@ export default function IsiCepteRecommendationWidget({
             {selectedProvider && (
               <>
                 <View style={styles.detailModalHeader}>
-                  <View style={styles.detailAvatarBox}>
-                    <Ionicons name="construct" size={24} color="#ea580c" />
-                  </View>
+                  <Image
+                    source={ISICEPTE_LOGO}
+                    style={{ width: 46, height: 46, borderRadius: 12 }}
+                    resizeMode="contain"
+                  />
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={styles.detailBusinessName} numberOfLines={2}>
@@ -415,7 +420,7 @@ export default function IsiCepteRecommendationWidget({
                       </Text>
                     </View>
                     <View style={styles.detailVerifiedRow}>
-                      <Ionicons name="shield-checkmark" size={13} color="#ea580c" />
+                      <Image source={ISICEPTE_LOGO} style={{ width: 14, height: 14, borderRadius: 3 }} resizeMode="contain" />
                       <Text style={styles.detailVerifiedText}>İşi Cepte Onaylı Usta</Text>
                     </View>
                   </View>

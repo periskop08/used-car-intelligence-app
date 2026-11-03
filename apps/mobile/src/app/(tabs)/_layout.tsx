@@ -134,7 +134,8 @@ export default function TabsLayout() {
           name="isicepte"
           options={{
             headerShown: false,
-            href: null,
+            tabBarButton: () => null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
@@ -159,14 +160,16 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="aracini-bul"
           options={{
-            href: null,
+            tabBarButton: () => null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
           name="vehicle-guide"
           options={{
             title: 'Araç Rehberi',
-            href: null,
+            tabBarButton: () => null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
@@ -182,8 +185,9 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="messages"
           options={{
-            href: null,
             headerShown: false,
+            tabBarButton: () => null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
@@ -201,7 +205,8 @@ export default function TabsLayout() {
           options={{
             headerShown: false,
             title: 'Profilim & Hesabım',
-            href: null,
+            tabBarButton: () => null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
       </Tabs>

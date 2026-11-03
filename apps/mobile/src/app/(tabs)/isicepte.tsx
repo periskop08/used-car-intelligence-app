@@ -14,129 +14,202 @@ import {
   SafeAreaView,
   StatusBar,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { TURKEY_81_PROVINCES, IsiCepteProviderItem } from '../../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
+const ISICEPTE_LOGO = require('../../../assets/images/isicepte-logo.png');
 
-const CANONICAL_ISICEPTE_CATEGORIES = [
-  'Tüm Kategoriler',
+// Canonical locked 11 automotive categories (matching Web)
+const CANONICAL_ISICEPTE_OTO_CATEGORIES = [
   'Motor/Mekanik',
   'Kaporta/Boya',
-  'Oto Ekspertiz',
-  'Oto Elektrik/Elektronik',
   'Oto Çekici/Kurtarıcı',
-  'Lastik/Jant',
+  'Oto Elektrik/Elektronik',
+  'Motosiklet Servisi',
   'Cam Filmi/Kaplama',
   'Oto Yıkama & Detay',
+  'Lastik/Jant',
   'Oto Aksesuar',
   'Oto Yedek Parça',
-  'Motosiklet Servisi',
-];
+  'Oto Ekspertiz',
+] as const;
 
-const POPULAR_BRANDS = [
-  'Tüm Markalar',
-  'Audi',
-  'BMW',
-  'Chery',
-  'Citroen',
-  'Dacia',
-  'Fiat',
-  'Ford',
-  'Honda',
-  'Hyundai',
-  'Kia',
-  'Mercedes-Benz',
-  'Nissan',
-  'Opel',
-  'Peugeot',
-  'Renault',
-  'Seat',
-  'Skoda',
-  'Tesla',
-  'Togg',
-  'Toyota',
-  'Volkswagen',
-  'Volvo',
+const INITIAL_CANONICAL_BRANDS: string[] = [
+  'Alfa Romeo', 'Audi', 'BMW', 'Chery', 'Chevrolet', 'Citroen', 'Cupra', 'Dacia', 'DS Automobiles', 'Fiat',
+  'Ford', 'Honda', 'Hyundai', 'Jeep', 'Kia', 'Land Rover', 'Mazda', 'Mercedes-Benz', 'MINI', 'Mitsubishi',
+  'Nissan', 'Opel', 'Peugeot', 'Porsche', 'Renault', 'Seat', 'Skoda', 'Subaru', 'Suzuki', 'Tesla',
+  'Togg', 'Toyota', 'Volkswagen', 'Volvo',
 ];
 
 export default function IsiCepteOneriyorScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  const initialBrandParam = typeof params.brand === 'string' ? params.brand : '';
-  const initialCityParam = typeof params.city === 'string' ? params.city : '';
+  const initialBrandParam = typeof params.brand === 'string' && params.brand ? params.brand : 'Tüm Markalar';
+  const initialCityParam = typeof params.city === 'string' && params.city ? params.city : 'Tüm Şehirler';
+  const initialCategoryParam = typeof params.category === 'string' && params.category ? params.category : 'Tüm Kategoriler';
 
   const [items, setItems] = useState<IsiCepteProviderItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [totalShowcase, setTotalShowcase] = useState(0);
+  const [totalAll, setTotalAll] = useState(0);
+  const [scope, setScope] = useState<'SHOWCASE_ONLY' | 'ALL_ELIGIBLE'>('SHOWCASE_ONLY');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // Filter States
+  // Available filter options from canonical sources and active pool
+  const [availableCities, setAvailableCities] = useState<string[]>(['Tüm Şehirler', ...TURKEY_81_PROVINCES]);
+  const [availableBrands, setAvailableBrands] = useState<string[]>(['Tüm Markalar', ...INITIAL_CANONICAL_BRANDS]);
+  const availableCategories = ['Tüm Kategoriler', ...CANONICAL_ISICEPTE_OTO_CATEGORIES];
+
+  // Active filter states
   const [selectedCity, setSelectedCity] = useState<string>(initialCityParam);
-  const [selectedBrand, setSelectedBrand] = useState<string>(initialBrandParam || 'Tüm Markalar');
-  const [selectedCategory, setSelectedCategory] = useState<string>('Tüm Kategoriler');
-  const [scope, setScope] = useState<'SHOWCASE_ONLY' | 'ALL_ELIGIBLE'>('SHOWCASE_ONLY');
+  const [selectedBrand, setSelectedBrand] = useState<string>(initialBrandParam);
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategoryParam);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // City Picker Modal State
-  const [isCityModalVisible, setIsCityModalVisible] = useState(false);
-  const [citySearch, setCitySearch] = useState('');
+  // Picker Modal States ('city' | 'brand' | 'category' | null)
+  const [activeFilterModal, setActiveFilterModal] = useState<'city' | 'brand' | 'category' | null>(null);
+  const [filterSearchText, setFilterSearchText] = useState('');
 
-  // Provider Detail Modal
-  const [selectedProvider, setSelectedProvider] = useState<IsiCepteProviderItem | null>(null);
+  // Selected Provider Detail Modal
+  const [detailModalProvider, setDetailModalProvider] = useState<IsiCepteProviderItem | null>(null);
 
-  // Fetch Providers from API
-  const fetchProviders = useCallback(async () => {
-    try {
-      const query = new URLSearchParams();
-      if (selectedCity && selectedCity !== 'Tüm Şehirler') {
-        query.append('city', selectedCity);
-      }
-      if (selectedBrand && selectedBrand !== 'Tüm Markalar') {
-        query.append('brand', selectedBrand);
-      }
-      if (selectedCategory && selectedCategory !== 'Tüm Kategoriler') {
-        query.append('category', selectedCategory);
-      }
-      query.append('scope', scope);
-      query.append('limit', '50');
-      query.append('seed', Math.random().toString(36).substring(2, 7));
+  // Session seed for stable randomization per view
+  const [sessionSeed] = useState(() => Math.random().toString(36).substring(2, 9));
 
-      const res = await fetch(`${API_URL}/isicepte/recommendations?${query.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        const providers = Array.isArray(data.items) ? data.items : [];
-        setItems(providers);
-        setTotalCount(data.total || providers.length);
-      }
-    } catch (e) {
-      console.error('Fetch IsiCepte screen providers error:', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  // Sync params if navigated with brand/city params
+  useEffect(() => {
+    if (typeof params.brand === 'string' && params.brand) {
+      setSelectedBrand(params.brand);
+      setPage(1);
     }
-  }, [selectedCity, selectedBrand, selectedCategory, scope]);
+    if (typeof params.city === 'string' && params.city) {
+      setSelectedCity(params.city);
+      setPage(1);
+    }
+  }, [params.brand, params.city]);
+
+  // Fetch recommendations from API (exact parity with Web)
+  const fetchRecommendations = useCallback(
+    async (isRefresh = false) => {
+      if (!isRefresh) setLoading(true);
+      try {
+        const query = new URLSearchParams();
+        if (selectedCity && selectedCity !== 'Tüm Şehirler') {
+          query.append('city', selectedCity);
+        }
+        if (selectedBrand && selectedBrand !== 'Tüm Markalar') {
+          query.append('brand', selectedBrand);
+        }
+        if (selectedCategory && selectedCategory !== 'Tüm Kategoriler') {
+          query.append('category', selectedCategory);
+        }
+        query.append('scope', scope);
+        query.append('page', page.toString());
+        query.append('limit', scope === 'SHOWCASE_ONLY' ? '50' : '24');
+        query.append('seed', sessionSeed);
+
+        const res = await fetch(`${API_URL}/isicepte/recommendations?${query.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          const fetchedItems = Array.isArray(data.items) ? data.items : [];
+          setItems(fetchedItems);
+          setTotalCount(data.total || 0);
+          setTotalShowcase(data.totalShowcase || 0);
+          setTotalAll(data.totalAll || 0);
+          setTotalPages(data.totalPages || 1);
+
+          if (Array.isArray(data.availableCities) && data.availableCities.length > 0) {
+            setAvailableCities(
+              data.availableCities.includes('Tüm Şehirler')
+                ? data.availableCities
+                : ['Tüm Şehirler', ...data.availableCities]
+            );
+          }
+          if (Array.isArray(data.availableBrands) && data.availableBrands.length > 0) {
+            setAvailableBrands(
+              data.availableBrands.includes('Tüm Markalar')
+                ? data.availableBrands
+                : ['Tüm Markalar', ...data.availableBrands]
+            );
+          }
+
+          // Record impression event for Vitrin analytics if items exist
+          if (fetchedItems.length > 0) {
+            fetch(`${API_URL}/isicepte/events`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                eventType: 'ISICEPTE_SHOWCASE_IMPRESSION',
+                city: selectedCity !== 'Tüm Şehirler' ? selectedCity : undefined,
+                brand: selectedBrand !== 'Tüm Markalar' ? selectedBrand : undefined,
+                metadata: {
+                  category: selectedCategory !== 'Tüm Kategoriler' ? selectedCategory : undefined,
+                  scope,
+                },
+              }),
+            }).catch(() => {});
+          }
+        } else {
+          setItems([]);
+          setTotalCount(0);
+          setTotalShowcase(0);
+          setTotalAll(0);
+        }
+      } catch (e) {
+        console.error('Failed to load IsiCepte providers:', e);
+        setItems([]);
+        setTotalCount(0);
+        setTotalShowcase(0);
+        setTotalAll(0);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [selectedCity, selectedBrand, selectedCategory, scope, page, sessionSeed]
+  );
 
   useEffect(() => {
-    setLoading(true);
-    fetchProviders();
-  }, [fetchProviders]);
+    fetchRecommendations();
+  }, [fetchRecommendations]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchProviders();
+    fetchRecommendations(true);
   };
 
-  const handleCall = (phone?: string | null) => {
-    if (!phone) return;
-    const cleanPhone = phone.replace(/[^0-9+]/g, '');
-    Linking.openURL(`tel:${cleanPhone}`);
+  const handleOpenDetailModal = (provider: IsiCepteProviderItem) => {
+    setDetailModalProvider(provider);
+    fetch(`${API_URL}/isicepte/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventType: 'ISICEPTE_PROFILE_CLICK',
+        providerId: provider.id,
+        city: provider.city,
+      }),
+    }).catch(() => {});
   };
 
-  const handleOpenIsiCepte = async (provider: IsiCepteProviderItem) => {
+  const handleOutboundClick = async (provider: IsiCepteProviderItem) => {
+    fetch(`${API_URL}/isicepte/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventType: 'ISICEPTE_OUTBOUND_CLICK',
+        providerId: provider.id,
+        city: provider.city,
+      }),
+    }).catch(() => {});
+
     const webUrl =
       provider.isicepteProfileUrl ||
       (provider.slug ? `https://isicepte.com/usta/${provider.slug}` : 'https://isicepte.com');
@@ -149,8 +222,57 @@ export default function IsiCepteOneriyorScreen() {
       } else {
         await Linking.openURL(webUrl);
       }
-    } catch (e) {
+    } catch {
       Linking.openURL(webUrl);
+    }
+  };
+
+  const handleCall = (phone?: string | null) => {
+    if (!phone) return;
+    const cleanPhone = phone.replace(/[^0-9+]/g, '');
+    Linking.openURL(`tel:${cleanPhone}`);
+  };
+
+  const handleClearAllFilters = () => {
+    setSelectedCity('Tüm Şehirler');
+    setSelectedBrand('Tüm Markalar');
+    setSelectedCategory('Tüm Kategoriler');
+    setSearchQuery('');
+    setPage(1);
+  };
+
+  const isFiltered =
+    selectedCity !== 'Tüm Şehirler' ||
+    selectedBrand !== 'Tüm Markalar' ||
+    selectedCategory !== 'Tüm Kategoriler';
+
+  // Contextual summary title matching Web
+  const getContextualSummaryTitle = () => {
+    const hasCity = selectedCity !== 'Tüm Şehirler';
+    const hasBrand = selectedBrand !== 'Tüm Markalar';
+    const hasCat = selectedCategory !== 'Tüm Kategoriler';
+
+    let descriptor = '';
+    if (hasCity && hasBrand && hasCat) {
+      descriptor = `${selectedCity} şehrinde ${selectedBrand} için ${selectedCategory} hizmeti veren`;
+    } else if (hasCity && hasBrand) {
+      descriptor = `${selectedCity} şehrinde ${selectedBrand} uzmanı`;
+    } else if (hasCity && hasCat) {
+      descriptor = `${selectedCity} şehrinde ${selectedCategory} hizmeti veren`;
+    } else if (hasBrand && hasCat) {
+      descriptor = `${selectedBrand} için ${selectedCategory} hizmeti veren`;
+    } else if (hasCity) {
+      descriptor = `${selectedCity} şehrindeki`;
+    } else if (hasBrand) {
+      descriptor = `${selectedBrand} uzmanı`;
+    } else if (hasCat) {
+      descriptor = `${selectedCategory} hizmeti veren`;
+    }
+
+    if (scope === 'SHOWCASE_ONLY') {
+      return descriptor ? `${descriptor} vitrin üyeleri` : 'Tüm Vitrin Üyeleri';
+    } else {
+      return descriptor ? `${descriptor} tüm ustalar ve servisler` : 'Tüm Ustalar ve Servisler';
     }
   };
 
@@ -168,87 +290,179 @@ export default function IsiCepteOneriyorScreen() {
     );
   }, [items, searchQuery]);
 
-  const filteredProvinces = TURKEY_81_PROVINCES.filter((c) =>
-    c.toLowerCase().includes(citySearch.toLowerCase().trim())
-  );
+  // Modal list items based on activeFilterModal
+  const modalOptions = useMemo(() => {
+    let sourceList: string[] = [];
+    if (activeFilterModal === 'city') sourceList = availableCities;
+    else if (activeFilterModal === 'brand') sourceList = availableBrands;
+    else if (activeFilterModal === 'category') sourceList = availableCategories;
+
+    if (!filterSearchText.trim()) return sourceList;
+    const q = filterSearchText.toLowerCase().trim();
+    return sourceList.filter((opt) => opt.toLowerCase().includes(q));
+  }, [activeFilterModal, availableCities, availableBrands, availableCategories, filterSearchText]);
+
+  const openFilterModal = (type: 'city' | 'brand' | 'category') => {
+    setFilterSearchText('');
+    setActiveFilterModal(type);
+  };
+
+  const handleSelectModalOption = (val: string) => {
+    if (activeFilterModal === 'city') setSelectedCity(val);
+    else if (activeFilterModal === 'brand') setSelectedBrand(val);
+    else if (activeFilterModal === 'category') setSelectedCategory(val);
+    setPage(1);
+    setActiveFilterModal(null);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle="dark-content" />
 
-      {/* HEADER BAR */}
+      {/* TOP HEADER BAR */}
       <View style={styles.headerBar}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => router.back()}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="chevron-back" size={22} color="#0f172a" />
+        </TouchableOpacity>
+
         <View style={styles.headerLeft}>
-          <View style={styles.headerIconBox}>
-            <Ionicons name="shield-checkmark" size={20} color="#ea580c" />
-          </View>
-          <View>
+          <Image source={ISICEPTE_LOGO} style={styles.headerLogoImg} resizeMode="contain" />
+          <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={styles.headerTitle}>İşi Cepte Öneriyor</Text>
               <View style={styles.headerBadge}>
                 <Text style={styles.headerBadgeText}>ONAYLI</Text>
               </View>
             </View>
-            <Text style={styles.headerSubtitle}>
-              Güvenilir Oto Servis, Ekspertiz & Ustalar
+            <Text style={styles.headerSubtitle} numberOfLines={1}>
+              {scope === 'SHOWCASE_ONLY'
+                ? 'Öne çıkan vitrin otomotiv ustaları ve servisleri'
+                : 'TorqueScout onaylı tüm aktif İşi Cepte servisleri'}
             </Text>
           </View>
         </View>
-
-        {/* City Filter Button */}
-        <TouchableOpacity
-          style={styles.cityPillBtn}
-          onPress={() => setIsCityModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="location-sharp" size={14} color="#ea580c" />
-          <Text style={styles.cityPillText} numberOfLines={1}>
-            {selectedCity || 'Tüm Şehirler'}
-          </Text>
-          <Ionicons name="chevron-down" size={12} color="#64748b" />
-        </TouchableOpacity>
       </View>
 
-      {/* SEARCH INPUT */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={18} color="#94a3b8" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="İşletme adı, semt veya uzmanlık ara..."
-            placeholderTextColor="#94a3b8"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color="#94a3b8" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      </View>
-
-      {/* FILTERS CONTAINER */}
+      {/* 3-FILTER BAR MATCHING WEB: ŞEHİR | MARKA | KATEGORİ */}
       <View style={styles.filterSection}>
-        {/* SCOPE TABS (VİTRİN vs TÜMÜ) */}
+        <View style={styles.threeFilterRow}>
+          {/* 1. Şehir */}
+          <TouchableOpacity
+            style={[
+              styles.filterDropdownBtn,
+              selectedCity !== 'Tüm Şehirler' && styles.filterDropdownBtnActive,
+            ]}
+            onPress={() => openFilterModal('city')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.filterDropdownLabel}>ŞEHİR</Text>
+            <View style={styles.filterDropdownValueRow}>
+              <Text
+                style={[
+                  styles.filterDropdownValue,
+                  selectedCity !== 'Tüm Şehirler' && styles.filterDropdownValueActive,
+                ]}
+                numberOfLines={1}
+              >
+                {selectedCity}
+              </Text>
+              <Ionicons name="chevron-down" size={13} color="#64748b" />
+            </View>
+          </TouchableOpacity>
+
+          {/* 2. Marka */}
+          <TouchableOpacity
+            style={[
+              styles.filterDropdownBtn,
+              selectedBrand !== 'Tüm Markalar' && styles.filterDropdownBtnActive,
+            ]}
+            onPress={() => openFilterModal('brand')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.filterDropdownLabel}>MARKA</Text>
+            <View style={styles.filterDropdownValueRow}>
+              <Text
+                style={[
+                  styles.filterDropdownValue,
+                  selectedBrand !== 'Tüm Markalar' && styles.filterDropdownValueActive,
+                ]}
+                numberOfLines={1}
+              >
+                {selectedBrand}
+              </Text>
+              <Ionicons name="chevron-down" size={13} color="#64748b" />
+            </View>
+          </TouchableOpacity>
+
+          {/* 3. Kategori */}
+          <TouchableOpacity
+            style={[
+              styles.filterDropdownBtn,
+              selectedCategory !== 'Tüm Kategoriler' && styles.filterDropdownBtnActive,
+            ]}
+            onPress={() => openFilterModal('category')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.filterDropdownLabel}>KATEGORİ</Text>
+            <View style={styles.filterDropdownValueRow}>
+              <Text
+                style={[
+                  styles.filterDropdownValue,
+                  selectedCategory !== 'Tüm Kategoriler' && styles.filterDropdownValueActive,
+                ]}
+                numberOfLines={1}
+              >
+                {selectedCategory}
+              </Text>
+              <Ionicons name="chevron-down" size={13} color="#64748b" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* SEARCH INPUT */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={16} color="#94a3b8" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="İşletme adı, ilçe veya uzmanlık ara..."
+              placeholderTextColor="#94a3b8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={17} color="#94a3b8" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+
+        {/* SCOPE TABS (VİTRİN ÜYELERİ vs TÜM USTALAR) */}
         <View style={styles.scopeTabsContainer}>
           <TouchableOpacity
             style={[styles.scopeTab, scope === 'SHOWCASE_ONLY' && styles.scopeTabActive]}
-            onPress={() => setScope('SHOWCASE_ONLY')}
+            onPress={() => {
+              setScope('SHOWCASE_ONLY');
+              setPage(1);
+            }}
           >
-            <Ionicons
-              name="sparkles"
-              size={13}
-              color={scope === 'SHOWCASE_ONLY' ? '#ea580c' : '#64748b'}
-            />
+            <Text style={{ fontSize: 12 }}>👑</Text>
             <Text style={[styles.scopeTabText, scope === 'SHOWCASE_ONLY' && styles.scopeTabTextActive]}>
-              Vitrin Esnafları (Öne Çıkanlar)
+              Vitrin Üyeleri {totalShowcase > 0 ? `(${totalShowcase})` : ''}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.scopeTab, scope === 'ALL_ELIGIBLE' && styles.scopeTabActive]}
-            onPress={() => setScope('ALL_ELIGIBLE')}
+            onPress={() => {
+              setScope('ALL_ELIGIBLE');
+              setPage(1);
+            }}
           >
             <Ionicons
               name="grid-outline"
@@ -256,24 +470,27 @@ export default function IsiCepteOneriyorScreen() {
               color={scope === 'ALL_ELIGIBLE' ? '#ea580c' : '#64748b'}
             />
             <Text style={[styles.scopeTabText, scope === 'ALL_ELIGIBLE' && styles.scopeTabTextActive]}>
-              Tüm Hizmet Verenler
+              Tüm Ustalar & Servisler {totalAll > 0 ? `(${totalAll})` : ''}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* CATEGORY CHIPS SCROLL */}
+        {/* QUICK CATEGORY CHIPS SCROLL */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsScrollContent}
         >
-          {CANONICAL_ISICEPTE_CATEGORIES.map((cat) => {
+          {availableCategories.map((cat) => {
             const isSelected = selectedCategory === cat;
             return (
               <TouchableOpacity
                 key={cat}
                 style={[styles.categoryChip, isSelected && styles.categoryChipActive]}
-                onPress={() => setSelectedCategory(cat)}
+                onPress={() => {
+                  setSelectedCategory(cat);
+                  setPage(1);
+                }}
                 activeOpacity={0.8}
               >
                 <Text style={[styles.categoryChipText, isSelected && styles.categoryChipTextActive]}>
@@ -283,56 +500,82 @@ export default function IsiCepteOneriyorScreen() {
             );
           })}
         </ScrollView>
+      </View>
 
-        {/* BRAND CHIPS SCROLL */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[styles.chipsScrollContent, { paddingTop: 6 }]}
-        >
-          {POPULAR_BRANDS.map((brand) => {
-            const isSelected = selectedBrand === brand;
-            return (
-              <TouchableOpacity
-                key={brand}
-                style={[styles.brandChip, isSelected && styles.brandChipActive]}
-                onPress={() => setSelectedBrand(brand)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.brandChipText, isSelected && styles.brandChipTextActive]}>
-                  {brand}
-                </Text>
+      {/* FILTERED MODE CONTEXT BAR & REMOVABLE CHIPS (MATCHING WEB) */}
+      {(isFiltered || scope === 'ALL_ELIGIBLE') && (
+        <View style={styles.contextSummaryBar}>
+          <View style={styles.contextTitleRow}>
+            <Text style={styles.contextTitleText} numberOfLines={2}>
+              {getContextualSummaryTitle()}
+            </Text>
+            <View style={styles.contextCountBadge}>
+              <Text style={styles.contextCountBadgeText}>
+                {scope === 'SHOWCASE_ONLY'
+                  ? `${displayedItems.length} vitrin üyesi`
+                  : `${totalCount || displayedItems.length} toplam işletme`}
+              </Text>
+            </View>
+          </View>
+
+          {isFiltered && (
+            <View style={styles.activeChipsWrap}>
+              {selectedCity !== 'Tüm Şehirler' && (
+                <TouchableOpacity
+                  style={styles.activeFilterChipBlue}
+                  onPress={() => {
+                    setSelectedCity('Tüm Şehirler');
+                    setPage(1);
+                  }}
+                >
+                  <Text style={styles.activeFilterChipBlueText}>{selectedCity}</Text>
+                  <Ionicons name="close" size={12} color="#1d4ed8" />
+                </TouchableOpacity>
+              )}
+
+              {selectedBrand !== 'Tüm Markalar' && (
+                <TouchableOpacity
+                  style={styles.activeFilterChipBlue}
+                  onPress={() => {
+                    setSelectedBrand('Tüm Markalar');
+                    setPage(1);
+                  }}
+                >
+                  <Text style={styles.activeFilterChipBlueText}>{selectedBrand}</Text>
+                  <Ionicons name="close" size={12} color="#1d4ed8" />
+                </TouchableOpacity>
+              )}
+
+              {selectedCategory !== 'Tüm Kategoriler' && (
+                <TouchableOpacity
+                  style={styles.activeFilterChipOrange}
+                  onPress={() => {
+                    setSelectedCategory('Tüm Kategoriler');
+                    setPage(1);
+                  }}
+                >
+                  <Text style={styles.activeFilterChipOrangeText}>{selectedCategory}</Text>
+                  <Ionicons name="close" size={12} color="#c2410c" />
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity onPress={handleClearAllFilters} style={styles.clearAllLinkBtn}>
+                <Text style={styles.clearAllLinkText}>Filtreleri Temizle</Text>
               </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+            </View>
+          )}
+        </View>
+      )}
 
-      {/* RESULTS COUNT ROW */}
-      <View style={styles.resultsInfoRow}>
-        <Text style={styles.resultsCountText}>
-          {loading ? 'Yükleniyor...' : `${displayedItems.length} Onaylı Esnaf Bulundu`}
-        </Text>
-        {Boolean(selectedCity || selectedBrand !== 'Tüm Markalar' || selectedCategory !== 'Tüm Kategoriler') && (
-          <TouchableOpacity
-            style={styles.clearFiltersBtn}
-            onPress={() => {
-              setSelectedCity('');
-              setSelectedBrand('Tüm Markalar');
-              setSelectedCategory('Tüm Kategoriler');
-              setSearchQuery('');
-            }}
-          >
-            <Text style={styles.clearFiltersText}>Filtreleri Temizle</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* MAIN LIST */}
+      {/* MAIN CONTENT LIST */}
       {loading && !refreshing ? (
         <View style={styles.centerLoading}>
           <ActivityIndicator size="large" color="#ea580c" />
-          <Text style={styles.centerLoadingText}>İşi Cepte esnafları getiriliyor...</Text>
+          <Text style={styles.centerLoadingText}>
+            {scope === 'SHOWCASE_ONLY'
+              ? 'Vitrin üyeleri yükleniyor...'
+              : 'Tüm ustalar ve servisler yükleniyor...'}
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -346,147 +589,243 @@ export default function IsiCepteOneriyorScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconCircle}>
-                <Ionicons name="search" size={32} color="#94a3b8" />
+                <Ionicons name="search" size={28} color="#ea580c" />
               </View>
-              <Text style={styles.emptyTitle}>Eşleşen Esnaf Bulunamadı</Text>
-              <Text style={styles.emptyDesc}>
-                Seçtiğiniz şehir veya uzmanlık filtresine uygun aktif üye bulunamadı. Filtreleri değiştirerek tekrar deneyebilirsiniz.
+              <Text style={styles.emptyTitle}>
+                {scope === 'SHOWCASE_ONLY'
+                  ? 'Bu filtrelere uygun aktif Vitrin üyesi bulunmuyor.'
+                  : isFiltered
+                  ? 'Seçtiğiniz şehir, marka ve kategoriye uygun işletme bulunamadı.'
+                  : 'Şu anda İşiCepte Öneriyor bölümünde aktif işletme bulunmuyor.'}
               </Text>
-              <TouchableOpacity
-                style={styles.resetBtn}
-                onPress={() => {
-                  setSelectedCity('');
-                  setSelectedBrand('Tüm Markalar');
-                  setSelectedCategory('Tüm Kategoriler');
-                  setScope('ALL_ELIGIBLE');
-                }}
-              >
-                <Text style={styles.resetBtnText}>Tüm Hizmet Verenleri Göster</Text>
-              </TouchableOpacity>
+              <Text style={styles.emptyDesc}>
+                {scope === 'SHOWCASE_ONLY' && totalAll > 0
+                  ? `Bu filtrelerle eşleşen ${totalAll} standart usta ve servis bulunuyor. "Tüm Ustaları Gör" butonuna tıklayarak erişebilirsiniz.`
+                  : isFiltered
+                  ? 'Filtreleri değiştirerek veya temizleyerek diğer servisleri görebilirsiniz.'
+                  : 'Yeni üye otomotiv servisleri eklendikçe burada listelenecektir.'}
+              </Text>
+
+              <View style={styles.emptyActionsRow}>
+                {scope === 'SHOWCASE_ONLY' && totalAll > 0 && (
+                  <TouchableOpacity
+                    style={styles.seeAllEligibleBtn}
+                    onPress={() => {
+                      setScope('ALL_ELIGIBLE');
+                      setPage(1);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.seeAllEligibleBtnText}>
+                      Tüm Ustaları Gör ({totalAll} İşletme) ➔
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {isFiltered && (
+                  <TouchableOpacity
+                    style={styles.resetFiltersBtn}
+                    onPress={handleClearAllFilters}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.resetFiltersBtnText}>Filtreleri Temizle</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           }
+          ListFooterComponent={
+            <>
+              {/* Under Vitrin Section CTA: "TÜM USTALARI GÖR" Button in Showcase View (Matching Web) */}
+              {scope === 'SHOWCASE_ONLY' && displayedItems.length > 0 && totalAll > 0 && (
+                <View style={styles.allEligibleBannerCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.allEligibleBannerTitle}>
+                      Tüm Ustaları ve Servisleri Görün
+                    </Text>
+                    <Text style={styles.allEligibleBannerSub}>
+                      Aynı filtre kriterlerine uyan toplam {totalAll} adet kayıtlı işletme bulunmaktadır.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.allEligibleBannerBtn}
+                    onPress={() => {
+                      setScope('ALL_ELIGIBLE');
+                      setPage(1);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.allEligibleBannerBtnText}>
+                      Tüm Ustaları Gör ({totalAll}) ➔
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Pagination Controls (Matching Web) */}
+              {totalPages > 1 && (
+                <View style={styles.paginationRow}>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+                    disabled={page <= 1}
+                    onPress={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    <Text style={styles.pageBtnText}>Önceki</Text>
+                  </TouchableOpacity>
+
+                  <Text style={styles.pageIndicatorText}>
+                    Sayfa {page} / {totalPages}
+                  </Text>
+
+                  <TouchableOpacity
+                    style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+                    disabled={page >= totalPages}
+                    onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    <Text style={styles.pageBtnText}>Sonraki</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
+          }
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.9}
-              onPress={() => setSelectedProvider(item)}
-            >
-              {/* Card Top */}
-              <View style={styles.cardTopRow}>
-                <View style={styles.avatarIconBox}>
-                  <Ionicons name="construct" size={22} color="#ea580c" />
-                </View>
+            <View style={styles.card}>
+              {/* Card Top: Cover Image Area & Showcase Badge (Matching Web) */}
+              <TouchableOpacity
+                style={styles.cardCoverArea}
+                activeOpacity={0.9}
+                onPress={() => handleOpenDetailModal(item)}
+              >
+                {item.coverImageUrl ? (
+                  <Image
+                    source={{ uri: item.coverImageUrl }}
+                    style={styles.cardCoverImg}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.cardCoverFallback}>
+                    <Image
+                      source={ISICEPTE_LOGO}
+                      style={{ width: 44, height: 44, borderRadius: 12 }}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.cardCoverFallbackText}>İşiCepte Otomotiv Servisi</Text>
+                  </View>
+                )}
 
-                <View style={styles.cardTitleCol}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text style={styles.cardBusinessName} numberOfLines={1}>
-                      {item.businessName}
-                    </Text>
-                    {item.isShowcase && (
-                      <View style={styles.cardVitrinBadge}>
-                        <Ionicons name="flash" size={10} color="#ea580c" />
-                        <Text style={styles.cardVitrinBadgeText}>VİTRİN</Text>
+                {/* Vitrin Üyesi Badge */}
+                {item.isShowcase && (
+                  <View style={styles.cardVitrinOverlayBadge}>
+                    <Text style={styles.cardVitrinOverlayBadgeText}>👑 VİTRİN ÜYESİ</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* Card Body */}
+              <View style={styles.cardBody}>
+                {/* Header: Name and Real Rating */}
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.cardBusinessName} numberOfLines={1}>
+                    {item.businessName}
+                  </Text>
+
+                  {item.rating > 0 && (
+                    <View style={styles.cardRatingCol}>
+                      <View style={styles.cardRatingTop}>
+                        <Ionicons name="star" size={13} color="#f97316" />
+                        <Text style={styles.cardRatingScore}>{item.rating.toFixed(1)}</Text>
                       </View>
-                    )}
-                  </View>
-
-                  <View style={styles.cardLocRatingRow}>
-                    <View style={styles.cardLocItem}>
-                      <Ionicons name="location-outline" size={12} color="#64748b" />
-                      <Text style={styles.cardLocText} numberOfLines={1}>
-                        {item.city}{item.district ? ` • ${item.district}` : ''}
-                      </Text>
+                      {item.reviewCount > 0 && (
+                        <Text style={styles.cardReviewCount}>
+                          {item.reviewCount} değerlendirme
+                        </Text>
+                      )}
                     </View>
-
-                    <View style={styles.cardRatingItem}>
-                      <Ionicons name="star" size={12} color="#eab308" />
-                      <Text style={styles.cardRatingScore}>
-                        {item.rating > 0 ? item.rating.toFixed(1) : '5.0'}
-                      </Text>
-                      <Text style={styles.cardReviewCount}>
-                        ({item.reviewCount > 0 ? item.reviewCount : 12})
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Service Categories */}
-              <View style={styles.cardCategoriesRow}>
-                {item.serviceCategories?.slice(0, 3).map((cat, idx) => (
-                  <View key={idx} style={styles.cardCategoryBadge}>
-                    <Text style={styles.cardCategoryText}>{cat}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Supported Brands */}
-              {item.supportedBrands && item.supportedBrands.length > 0 ? (
-                <View style={styles.cardBrandsRow}>
-                  <Text style={styles.cardBrandsLabel}>Uzmanlık:</Text>
-                  {item.supportedBrands.slice(0, 4).map((b, idx) => (
-                    <View key={idx} style={styles.cardBrandBadge}>
-                      <Text style={styles.cardBrandText}>{b}</Text>
-                    </View>
-                  ))}
-                  {item.supportedBrands.length > 4 && (
-                    <Text style={styles.cardMoreBrandsText}>
-                      +{item.supportedBrands.length - 4} Marka
-                    </Text>
                   )}
                 </View>
-              ) : null}
 
-              {/* Action Buttons */}
-              <View style={styles.cardActionRow}>
-                {item.phone ? (
-                  <TouchableOpacity
-                    style={styles.cardCallBtn}
-                    onPress={() => handleCall(item.phone)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="call" size={15} color="#ffffff" />
-                    <Text style={styles.cardCallBtnText}>Hemen Ara</Text>
-                  </TouchableOpacity>
+                {/* Location */}
+                <View style={styles.cardLocRow}>
+                  <Ionicons name="location-outline" size={14} color="#64748b" />
+                  <Text style={styles.cardLocText} numberOfLines={1}>
+                    {item.city} {item.district ? `/ ${item.district}` : ''}
+                  </Text>
+                </View>
+
+                {/* Supported Brands */}
+                {item.supportedBrands && item.supportedBrands.length > 0 ? (
+                  <Text style={styles.cardBrandsJoined} numberOfLines={2}>
+                    {item.supportedBrands.join(' • ')}
+                  </Text>
                 ) : null}
 
-                <TouchableOpacity
-                  style={styles.cardIsiCepteBtn}
-                  onPress={() => handleOpenIsiCepte(item)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="open-outline" size={15} color="#0284c7" />
-                  <Text style={styles.cardIsiCepteBtnText}>İşi Cepte'de Aç</Text>
-                </TouchableOpacity>
+                {/* Canonical Service Categories Chips */}
+                {item.serviceCategories && item.serviceCategories.length > 0 ? (
+                  <View style={styles.cardCategoriesRow}>
+                    {item.serviceCategories.map((cat, idx) => (
+                      <View key={idx} style={styles.cardCategoryBadge}>
+                        <Text style={styles.cardCategoryText}>{cat}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
 
-                <TouchableOpacity
-                  style={styles.cardDetailBtn}
-                  onPress={() => setSelectedProvider(item)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="information-circle-outline" size={18} color="#64748b" />
-                </TouchableOpacity>
+                {/* Card Actions: Profili Gör & İşiCepte'de Aç (Matching Web) */}
+                <View style={styles.cardActionRow}>
+                  <TouchableOpacity
+                    style={styles.cardProfileBtn}
+                    onPress={() => handleOpenDetailModal(item)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.cardProfileBtnText}>Profili Gör</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.cardOutboundBtn}
+                    onPress={() => handleOutboundClick(item)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="open-outline" size={14} color="#ffffff" />
+                    <Text style={styles.cardOutboundBtnText}>İşiCepte'de Aç</Text>
+                  </TouchableOpacity>
+
+                  {item.phone ? (
+                    <TouchableOpacity
+                      style={styles.cardCallIconBtn}
+                      onPress={() => handleCall(item.phone)}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="call" size={16} color="#ea580c" />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
-            </TouchableOpacity>
+            </View>
           )}
         />
       )}
 
       {/* ========================================================================= */}
-      {/* CITY SELECTION MODAL */}
+      {/* FILTER SELECTION MODAL (ŞEHİR / MARKA / KATEGORİ) */}
       {/* ========================================================================= */}
       <Modal
-        visible={isCityModalVisible}
+        visible={activeFilterModal !== null}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setIsCityModalVisible(false)}
+        onRequestClose={() => setActiveFilterModal(null)}
       >
         <View style={styles.cityModalOverlay}>
           <View style={styles.cityModalContainer}>
             <View style={styles.cityModalHeader}>
-              <Text style={styles.cityModalTitle}>Şehir Seçin</Text>
+              <Text style={styles.cityModalTitle}>
+                {activeFilterModal === 'city'
+                  ? 'Şehir Seçin'
+                  : activeFilterModal === 'brand'
+                  ? 'Marka Seçin'
+                  : 'Kategori Seçin'}
+              </Text>
               <TouchableOpacity
-                onPress={() => setIsCityModalVisible(false)}
+                onPress={() => setActiveFilterModal(null)}
                 style={styles.cityModalCloseBtn}
               >
                 <Ionicons name="close" size={22} color="#0f172a" />
@@ -498,47 +837,37 @@ export default function IsiCepteOneriyorScreen() {
               <Ionicons name="search" size={18} color="#94a3b8" />
               <TextInput
                 style={styles.citySearchInput}
-                placeholder="Şehir ara (örn: İstanbul, İzmir, Ankara)..."
+                placeholder={
+                  activeFilterModal === 'city'
+                    ? 'Şehir ara (örn: İstanbul, İzmir, Ankara)...'
+                    : activeFilterModal === 'brand'
+                    ? 'Marka ara (örn: BMW, Renault, Fiat)...'
+                    : 'Kategori ara...'
+                }
                 placeholderTextColor="#94a3b8"
-                value={citySearch}
-                onChangeText={setCitySearch}
+                value={filterSearchText}
+                onChangeText={setFilterSearchText}
               />
-              {citySearch ? (
-                <TouchableOpacity onPress={() => setCitySearch('')}>
+              {filterSearchText ? (
+                <TouchableOpacity onPress={() => setFilterSearchText('')}>
                   <Ionicons name="close-circle" size={18} color="#94a3b8" />
                 </TouchableOpacity>
               ) : null}
             </View>
 
-            {/* All Cities Option */}
-            <TouchableOpacity
-              style={[styles.cityItem, !selectedCity && styles.cityItemActive]}
-              onPress={() => {
-                setSelectedCity('');
-                setIsCityModalVisible(false);
-                setCitySearch('');
-              }}
-            >
-              <Text style={[styles.cityItemText, !selectedCity && styles.cityItemTextActive]}>
-                🌍 Tüm Şehirler (Türkiye Geneli)
-              </Text>
-              {!selectedCity && <Ionicons name="checkmark" size={18} color="#ea580c" />}
-            </TouchableOpacity>
-
-            {/* Province List */}
+            {/* Options List */}
             <FlatList
-              data={filteredProvinces}
+              data={modalOptions}
               keyExtractor={(item) => item}
               renderItem={({ item }) => {
-                const isSelected = selectedCity === item;
+                const isSelected =
+                  (activeFilterModal === 'city' && selectedCity === item) ||
+                  (activeFilterModal === 'brand' && selectedBrand === item) ||
+                  (activeFilterModal === 'category' && selectedCategory === item);
                 return (
                   <TouchableOpacity
                     style={[styles.cityItem, isSelected && styles.cityItemActive]}
-                    onPress={() => {
-                      setSelectedCity(item);
-                      setIsCityModalVisible(false);
-                      setCitySearch('');
-                    }}
+                    onPress={() => handleSelectModalOption(item)}
                   >
                     <Text style={[styles.cityItemText, isSelected && styles.cityItemTextActive]}>
                       {item}
@@ -553,120 +882,164 @@ export default function IsiCepteOneriyorScreen() {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* PROVIDER FULL DETAIL MODAL */}
+      {/* PROVIDER DETAIL MODAL (MATCHING WEB MODAL) */}
       {/* ========================================================================= */}
       <Modal
-        visible={Boolean(selectedProvider)}
+        visible={Boolean(detailModalProvider)}
         animationType="fade"
         transparent={true}
-        onRequestClose={() => setSelectedProvider(null)}
+        onRequestClose={() => setDetailModalProvider(null)}
       >
         <View style={styles.detailModalOverlay}>
           <View style={styles.detailModalCard}>
-            {selectedProvider && (
+            {detailModalProvider && (
               <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Modal Header */}
                 <View style={styles.detailModalHeader}>
-                  <View style={styles.detailAvatarBox}>
-                    <Ionicons name="construct" size={26} color="#ea580c" />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.detailBusinessName} numberOfLines={2}>
-                      {selectedProvider.businessName}
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    {detailModalProvider.isShowcase ? (
+                      <View style={styles.detailShowcaseTag}>
+                        <Text style={styles.detailShowcaseTagText}>👑 İŞİCEPTE VİTRİN ÜYESİ</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.detailVerifiedTag}>
+                        <Image
+                          source={ISICEPTE_LOGO}
+                          style={{ width: 14, height: 14, borderRadius: 3 }}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.detailVerifiedTagText}>İŞİCEPTE ONAYLI SERVİS</Text>
+                      </View>
+                    )}
+                    <Text style={styles.detailBusinessName}>
+                      {detailModalProvider.businessName}
                     </Text>
-                    <View style={styles.detailVerifiedRow}>
-                      <Ionicons name="shield-checkmark" size={14} color="#ea580c" />
-                      <Text style={styles.detailVerifiedText}>İşi Cepte Onaylı Üye</Text>
-                    </View>
                   </View>
+
                   <TouchableOpacity
-                    onPress={() => setSelectedProvider(null)}
+                    onPress={() => setDetailModalProvider(null)}
                     style={styles.detailCloseBtn}
                   >
-                    <Ionicons name="close" size={22} color="#0f172a" />
+                    <Ionicons name="close" size={20} color="#0f172a" />
                   </TouchableOpacity>
                 </View>
 
-                {/* Score & Location Box */}
-                <View style={styles.detailInfoBox}>
-                  <View style={styles.detailInfoCol}>
-                    <Text style={styles.detailInfoLabel}>Puan & Yorum</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                      <Ionicons name="star" size={14} color="#eab308" />
-                      <Text style={styles.detailScoreText}>
-                        {selectedProvider.rating > 0 ? selectedProvider.rating.toFixed(1) : '5.0'}
-                      </Text>
-                      <Text style={styles.detailReviewText}>
-                        ({selectedProvider.reviewCount > 0 ? selectedProvider.reviewCount : 12} yorum)
-                      </Text>
+                {/* Modal Cover Image */}
+                <View style={styles.detailCoverBox}>
+                  {detailModalProvider.coverImageUrl ? (
+                    <Image
+                      source={{ uri: detailModalProvider.coverImageUrl }}
+                      style={styles.detailCoverImg}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.detailCoverFallback}>
+                      <Image
+                        source={ISICEPTE_LOGO}
+                        style={{ width: 48, height: 48, borderRadius: 12 }}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.detailCoverFallbackText}>İşletme Görseli</Text>
                     </View>
-                  </View>
-
-                  <View style={styles.detailInfoDivider} />
-
-                  <View style={styles.detailInfoCol}>
-                    <Text style={styles.detailInfoLabel}>Konum</Text>
-                    <Text style={styles.detailLocText}>
-                      {selectedProvider.city} {selectedProvider.district ? `/ ${selectedProvider.district}` : ''}
-                    </Text>
-                  </View>
+                  )}
                 </View>
 
-                {/* Address */}
-                {selectedProvider.address ? (
-                  <View style={styles.detailAddressSection}>
-                    <Ionicons name="map-outline" size={18} color="#64748b" style={{ marginTop: 2 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.detailAddressLabel}>Adres</Text>
-                      <Text style={styles.detailAddressText}>{selectedProvider.address}</Text>
+                {/* Rating & Reviews (Only if real data exists, matching Web) */}
+                {detailModalProvider.rating > 0 && (
+                  <View style={styles.detailRatingBox}>
+                    <View>
+                      <Text style={styles.detailFieldLabel}>MÜŞTERİ DEĞERLENDİRMESİ</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                        <Ionicons name="star" size={16} color="#f97316" />
+                        <Text style={styles.detailScoreText}>
+                          {detailModalProvider.rating.toFixed(1)} / 5.0
+                        </Text>
+                      </View>
                     </View>
+                    {detailModalProvider.reviewCount > 0 && (
+                      <Text style={styles.detailReviewText}>
+                        {detailModalProvider.reviewCount} gerçek değerlendirme
+                      </Text>
+                    )}
                   </View>
-                ) : null}
+                )}
 
-                {/* Service Categories */}
-                <Text style={styles.detailSectionTitle}>Hizmet Alanları</Text>
-                <View style={styles.detailTagsGrid}>
-                  {selectedProvider.serviceCategories?.map((cat, idx) => (
-                    <View key={idx} style={styles.detailCategoryBadge}>
-                      <Ionicons name="checkmark-circle" size={13} color="#ea580c" />
-                      <Text style={styles.detailCategoryBadgeText}>{cat}</Text>
-                    </View>
-                  ))}
+                {/* Location & Address */}
+                <View style={styles.detailFieldBlock}>
+                  <Text style={styles.detailFieldLabel}>ADRES & KONUM</Text>
+                  <Text style={styles.detailFieldValue}>
+                    {detailModalProvider.address ||
+                      `${detailModalProvider.city} ${
+                        detailModalProvider.district ? `/ ${detailModalProvider.district}` : ''
+                      }`}
+                  </Text>
                 </View>
 
                 {/* Supported Brands */}
-                {selectedProvider.supportedBrands && selectedProvider.supportedBrands.length > 0 ? (
-                  <>
-                    <Text style={styles.detailSectionTitle}>Uzman Olduğu Markalar</Text>
+                {detailModalProvider.supportedBrands && detailModalProvider.supportedBrands.length > 0 ? (
+                  <View style={styles.detailFieldBlock}>
+                    <Text style={styles.detailFieldLabel}>HİZMET VERİLEN ARAÇ MARKALARI</Text>
                     <View style={styles.detailTagsGrid}>
-                      {selectedProvider.supportedBrands.map((b, idx) => (
+                      {detailModalProvider.supportedBrands.map((b, idx) => (
                         <View key={idx} style={styles.detailBrandBadge}>
                           <Text style={styles.detailBrandBadgeText}>{b}</Text>
                         </View>
                       ))}
                     </View>
-                  </>
+                  </View>
                 ) : null}
 
-                {/* Action CTA Buttons */}
+                {/* Service Categories */}
+                {detailModalProvider.serviceCategories && detailModalProvider.serviceCategories.length > 0 ? (
+                  <View style={styles.detailFieldBlock}>
+                    <Text style={styles.detailFieldLabel}>HİZMET UZMANLIKLARI</Text>
+                    <View style={styles.detailTagsGrid}>
+                      {detailModalProvider.serviceCategories.map((cat, idx) => (
+                        <View key={idx} style={styles.detailCategoryBadge}>
+                          <Text style={styles.detailCategoryBadgeText}>{cat}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+
+                {/* Phone / Contact */}
+                {detailModalProvider.phone ? (
+                  <TouchableOpacity
+                    style={styles.detailPhoneBox}
+                    onPress={() => handleCall(detailModalProvider.phone)}
+                    activeOpacity={0.8}
+                  >
+                    <View>
+                      <Text style={styles.detailFieldLabel}>İLETİŞİM TELEFONU</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                        <Ionicons name="call" size={15} color="#ea580c" />
+                        <Text style={styles.detailPhoneText}>{detailModalProvider.phone}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.detailPhoneCallPill}>
+                      <Text style={styles.detailPhoneCallPillText}>Hemen Ara</Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : null}
+
+                {/* Modal Actions: Kapat & İşiCepte'de Profili Aç (Matching Web) */}
                 <View style={styles.detailCtaRow}>
-                  {selectedProvider.phone ? (
-                    <TouchableOpacity
-                      style={styles.detailCallBtn}
-                      onPress={() => handleCall(selectedProvider.phone)}
-                      activeOpacity={0.85}
-                    >
-                      <Ionicons name="call" size={18} color="#ffffff" />
-                      <Text style={styles.detailCallBtnText}>Hemen Ara</Text>
-                    </TouchableOpacity>
-                  ) : null}
+                  <TouchableOpacity
+                    style={styles.detailCloseActionBtn}
+                    onPress={() => setDetailModalProvider(null)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.detailCloseActionBtnText}>Kapat</Text>
+                  </TouchableOpacity>
 
                   <TouchableOpacity
                     style={styles.detailIsiCepteBtn}
-                    onPress={() => handleOpenIsiCepte(selectedProvider)}
+                    onPress={() => handleOutboundClick(detailModalProvider)}
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="open-outline" size={18} color="#ffffff" />
-                    <Text style={styles.detailIsiCepteBtnText}>İşi Cepte'de Aç</Text>
+                    <Ionicons name="open-outline" size={16} color="#ffffff" />
+                    <Text style={styles.detailIsiCepteBtnText}>İşiCepte'de Profili Aç</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -686,13 +1059,23 @@ const styles = StyleSheet.create({
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 8 : 12,
+    paddingHorizontal: 14,
+    paddingTop: Platform.OS === 'ios' ? 4 : 10,
     paddingBottom: 10,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
+    gap: 8,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -700,18 +1083,13 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
   },
-  headerIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#fff7ed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#ffedd5',
+  headerLogoImg: {
+    width: 40,
+    height: 40,
+    borderRadius: 11,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '900',
     color: '#0f172a',
     letterSpacing: -0.3,
@@ -721,7 +1099,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ffedd5',
     paddingHorizontal: 6,
-    paddingVertical: 1,
+    paddingVertical: 1.5,
     borderRadius: 6,
   },
   headerBadgeText: {
@@ -734,52 +1112,77 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginTop: 1,
   },
-  cityPillBtn: {
+  filterSection: {
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  threeFilterRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    paddingHorizontal: 14,
+    gap: 8,
+    marginBottom: 8,
+  },
+  filterDropdownBtn: {
+    flex: 1,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 12,
-    maxWidth: 130,
   },
-  cityPillText: {
-    fontSize: 11,
+  filterDropdownBtnActive: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fdba74',
+  },
+  filterDropdownLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748b',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  filterDropdownValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
+  filterDropdownValue: {
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#0f172a',
-    maxWidth: 75,
+    flex: 1,
+  },
+  filterDropdownValueActive: {
+    color: '#ea580c',
+    fontWeight: '800',
   },
   searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#ffffff',
+    paddingHorizontal: 14,
+    marginBottom: 8,
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f1f5f9',
-    borderRadius: 14,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 7,
     gap: 8,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#0f172a',
-  },
-  filterSection: {
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    paddingBottom: 8,
+    paddingVertical: 0,
   },
   scopeTabsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     gap: 8,
     marginBottom: 8,
   },
@@ -797,10 +1200,10 @@ const styles = StyleSheet.create({
   },
   scopeTabActive: {
     backgroundColor: '#fff7ed',
-    borderColor: '#fed7aa',
+    borderColor: '#fb923c',
   },
   scopeTabText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#64748b',
   },
@@ -809,7 +1212,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   chipsScrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     gap: 6,
   },
   categoryChip: {
@@ -833,232 +1236,320 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '800',
   },
-  brandChip: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+  contextSummaryBar: {
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    gap: 8,
   },
-  brandChipActive: {
-    backgroundColor: '#0f172a',
-    borderColor: '#0f172a',
-  },
-  brandChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  brandChipTextActive: {
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  resultsInfoRow: {
+  contextTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#f8fafc',
+    gap: 8,
   },
-  resultsCountText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
+  contextTitleText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#0f172a',
+    flex: 1,
   },
-  clearFiltersBtn: {
-    paddingVertical: 2,
+  contextCountBadge: {
+    backgroundColor: '#e2e8f0',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
-  clearFiltersText: {
+  contextCountBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  activeChipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
+  activeFilterChipBlue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#dbeafe',
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+  },
+  activeFilterChipBlueText: {
     fontSize: 11,
     fontWeight: '700',
+    color: '#1d4ed8',
+  },
+  activeFilterChipOrange: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ffedd5',
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+  },
+  activeFilterChipOrangeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#c2410c',
+  },
+  clearAllLinkBtn: {
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  clearAllLinkText: {
+    fontSize: 11,
+    fontWeight: '800',
     color: '#ea580c',
+    textDecorationLine: 'underline',
   },
   listContainer: {
-    padding: 16,
-    gap: 14,
+    padding: 14,
+    gap: 16,
     backgroundColor: '#f8fafc',
+    paddingBottom: 36,
   },
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardCoverArea: {
+    height: 150,
+    width: '100%',
+    backgroundColor: '#0b101e',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardCoverImg: {
+    width: '100%',
+    height: '100%',
+  },
+  cardCoverFallback: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#0b101e',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cardCoverFallbackText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
+  cardVitrinOverlayBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: '#f97316',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  cardTopRow: {
+  cardVitrinOverlayBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.4,
+  },
+  cardBody: {
+    padding: 16,
+    gap: 10,
+  },
+  cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 10,
-  },
-  avatarIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#fff7ed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#ffedd5',
-  },
-  cardTitleCol: {
-    flex: 1,
+    justifyContent: 'space-between',
+    gap: 8,
   },
   cardBusinessName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '900',
     color: '#0f172a',
     flex: 1,
-    marginRight: 6,
   },
-  cardVitrinBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#ffedd5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+  cardRatingCol: {
+    alignItems: 'flex-end',
   },
-  cardVitrinBadgeText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#ea580c',
-  },
-  cardLocRatingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 4,
-  },
-  cardLocItem: {
+  cardRatingTop: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    flex: 1,
-  },
-  cardLocText: {
-    fontSize: 11,
-    color: '#64748b',
-  },
-  cardRatingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#fefce8',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
   },
   cardRatingScore: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '800',
-    color: '#854d0e',
+    color: '#ea580c',
   },
   cardReviewCount: {
     fontSize: 10,
-    color: '#a16207',
+    color: '#64748b',
+  },
+  cardLocRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cardLocText: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  cardBrandsJoined: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+    lineHeight: 17,
   },
   cardCategoriesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 8,
   },
   cardCategoryBadge: {
     backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   cardCategoryText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  cardBrandsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginBottom: 12,
-  },
-  cardBrandsLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#94a3b8',
-    marginRight: 2,
-  },
-  cardBrandBadge: {
-    backgroundColor: '#fff7ed',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  cardBrandText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#c2410c',
-  },
-  cardMoreBrandsText: {
-    fontSize: 10,
-    color: '#94a3b8',
+    fontSize: 11,
     fontWeight: '600',
+    color: '#334155',
   },
   cardActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginTop: 4,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    paddingTop: 10,
   },
-  cardCallBtn: {
+  cardProfileBtn: {
+    flex: 1,
+    backgroundColor: '#ea580c',
+    paddingVertical: 11,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardProfileBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  cardOutboundBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#ea580c',
-    paddingVertical: 8,
-    borderRadius: 10,
+    gap: 5,
+    backgroundColor: '#1e293b',
+    paddingVertical: 11,
+    borderRadius: 12,
   },
-  cardCallBtnText: {
-    fontSize: 12,
+  cardOutboundBtnText: {
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#ffffff',
   },
-  cardIsiCepteBtn: {
-    flex: 1.2,
+  cardCallIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  allEligibleBannerCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: 20,
+    padding: 18,
+    marginTop: 8,
+    gap: 12,
+  },
+  allEligibleBannerTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  allEligibleBannerSub: {
+    fontSize: 12,
+    color: '#94a3b8',
+    lineHeight: 17,
+  },
+  allEligibleBannerBtn: {
+    backgroundColor: '#2563eb',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  allEligibleBannerBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  paginationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#f0f9ff',
+    gap: 12,
+    paddingVertical: 16,
+  },
+  pageBtn: {
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#bae6fd',
+    borderColor: '#cbd5e1',
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
   },
-  cardIsiCepteBtnText: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#0284c7',
+  pageBtnDisabled: {
+    opacity: 0.4,
   },
-  cardDetailBtn: {
-    width: 36,
-    height: 36,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+  pageBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  pageIndicatorText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
   },
   centerLoading: {
     flex: 1,
@@ -1075,42 +1566,68 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 24,
+    paddingVertical: 48,
+    paddingHorizontal: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   emptyIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   emptyTitle: {
-    fontSize: 17,
+    fontSize: 15.5,
     fontWeight: '900',
     color: '#0f172a',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyDesc: {
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#64748b',
     textAlign: 'center',
     lineHeight: 18,
-    marginBottom: 20,
+    marginBottom: 18,
   },
-  resetBtn: {
-    backgroundColor: '#ea580c',
-    paddingHorizontal: 20,
+  emptyActionsRow: {
+    flexDirection: 'column',
+    gap: 10,
+    width: '100%',
+  },
+  seeAllEligibleBtn: {
+    backgroundColor: '#2563eb',
     paddingVertical: 12,
+    paddingHorizontal: 18,
     borderRadius: 12,
+    alignItems: 'center',
   },
-  resetBtnText: {
+  seeAllEligibleBtnText: {
     fontSize: 13,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  resetFiltersBtn: {
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  resetFiltersBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#334155',
   },
   cityModalOverlay: {
     flex: 1,
@@ -1177,9 +1694,9 @@ const styles = StyleSheet.create({
   },
   detailModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
     justifyContent: 'center',
-    padding: 20,
+    padding: 18,
   },
   detailModalCard: {
     backgroundColor: '#ffffff',
@@ -1187,172 +1704,215 @@ const styles = StyleSheet.create({
     padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 20,
-    elevation: 8,
-    maxHeight: '85%',
+    elevation: 10,
+    maxHeight: '88%',
   },
   detailModalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    marginBottom: 14,
   },
-  detailAvatarBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+  detailShowcaseTag: {
+    alignSelf: 'flex-start',
     backgroundColor: '#fff7ed',
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#ffedd5',
+    borderColor: '#fed7aa',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  detailShowcaseTagText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#ea580c',
+  },
+  detailVerifiedTag: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  detailVerifiedTagText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#1d4ed8',
   },
   detailBusinessName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
     color: '#0f172a',
   },
-  detailVerifiedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  detailVerifiedText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#ea580c',
-  },
   detailCloseBtn: {
-    padding: 6,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  detailInfoBox: {
+  detailCoverBox: {
+    height: 160,
+    width: '100%',
+    borderRadius: 16,
+    backgroundColor: '#0b101e',
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  detailCoverImg: {
+    width: '100%',
+    height: '100%',
+  },
+  detailCoverFallback: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailCoverFallbackText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  detailRatingBox: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     borderRadius: 14,
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  detailInfoCol: {
-    flex: 1,
+  detailFieldBlock: {
+    marginBottom: 14,
   },
-  detailInfoDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: '#e2e8f0',
-    marginHorizontal: 12,
-  },
-  detailInfoLabel: {
+  detailFieldLabel: {
     fontSize: 10,
+    fontWeight: '800',
     color: '#64748b',
-    fontWeight: '700',
+    letterSpacing: 0.4,
+    marginBottom: 5,
+  },
+  detailFieldValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1e293b',
+    lineHeight: 18,
   },
   detailScoreText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '900',
-    color: '#854d0e',
+    color: '#0f172a',
   },
   detailReviewText: {
     fontSize: 11,
-    color: '#a16207',
-  },
-  detailLocText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#0f172a',
-    marginTop: 2,
-  },
-  detailAddressSection: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: '#f1f5f9',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 14,
-  },
-  detailAddressLabel: {
-    fontSize: 10,
-    fontWeight: '700',
     color: '#64748b',
-    marginBottom: 2,
-  },
-  detailAddressText: {
-    fontSize: 12,
-    color: '#334155',
-    lineHeight: 16,
-  },
-  detailSectionTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#0f172a',
-    marginBottom: 6,
-    marginTop: 6,
+    fontWeight: '600',
   },
   detailTagsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 10,
-  },
-  detailCategoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#fff7ed',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  detailCategoryBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#c2410c',
   },
   detailBrandBadge: {
-    backgroundColor: '#e2e8f0',
-    paddingHorizontal: 8,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 8,
   },
   detailBrandBadgeText: {
     fontSize: 11,
     fontWeight: '700',
+    color: '#1d4ed8',
+  },
+  detailCategoryBadge: {
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  detailCategoryBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
     color: '#334155',
+  },
+  detailPhoneBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+  },
+  detailPhoneText: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  detailPhoneCallPill: {
+    backgroundColor: '#ea580c',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  detailPhoneCallPillText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#ffffff',
   },
   detailCtaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginTop: 14,
+    marginTop: 6,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     paddingTop: 14,
   },
-  detailCallBtn: {
-    flex: 1,
+  detailCloseActionBtn: {
+    flex: 0.8,
+    backgroundColor: '#f1f5f9',
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailCloseActionBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  detailIsiCepteBtn: {
+    flex: 1.4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#ea580c',
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  detailCallBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  detailIsiCepteBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#0284c7',
-    paddingVertical: 12,
+    paddingVertical: 13,
     borderRadius: 12,
   },
   detailIsiCepteBtnText: {

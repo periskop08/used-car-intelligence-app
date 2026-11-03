@@ -1,7 +1,9 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+
+const ISICEPTE_LOGO = require('../../../assets/images/isicepte-logo.png');
 
 export default function KesfetHub() {
   const router = useRouter();
@@ -25,6 +27,7 @@ export default function KesfetHub() {
       title: 'İşi Cepte Öneriyor',
       description: 'Bölgenizdeki onaylı oto servisleri, yetkili ve özel mekanik ustaları, oto ekspertiz noktalarını keşfedin.',
       icon: 'shield-checkmark',
+      customLogo: ISICEPTE_LOGO,
       route: '/(tabs)/isicepte',
       color: '#ea580c',
     },
@@ -38,43 +41,58 @@ export default function KesfetHub() {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Keşfet</Text>
-        <Text style={styles.subtitle}>Sizin için özel olarak geliştirilmiş araç ve ilan keşif modülleri</Text>
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Keşfet</Text>
+          <Text style={styles.subtitle}>Sizin için özel olarak geliştirilmiş araç ve ilan keşif modülleri</Text>
+        </View>
 
-      <View style={styles.grid}>
-        {options.map((opt, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[styles.card, { borderColor: opt.color + '22' }]}
-            activeOpacity={0.8}
-            onPress={() => router.push(opt.route as any)}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: opt.color + '12' }]}>
-              <Ionicons name={opt.icon as any} size={28} color={opt.color} />
-            </View>
-            <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: opt.color }]}>{opt.title}</Text>
-              <Text style={styles.cardDesc}>{opt.description}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#94a3b8" style={styles.arrow} />
-          </TouchableOpacity>
-        ))}
-      </View>
-    </ScrollView>
+        <View style={styles.grid}>
+          {options.map((opt, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[styles.card, { borderColor: opt.color + '22' }]}
+              activeOpacity={0.8}
+              onPress={() => router.push(opt.route as any)}
+            >
+              <View
+                style={[
+                  styles.iconContainer,
+                  opt.customLogo ? styles.logoContainer : { backgroundColor: opt.color + '12' },
+                ]}
+              >
+                {opt.customLogo ? (
+                  <Image source={opt.customLogo} style={styles.customLogoImg} resizeMode="contain" />
+                ) : (
+                  <Ionicons name={opt.icon as any} size={28} color={opt.color} />
+                )}
+              </View>
+              <View style={styles.cardText}>
+                <Text style={[styles.cardTitle, { color: opt.color }]}>{opt.title}</Text>
+                <Text style={styles.cardDesc}>{opt.description}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#94a3b8" style={styles.arrow} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
   },
   content: {
     padding: 20,
-    paddingTop: 16,
+    paddingTop: 12,
   },
   header: {
     marginBottom: 24,
@@ -113,6 +131,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+  },
+  logoContainer: {
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  customLogoImg: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
   },
   cardText: {
     flex: 1,

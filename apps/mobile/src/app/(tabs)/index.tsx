@@ -1635,11 +1635,14 @@ export default function MobileDashboard() {
           <TouchableOpacity
             style={styles.kesfetCard}
             activeOpacity={0.85}
+            onPressIn={handleKesfetUserTouch}
             onPress={() => router.push('/(tabs)/isicepte')}
           >
-            <View style={[styles.kesfetIconBox, styles.kesfetIconBoxEmerald]}>
-              <Ionicons name="shield-checkmark" size={20} color="#059669" />
-            </View>
+            <Image
+              source={require('../../../assets/images/isicepte-logo.png')}
+              style={{ width: 42, height: 42, borderRadius: 12 }}
+              resizeMode="contain"
+            />
             <View style={styles.kesfetCardContent}>
               <Text style={styles.kesfetCardText}>İşi Cepte Öneriyor</Text>
               <Text style={styles.kesfetCardSubText}>Onaylı Ustalar</Text>
