@@ -380,7 +380,7 @@ function TorkScoutWebExactAnimatedLogo() {
 
   return (
     <View style={webLogoStyles.container}>
-      <Svg width={204} height={168} viewBox="-50 0 250 200">
+      <Svg width={153} height={126} viewBox="-50 0 250 200">
         <Defs>
           <LinearGradient id="t-gradient-large" x1="0" y1="0" x2="1" y2="1">
             <Stop offset="0%" stopColor="#00f2fe" />
@@ -2835,8 +2835,8 @@ export default function MobileDashboard() {
 
 const webLogoStyles = StyleSheet.create({
   container: {
-    width: 204,
-    height: 168,
+    width: 153,
+    height: 126,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -3036,8 +3036,8 @@ const styles = StyleSheet.create({
   },
   heroLogoWrapper: {
     position: 'absolute',
-    right: -14,
-    top: 16,
+    right: -8,
+    top: 24,
     zIndex: 1,
   },
   sectionHeaderRow: {
