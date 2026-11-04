@@ -42,7 +42,7 @@ export default function KesfetHub() {
       icon: 'shield-checkmark',
       customLogo: ISICEPTE_LOGO,
       route: '/isicepte',
-      color: '#ea580c',
+      color: '#131b2e',
     },
   ];
 
