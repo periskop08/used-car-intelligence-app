@@ -3,7 +3,10 @@ import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, SafeAreaVi
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+const ARAC_REHBERI_ICON = require('../../../assets/images/arac-rehberi-icon.png');
+const ARACINI_BUL_ICON = require('../../../assets/images/aracini-bul-icon.png');
 const ISICEPTE_LOGO = require('../../../assets/images/isicepte-logo.png');
+const AKIS_ICON = require('../../../assets/images/akis-icon.png');
 
 export default function KesfetHub() {
   const router = useRouter();
@@ -11,15 +14,17 @@ export default function KesfetHub() {
   const options = [
     {
       title: 'Araç Rehberi',
-      description: 'Hangi araç alınır? Kronik sorunları ve detaylı teknik özellikleri dikey kart rehberimizden inceleyin.',
+      description: 'Araçların teknik özelliklerini, kronik sorunlarını ve önemli detaylarını keşfedin.',
       icon: 'book',
+      customLogo: ARAC_REHBERI_ICON,
       route: '/vehicle-guide',
       color: '#0284c7',
     },
     {
       title: 'Aracını Bul',
-      description: 'Hızlı kaydırmalı (swipe) kartlar ve kişiselleştirilmiş tercih profiliyle hayalindeki aracı keşfet.',
+      description: 'Araçları kaydırarak değerlendir, tercihlerine göre sana en uygun modelleri keşfet.',
       icon: 'car-sport',
+      customLogo: ARACINI_BUL_ICON,
       route: '/aracini-bul',
       color: '#ea580c',
     },
@@ -33,8 +38,9 @@ export default function KesfetHub() {
     },
     {
       title: 'Akış',
-      description: 'Aktif ilanları Reels / TikTok tarzı dikey bir akışta kaydırarak rastgele ve eğlenceli şekilde keşfedin.',
+      description: 'İlanları kart kart kaydırarak yeni araçları hızlı ve keyifli şekilde keşfedin.',
       icon: 'play-circle',
+      customLogo: AKIS_ICON,
       route: '/ilan-akisi',
       color: '#16a34a',
     },

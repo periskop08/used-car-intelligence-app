@@ -1589,9 +1589,11 @@ export default function MobileDashboard() {
             activeOpacity={0.85}
             onPress={() => router.push('/vehicle-guide' as any)}
           >
-            <View style={[styles.kesfetIconBox, styles.kesfetIconBoxIndigo]}>
-              <Ionicons name="book" size={20} color="#4f46e5" />
-            </View>
+            <Image
+              source={require('../../../assets/images/arac-rehberi-icon.png')}
+              style={{ width: 42, height: 42, borderRadius: 12 }}
+              resizeMode="contain"
+            />
             <View style={styles.kesfetCardContent}>
               <Text style={styles.kesfetCardText}>Araç Rehberi</Text>
               <Text style={styles.kesfetCardSubText}>Kronik &amp; Teknik</Text>
@@ -1605,9 +1607,11 @@ export default function MobileDashboard() {
             activeOpacity={0.85}
             onPress={() => router.push('/aracini-bul' as any)}
           >
-            <View style={[styles.kesfetIconBox, styles.kesfetIconBoxOrange]}>
-              <Ionicons name="compass" size={20} color="#ea580c" />
-            </View>
+            <Image
+              source={require('../../../assets/images/aracini-bul-icon.png')}
+              style={{ width: 42, height: 42, borderRadius: 12 }}
+              resizeMode="contain"
+            />
             <View style={styles.kesfetCardContent}>
               <Text style={styles.kesfetCardText}>Aracını Bul</Text>
               <Text style={styles.kesfetCardSubText}>Kriterli Filtrele</Text>
@@ -1621,9 +1625,11 @@ export default function MobileDashboard() {
             activeOpacity={0.85}
             onPress={() => router.push('/ilan-akisi')}
           >
-            <View style={[styles.kesfetIconBox, styles.kesfetIconBoxCyan]}>
-              <Ionicons name="newspaper" size={20} color="#0284c7" />
-            </View>
+            <Image
+              source={require('../../../assets/images/akis-icon.png')}
+              style={{ width: 42, height: 42, borderRadius: 12 }}
+              resizeMode="contain"
+            />
             <View style={styles.kesfetCardContent}>
               <Text style={styles.kesfetCardText}>Akış</Text>
               <Text style={styles.kesfetCardSubText}>Canlı Paylaşımlar</Text>
