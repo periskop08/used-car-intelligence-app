@@ -380,7 +380,7 @@ function TorkScoutWebExactAnimatedLogo() {
 
   return (
     <View style={webLogoStyles.container}>
-      <Svg width={160} height={130} viewBox="-50 0 250 200">
+      <Svg width={136} height={112} viewBox="-50 0 250 200">
         <Defs>
           <LinearGradient id="t-gradient-large" x1="0" y1="0" x2="1" y2="1">
             <Stop offset="0%" stopColor="#00f2fe" />
@@ -512,6 +512,7 @@ export default function MobileDashboard() {
   } | null>(null);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [vitrinListings, setVitrinListings] = useState<ShowcaseItem[]>([]);
+  const [recentListings, setRecentListings] = useState<ShowcaseItem[]>([]);
   const [promoTab, setPromoTab] = useState<'vitrin' | 'acil'>('vitrin');
   const [loadingListings, setLoadingListings] = useState(false);
 
@@ -829,6 +830,42 @@ export default function MobileDashboard() {
     }, [])
   );
 
+  const mapApiListingItems = (apiItems: any[]): ShowcaseItem[] => {
+    return apiItems.map((item: any, idx: number) => {
+      const brandStr = item.vehicleVariant?.brand?.name || item.customBrand || '';
+      const modelStr = item.vehicleVariant?.model?.name || item.customModel || '';
+      const computedTitle = item.title || `${brandStr} ${modelStr}`.trim() || 'Araç İlanı';
+
+      const priceVal = Number(item.priceAmount || item.price || 0);
+      const yearVal = Number(item.modelYear || item.year || item.vehicleVariant?.year || 2020);
+      const kmVal = Number(item.kilometers || item.mileage || 0);
+
+      const firstImage =
+        item.media?.[0]?.url ||
+        item.media?.[0]?.mediaUrl ||
+        item.photos?.[0]?.url ||
+        item.images?.[0] ||
+        null;
+
+      const imgUrl = resolveVehicleImageUrl(firstImage, brandStr, modelStr);
+
+      return {
+        id: item.id || `api-${idx}`,
+        title: computedTitle,
+        price: priceVal,
+        year: yearVal,
+        mileage: kmVal,
+        city: item.city ? item.city.trim() : 'İstanbul',
+        isUrgent: !!item.isUrgent,
+        isShowcaseFeedActive: !!item.isShowcaseFeedActive,
+        isAiReady: !!item.isAiReady,
+        imageUrl: imgUrl,
+        brandName: brandStr || 'Marka',
+        modelName: modelStr || 'Model',
+      };
+    });
+  };
+
   const fetchFeaturedListings = async (tab: 'vitrin' | 'acil' = promoTab) => {
     setLoadingListings(true);
     try {
@@ -849,42 +886,26 @@ export default function MobileDashboard() {
                   : [];
 
         if (apiItems.length > 0) {
-          const formatted: ShowcaseItem[] = apiItems.map((item: any, idx: number) => {
-            const brandStr = item.vehicleVariant?.brand?.name || item.customBrand || '';
-            const modelStr = item.vehicleVariant?.model?.name || item.customModel || '';
-            const computedTitle = item.title || `${brandStr} ${modelStr}`.trim() || 'Araç İlanı';
-
-            const priceVal = Number(item.priceAmount || item.price || 0);
-            const yearVal = Number(item.modelYear || item.year || item.vehicleVariant?.year || 2020);
-            const kmVal = Number(item.kilometers || item.mileage || 0);
-
-            const firstImage =
-              item.media?.[0]?.url ||
-              item.media?.[0]?.mediaUrl ||
-              item.photos?.[0]?.url ||
-              item.images?.[0] ||
-              null;
-
-            const imgUrl = resolveVehicleImageUrl(firstImage, brandStr, modelStr);
-
-            return {
-              id: item.id || `api-${idx}`,
-              title: computedTitle,
-              price: priceVal,
-              year: yearVal,
-              mileage: kmVal,
-              city: item.city ? item.city.trim() : 'İstanbul',
-              isUrgent: !!item.isUrgent,
-              isShowcaseFeedActive: !!item.isShowcaseFeedActive,
-              isAiReady: !!item.isAiReady,
-              imageUrl: imgUrl,
-              brandName: brandStr || 'Marka',
-              modelName: modelStr || 'Model',
-            };
-          });
-          setVitrinListings(formatted);
+          setVitrinListings(mapApiListingItems(apiItems));
         } else {
           setVitrinListings([]);
+          // Fetch recent active listings when vitrin/acil is empty
+          const fallbackRes = await fetch(`${API_URL}/listings?limit=12`);
+          if (fallbackRes.ok) {
+            const fbData = await fallbackRes.json();
+            const fbItems = Array.isArray(fbData)
+              ? fbData
+              : Array.isArray(fbData?.items)
+                ? fbData.items
+                : Array.isArray(fbData?.data)
+                  ? fbData.data
+                  : Array.isArray(fbData?.data?.items)
+                    ? fbData.data.items
+                    : Array.isArray(fbData?.listings)
+                      ? fbData.listings
+                      : [];
+            setRecentListings(mapApiListingItems(fbItems));
+          }
         }
       } else {
         setVitrinListings([]);
@@ -1471,21 +1492,14 @@ export default function MobileDashboard() {
       {/* TOP HEADER - White Clean Navbar */}
       <View style={styles.topNavbar}>
         <View style={styles.logoRow}>
-          <View style={styles.logoIconLines}>
-            <View style={[styles.logoLine, { width: 14, backgroundColor: '#0284c7' }]} />
-            <View style={[styles.logoLine, { width: 18, backgroundColor: '#0284c7' }]} />
-            <View style={[styles.logoLine, { width: 10, backgroundColor: '#0284c7' }]} />
-          </View>
-          <Text style={styles.logoTextMain}>Tork<Text style={styles.logoTextSub}>Scout</Text></Text>
+          <Image
+            source={require('../../../assets/images/torkscout-header-logo.png')}
+            style={{ width: 156, height: 26 }}
+            resizeMode="contain"
+          />
         </View>
 
         <View style={styles.topRightActions}>
-          <TouchableOpacity style={styles.regionChip}>
-            <Ionicons name="globe-outline" size={15} color="#334155" />
-            <Text style={styles.regionText}>Türkiye</Text>
-            <Ionicons name="chevron-down" size={14} color="#64748b" />
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.headerProfileButton}
             onPress={() => router.push('/(tabs)/profile' as any)}
@@ -1527,7 +1541,7 @@ export default function MobileDashboard() {
           <View style={styles.heroContentLeft}>
             <Text style={styles.heroTitle}>İlanı gör, aracı anla, doğru kararı ver</Text>
             <Text style={styles.heroSubtitle}>
-              Araçları Karşılaştırın, Size En Uygun Aracı Keşfedin.
+              Araçları karşılaştırın, size en uygun aracı keşfedin.
             </Text>
 
             <View style={styles.heroActionsRow}>
@@ -1614,7 +1628,7 @@ export default function MobileDashboard() {
             />
             <View style={styles.kesfetCardContent}>
               <Text style={styles.kesfetCardText}>Aracını Bul</Text>
-              <Text style={styles.kesfetCardSubText}>Kriterli Filtrele</Text>
+              <Text style={styles.kesfetCardSubText}>Kaydır &amp; Keşfet</Text>
             </View>
             <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
           </TouchableOpacity>
@@ -1816,27 +1830,101 @@ export default function MobileDashboard() {
               ))}
             </View>
         ) : (
-        <View style={styles.emptyPromoBox}>
-          <Ionicons
-            name={promoTab === 'vitrin' ? 'star-outline' : 'flame-outline'}
-            size={34}
-            color="#94a3b8"
-          />
-          <Text style={styles.emptyPromoTitle}>
-            {promoTab === 'vitrin'
-              ? 'Şu anda vitrinde aktif araç ilanı bulunmuyor.'
-              : 'Şu anda acil satılık aktif araç ilanı bulunmuyor.'}
-          </Text>
-          <Text style={styles.emptyPromoSub}>
-            Tüm paylaşımları ve satılık araçları incelemek için Akış'a göz atabilirsiniz.
-          </Text>
-          <TouchableOpacity
-            style={styles.emptyPromoBtn}
-            onPress={() => router.push('/ilan-akisi')}
-          >
-            <Text style={styles.emptyPromoBtnText}>Akışa Git ➔</Text>
-          </TouchableOpacity>
-        </View>
+          <View>
+            <View style={styles.emptyPromoBox}>
+              <View style={styles.emptyPromoCompactLeft}>
+                <View style={styles.emptyPromoIconWrap}>
+                  <Ionicons
+                    name={promoTab === 'vitrin' ? 'star-outline' : 'flame-outline'}
+                    size={18}
+                    color="#64748b"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.emptyPromoTitle}>
+                    {promoTab === 'vitrin'
+                      ? 'Şu anda vitrinde aktif ilan bulunmuyor.'
+                      : 'Şu anda acil satılık aktif ilan bulunmuyor.'}
+                  </Text>
+                  <Text style={styles.emptyPromoSub}>
+                    Tüm satılık araçları incelemek için Akış'a göz atabilirsiniz.
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.emptyPromoBtn}
+                onPress={() => router.push('/ilan-akisi')}
+              >
+                <Text style={styles.emptyPromoBtnText}>Akışa Git ➔</Text>
+              </TouchableOpacity>
+            </View>
+
+            {recentListings.length > 0 && (
+              <View style={{ marginTop: 18 }}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionTitle}>Son Eklenen İlanlar</Text>
+                  <TouchableOpacity onPress={() => router.push('/listings')}>
+                    <Text style={styles.sectionLinkText}>Tümünü Gör</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.vitrinHorizontalScrollContent}
+                  style={styles.vitrinRowScrollView}
+                >
+                  {recentListings.map((item) => {
+                    const isFav = !!favorites[item.id];
+                    return (
+                      <TouchableOpacity
+                        key={`recent-${item.id}`}
+                        style={styles.vitrinCard}
+                        activeOpacity={0.9}
+                        onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
+                      >
+                        <View style={styles.vitrinImageContainer}>
+                          <ExpoImage
+                            source={{ uri: item.imageUrl }}
+                            style={styles.vitrinCarImage}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                          />
+                          <View style={styles.vitrinBadgesOverlay}>
+                            {item.isUrgent && <UrgentBadge size="small" />}
+                            {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
+                          </View>
+                          <TouchableOpacity
+                            style={styles.favCircleButton}
+                            onPress={() => toggleFavorite(item.id)}
+                          >
+                            <Ionicons
+                              name={isFav ? 'heart' : 'heart-outline'}
+                              size={17}
+                              color={isFav ? '#ef4444' : '#ffffff'}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={styles.vitrinCardBody}>
+                          <Text style={styles.vitrinTitle} numberOfLines={2}>
+                            {item.title}
+                          </Text>
+                          <Text style={styles.vitrinSpecs}>
+                            {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
+                          </Text>
+                          <View style={styles.vitrinPriceRow}>
+                            <Text style={styles.vitrinPrice}>
+                              {(item.price ?? 0).toLocaleString('tr-TR')} ₺
+                            </Text>
+                            <Text style={styles.vitrinCityBadge}>{item.city}</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+          </View>
           )}
       </View>
     </ScrollView>
@@ -1872,12 +1960,11 @@ export default function MobileDashboard() {
           {/* TorkScout Brand Header */}
           <View style={styles.brandHeroSection}>
             <View style={styles.brandHeroLogoRow}>
-              <View style={styles.logoIconLines}>
-                <View style={[styles.logoLine, { width: 14, backgroundColor: '#0284c7' }]} />
-                <View style={[styles.logoLine, { width: 18, backgroundColor: '#0284c7' }]} />
-                <View style={[styles.logoLine, { width: 10, backgroundColor: '#0284c7' }]} />
-              </View>
-              <Text style={styles.brandHeroLogoMain}>Tork<Text style={styles.brandHeroLogoSub}>Scout</Text></Text>
+              <Image
+                source={require('../../../assets/images/torkscout-header-logo.png')}
+                style={{ width: 165, height: 28 }}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.brandHeroSubtitle}>
               Aracını seç, teknik özelliklerini, yaygın sorunlarını ve satın alma öncesi kritik detaylarını öğren.
@@ -2748,8 +2835,8 @@ export default function MobileDashboard() {
 
 const webLogoStyles = StyleSheet.create({
   container: {
-    width: 160,
-    height: 130,
+    width: 136,
+    height: 112,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2897,7 +2984,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   heroContentLeft: {
-    width: '62%',
+    width: '60%',
     zIndex: 2,
   },
   heroTitle: {
@@ -2905,11 +2992,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#ffffff',
     lineHeight: 27,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   heroSubtitle: {
-    fontSize: 12,
-    color: '#94a3b8',
+    fontSize: 12.5,
+    color: '#cbd5e1',
     lineHeight: 18,
     marginBottom: 18,
   },
@@ -2949,9 +3036,9 @@ const styles = StyleSheet.create({
   },
   heroLogoWrapper: {
     position: 'absolute',
-    right: -4,
-    top: 24,
-    zIndex: 2,
+    right: -6,
+    top: 32,
+    zIndex: 1,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -3186,40 +3273,53 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
   },
   emptyPromoBox: {
-    paddingVertical: 28,
-    paddingHorizontal: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     marginTop: 4,
-    gap: 6,
+    gap: 10,
+  },
+  emptyPromoCompactLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  emptyPromoIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyPromoTitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#1e293b',
-    textAlign: 'center',
-    marginTop: 4,
   },
   emptyPromoSub: {
-    fontSize: 11.5,
+    fontSize: 11,
     color: '#64748b',
-    textAlign: 'center',
-    maxWidth: 280,
-    lineHeight: 16,
+    lineHeight: 15,
+    marginTop: 2,
   },
   emptyPromoBtn: {
-    marginTop: 8,
     backgroundColor: '#0f172a',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 9,
   },
   emptyPromoBtnText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#ffffff',
   },
