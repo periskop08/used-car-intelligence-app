@@ -21,39 +21,46 @@ import { useRouter } from 'expo-router';
 const ISICEPTE_LOGO = require('../../assets/images/isicepte-logo.png');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
-export const ISICEPTE_IOS_STORE_URL = 'https://apps.apple.com/tr/app/i%C5%9Fi-cepte/id6736539281';
-export const ISICEPTE_ANDROID_MARKET_URL = 'market://details?id=com.mefe.isicepte';
-export const ISICEPTE_ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.mefe.isicepte';
+export const ISICEPTE_IOS_STORE_URL = 'itms-apps://apps.apple.com/tr/search?term=%C4%B0%C5%9Fi%20Cepte';
+export const ISICEPTE_IOS_WEB_STORE_URL = 'https://apps.apple.com/tr/search?term=%C4%B0%C5%9Fi%20Cepte';
+export const ISICEPTE_ANDROID_MARKET_URL = 'market://search?q=%C4%B0%C5%9Fi%20Cepte&c=apps';
+export const ISICEPTE_ANDROID_STORE_URL = 'https://play.google.com/store/search?q=%C4%B0%C5%9Fi%20Cepte&c=apps';
 
-export async function openIsiCepteAppOrStore(provider?: { id?: string; slug?: string | null }) {
+export async function openIsiCepteAppOrStore(provider?: {
+  id?: string;
+  slug?: string | null;
+  isicepteProfileUrl?: string | null;
+}) {
   const slugOrId = provider?.slug || provider?.id || '';
-  const appDeepLink = slugOrId ? `isicepte://usta/${slugOrId}` : 'isicepte://';
+  const candidateDeepLinks = [
+    ...(slugOrId ? [`isicepte://usta/${slugOrId}`, `isicepte://profile/${slugOrId}`] : []),
+    'isicepte://',
+    'isicepte://home',
+  ];
 
-  try {
-    const canOpenDeepLink = await Linking.canOpenURL(appDeepLink).catch(() => false);
-    if (canOpenDeepLink) {
-      await Linking.openURL(appDeepLink);
+  // IMPORTANT: On iOS (especially inside Expo Go), Linking.canOpenURL('isicepte://')
+  // always returns false because Expo Go's Info.plist does not include 'isicepte' in LSApplicationQueriesSchemes.
+  // Calling Linking.openURL() directly bypasses LSApplicationQueriesSchemes and opens the installed app!
+  for (const deepLink of candidateDeepLinks) {
+    try {
+      await Linking.openURL(deepLink);
       return;
+    } catch {
+      // Try next candidate scheme
     }
-
-    const canOpenRootScheme = await Linking.canOpenURL('isicepte://').catch(() => false);
-    if (canOpenRootScheme) {
-      await Linking.openURL(appDeepLink);
-      return;
-    }
-  } catch {
-    // Fallback to store below
   }
 
+  // Fallback if the app is not installed on the device: open App Store (iOS) or Play Store (Android)
   if (Platform.OS === 'ios') {
-    await Linking.openURL(ISICEPTE_IOS_STORE_URL).catch(() => {});
+    try {
+      await Linking.openURL(ISICEPTE_IOS_STORE_URL);
+    } catch {
+      await Linking.openURL(ISICEPTE_IOS_WEB_STORE_URL).catch(() => {});
+    }
   } else {
-    const canOpenMarket = await Linking.canOpenURL(ISICEPTE_ANDROID_MARKET_URL).catch(() => false);
-    if (canOpenMarket) {
-      await Linking.openURL(ISICEPTE_ANDROID_MARKET_URL).catch(() =>
-        Linking.openURL(ISICEPTE_ANDROID_STORE_URL)
-      );
-    } else {
+    try {
+      await Linking.openURL(ISICEPTE_ANDROID_MARKET_URL);
+    } catch {
       await Linking.openURL(ISICEPTE_ANDROID_STORE_URL).catch(() => {});
     }
   }
