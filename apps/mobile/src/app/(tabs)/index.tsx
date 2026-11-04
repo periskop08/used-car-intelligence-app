@@ -1587,7 +1587,7 @@ export default function MobileDashboard() {
           <TouchableOpacity
             style={styles.kesfetCard}
             activeOpacity={0.85}
-            onPress={() => router.push('/(tabs)/vehicle-guide')}
+            onPress={() => router.push('/vehicle-guide' as any)}
           >
             <View style={[styles.kesfetIconBox, styles.kesfetIconBoxIndigo]}>
               <Ionicons name="book" size={20} color="#4f46e5" />
@@ -1603,7 +1603,7 @@ export default function MobileDashboard() {
           <TouchableOpacity
             style={styles.kesfetCard}
             activeOpacity={0.85}
-            onPress={() => router.push('/(tabs)/aracini-bul')}
+            onPress={() => router.push('/aracini-bul' as any)}
           >
             <View style={[styles.kesfetIconBox, styles.kesfetIconBoxOrange]}>
               <Ionicons name="compass" size={20} color="#ea580c" />
@@ -1636,7 +1636,7 @@ export default function MobileDashboard() {
             style={styles.kesfetCard}
             activeOpacity={0.85}
             onPressIn={handleKesfetUserTouch}
-            onPress={() => router.push('/(tabs)/isicepte')}
+            onPress={() => router.push('/isicepte' as any)}
           >
             <Image
               source={require('../../../assets/images/isicepte-logo.png')}

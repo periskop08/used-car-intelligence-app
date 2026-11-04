@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -14,7 +14,11 @@ import {
   Image,
   PanResponder,
   Pressable,
+  Animated,
+  Dimensions,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
@@ -118,19 +122,87 @@ export default function IsiCepteRecommendationWidget({
   const [citySearchQuery, setCitySearchQuery] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<IsiCepteProviderItem | null>(null);
 
+  const cityModalPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const providerModalPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+
+  useEffect(() => {
+    if (isCityModalVisible) {
+      cityModalPan.setValue({ x: 0, y: 0 });
+    }
+  }, [isCityModalVisible, cityModalPan]);
+
+  useEffect(() => {
+    if (selectedProvider) {
+      providerModalPan.setValue({ x: 0, y: 0 });
+    }
+  }, [selectedProvider, providerModalPan]);
+
   const cityModalSwipeResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, g) =>
-          Math.abs(g.dx) > 16 || (g.dy > 14 && Math.abs(g.dy) > Math.abs(g.dx)),
+          Math.abs(g.dx) > 10 || (g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx)),
+        onPanResponderMove: (_, g) => {
+          const isHorizontal = Math.abs(g.dx) > Math.abs(g.dy);
+          cityModalPan.setValue({
+            x: isHorizontal ? g.dx : g.dx * 0.25,
+            y: !isHorizontal ? Math.max(0, g.dy) : Math.max(0, g.dy * 0.25),
+          });
+        },
         onPanResponderRelease: (_, g) => {
-          if (Math.abs(g.dx) > 45 || g.dy > 45 || g.vy > 0.4 || Math.abs(g.vx) > 0.4) {
-            setIsCityModalVisible(false);
+          const isHorizontal = Math.abs(g.dx) > Math.abs(g.dy);
+          const cancelledHorizontally =
+            (g.dx > 0 && g.vx < -0.15) || (g.dx < 0 && g.vx > 0.15);
+          const cancelledVertically = g.dy > 0 && g.vy < -0.15;
+
+          const shouldDismissHorizontal =
+            isHorizontal &&
+            !cancelledHorizontally &&
+            (Math.abs(g.dx) > SCREEN_WIDTH * 0.32 || Math.abs(g.vx) > 0.65);
+
+          const shouldDismissVertical =
+            !isHorizontal &&
+            !cancelledVertically &&
+            (g.dy > 110 || g.vy > 0.65);
+
+          if (shouldDismissHorizontal) {
+            Animated.timing(cityModalPan, {
+              toValue: { x: g.dx > 0 ? SCREEN_WIDTH : -SCREEN_WIDTH, y: 0 },
+              duration: 180,
+              useNativeDriver: true,
+            }).start(() => {
+              setIsCityModalVisible(false);
+              cityModalPan.setValue({ x: 0, y: 0 });
+            });
+          } else if (shouldDismissVertical) {
+            Animated.timing(cityModalPan, {
+              toValue: { x: 0, y: SCREEN_HEIGHT },
+              duration: 180,
+              useNativeDriver: true,
+            }).start(() => {
+              setIsCityModalVisible(false);
+              cityModalPan.setValue({ x: 0, y: 0 });
+            });
+          } else {
+            Animated.spring(cityModalPan, {
+              toValue: { x: 0, y: 0 },
+              bounciness: 5,
+              speed: 18,
+              useNativeDriver: true,
+            }).start();
           }
         },
+        onPanResponderTerminate: () => {
+          Animated.spring(cityModalPan, {
+            toValue: { x: 0, y: 0 },
+            bounciness: 5,
+            speed: 18,
+            useNativeDriver: true,
+          }).start();
+        },
       }),
-    []
+    [cityModalPan]
   );
 
   const providerModalSwipeResponder = useMemo(
@@ -138,14 +210,67 @@ export default function IsiCepteRecommendationWidget({
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, g) =>
-          Math.abs(g.dx) > 16 || (g.dy > 14 && Math.abs(g.dy) > Math.abs(g.dx)),
+          Math.abs(g.dx) > 10 || (g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx)),
+        onPanResponderMove: (_, g) => {
+          const isHorizontal = Math.abs(g.dx) > Math.abs(g.dy);
+          providerModalPan.setValue({
+            x: isHorizontal ? g.dx : g.dx * 0.25,
+            y: !isHorizontal ? Math.max(0, g.dy) : Math.max(0, g.dy * 0.25),
+          });
+        },
         onPanResponderRelease: (_, g) => {
-          if (Math.abs(g.dx) > 45 || g.dy > 45 || g.vy > 0.4 || Math.abs(g.vx) > 0.4) {
-            setSelectedProvider(null);
+          const isHorizontal = Math.abs(g.dx) > Math.abs(g.dy);
+          const cancelledHorizontally =
+            (g.dx > 0 && g.vx < -0.15) || (g.dx < 0 && g.vx > 0.15);
+          const cancelledVertically = g.dy > 0 && g.vy < -0.15;
+
+          const shouldDismissHorizontal =
+            isHorizontal &&
+            !cancelledHorizontally &&
+            (Math.abs(g.dx) > SCREEN_WIDTH * 0.32 || Math.abs(g.vx) > 0.65);
+
+          const shouldDismissVertical =
+            !isHorizontal &&
+            !cancelledVertically &&
+            (g.dy > 110 || g.vy > 0.65);
+
+          if (shouldDismissHorizontal) {
+            Animated.timing(providerModalPan, {
+              toValue: { x: g.dx > 0 ? SCREEN_WIDTH : -SCREEN_WIDTH, y: 0 },
+              duration: 180,
+              useNativeDriver: true,
+            }).start(() => {
+              setSelectedProvider(null);
+              providerModalPan.setValue({ x: 0, y: 0 });
+            });
+          } else if (shouldDismissVertical) {
+            Animated.timing(providerModalPan, {
+              toValue: { x: 0, y: SCREEN_HEIGHT },
+              duration: 180,
+              useNativeDriver: true,
+            }).start(() => {
+              setSelectedProvider(null);
+              providerModalPan.setValue({ x: 0, y: 0 });
+            });
+          } else {
+            Animated.spring(providerModalPan, {
+              toValue: { x: 0, y: 0 },
+              bounciness: 5,
+              speed: 18,
+              useNativeDriver: true,
+            }).start();
           }
         },
+        onPanResponderTerminate: () => {
+          Animated.spring(providerModalPan, {
+            toValue: { x: 0, y: 0 },
+            bounciness: 5,
+            speed: 18,
+            useNativeDriver: true,
+          }).start();
+        },
       }),
-    []
+    [providerModalPan]
   );
 
   const fetchRecommendations = useCallback(async () => {
@@ -248,7 +373,7 @@ export default function IsiCepteRecommendationWidget({
             style={styles.seeAllBtnSmall}
             onPress={() =>
               router.push({
-                pathname: '/(tabs)/isicepte',
+                pathname: '/isicepte',
                 params: { brand: vehicleBrand || '' },
               } as any)
             }
@@ -358,7 +483,7 @@ export default function IsiCepteRecommendationWidget({
           activeOpacity={0.85}
           onPress={() =>
             router.push({
-              pathname: '/(tabs)/isicepte',
+              pathname: '/isicepte',
               params: {
                 brand: vehicleBrand && vehicleBrand !== 'Bu Araç' ? vehicleBrand : '',
                 city: selectedCity && selectedCity !== 'Tüm Şehirler' ? selectedCity : '',
@@ -395,7 +520,12 @@ export default function IsiCepteRecommendationWidget({
             style={styles.modalEdgeSwipeZoneRight}
             {...cityModalSwipeResponder.panHandlers}
           />
-          <View style={styles.cityModalContainer}>
+          <Animated.View
+            style={[
+              styles.cityModalContainer,
+              { transform: cityModalPan.getTranslateTransform() },
+            ]}
+          >
             <View {...cityModalSwipeResponder.panHandlers}>
               <View style={styles.modalDragHandleWrap}>
                 <View style={styles.modalDragHandleBar} />
@@ -469,7 +599,7 @@ export default function IsiCepteRecommendationWidget({
                 );
               }}
             />
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -495,7 +625,12 @@ export default function IsiCepteRecommendationWidget({
             style={styles.modalEdgeSwipeZoneRight}
             {...providerModalSwipeResponder.panHandlers}
           />
-          <View style={styles.detailModalCard}>
+          <Animated.View
+            style={[
+              styles.detailModalCard,
+              { transform: providerModalPan.getTranslateTransform() },
+            ]}
+          >
             <View
               style={styles.modalDragHandleWrap}
               {...providerModalSwipeResponder.panHandlers}
@@ -614,7 +749,7 @@ export default function IsiCepteRecommendationWidget({
                 </View>
               </>
             )}
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </View>

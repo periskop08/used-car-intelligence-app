@@ -13,14 +13,14 @@ export default function KesfetHub() {
       title: 'Araç Rehberi',
       description: 'Hangi araç alınır? Kronik sorunları ve detaylı teknik özellikleri dikey kart rehberimizden inceleyin.',
       icon: 'book',
-      route: '/(tabs)/vehicle-guide',
+      route: '/vehicle-guide',
       color: '#0284c7',
     },
     {
       title: 'Aracını Bul',
       description: 'Hızlı kaydırmalı (swipe) kartlar ve kişiselleştirilmiş tercih profiliyle hayalindeki aracı keşfet.',
       icon: 'car-sport',
-      route: '/(tabs)/aracini-bul',
+      route: '/aracini-bul',
       color: '#ea580c',
     },
     {
@@ -28,7 +28,7 @@ export default function KesfetHub() {
       description: 'Bölgenizdeki onaylı oto servisleri, yetkili ve özel mekanik ustaları, oto ekspertiz noktalarını keşfedin.',
       icon: 'shield-checkmark',
       customLogo: ISICEPTE_LOGO,
-      route: '/(tabs)/isicepte',
+      route: '/isicepte',
       color: '#ea580c',
     },
     {

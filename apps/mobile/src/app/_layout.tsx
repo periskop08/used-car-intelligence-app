@@ -28,6 +28,9 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="isicepte" options={{ headerShown: false, gestureEnabled: true, fullScreenGestureEnabled: true }} />
+        <Stack.Screen name="vehicle-guide" options={{ headerShown: false, gestureEnabled: true, fullScreenGestureEnabled: true }} />
+        <Stack.Screen name="aracini-bul" options={{ headerShown: false, gestureEnabled: true, fullScreenGestureEnabled: false }} />
         <Stack.Screen name="login" options={{ title: 'Giriş Yap', headerBackTitle: 'Geri' }} />
         <Stack.Screen name="register" options={{ title: 'Kayıt Ol', headerBackTitle: 'Geri' }} />
         <Stack.Screen name="vehicle-query" options={{ title: 'Araç Sorgula', headerBackTitle: 'Geri' }} />
