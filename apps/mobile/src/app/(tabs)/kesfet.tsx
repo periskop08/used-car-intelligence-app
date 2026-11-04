@@ -29,20 +29,20 @@ export default function KesfetHub() {
       color: '#ea580c',
     },
     {
-      title: 'İşi Cepte Öneriyor',
-      description: 'Bölgenizdeki onaylı oto servisleri, yetkili ve özel mekanik ustaları, oto ekspertiz noktalarını keşfedin.',
-      icon: 'shield-checkmark',
-      customLogo: ISICEPTE_LOGO,
-      route: '/isicepte',
-      color: '#ea580c',
-    },
-    {
       title: 'Akış',
       description: 'İlanları kart kart kaydırarak yeni araçları hızlı ve keyifli şekilde keşfedin.',
       icon: 'play-circle',
       customLogo: AKIS_ICON,
       route: '/ilan-akisi',
       color: '#16a34a',
+    },
+    {
+      title: 'İşi Cepte Öneriyor',
+      description: 'Bölgenizdeki onaylı oto servisleri, yetkili ve özel mekanik ustaları, oto ekspertiz noktalarını keşfedin.',
+      icon: 'shield-checkmark',
+      customLogo: ISICEPTE_LOGO,
+      route: '/isicepte',
+      color: '#ea580c',
     },
   ];
 
