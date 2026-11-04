@@ -3037,7 +3037,7 @@ const styles = StyleSheet.create({
   heroLogoWrapper: {
     position: 'absolute',
     right: -8,
-    top: 24,
+    top: -22,
     zIndex: 1,
   },
   sectionHeaderRow: {
