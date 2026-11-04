@@ -18,32 +18,64 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { TURKEY_81_PROVINCES, IsiCepteProviderItem } from '../../components/IsiCepteRecommendationWidget';
+import {
+  TURKEY_81_PROVINCES,
+  IsiCepteProviderItem,
+  openIsiCepteAppOrStore,
+} from '../../components/IsiCepteRecommendationWidget';
+import { getBrandLogoUrl } from '../../constants/brandLogos';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const ISICEPTE_LOGO = require('../../../assets/images/isicepte-logo.png');
 
-// Canonical locked 11 automotive categories (matching Web)
-const CANONICAL_ISICEPTE_OTO_CATEGORIES = [
+export type IsiCepteVehicleType = 'AUTOMOBILE' | 'MOTORCYCLE';
+
+// Otomobil Servis Kategorileri
+const AUTOMOBILE_CATEGORIES = [
   'Motor/Mekanik',
   'Kaporta/Boya',
-  'Oto Çekici/Kurtarıcı',
+  'Oto Ekspertiz',
   'Oto Elektrik/Elektronik',
-  'Motosiklet Servisi',
+  'Oto Çekici/Kurtarıcı',
+  'Lastik/Jant',
   'Cam Filmi/Kaplama',
   'Oto Yıkama & Detay',
-  'Lastik/Jant',
   'Oto Aksesuar',
   'Oto Yedek Parça',
+] as const;
+
+// Motosiklet Servis Kategorileri
+const MOTORCYCLE_CATEGORIES = [
+  'Motosiklet Servisi',
+  'Motor/Mekanik',
+  'Lastik/Jant',
+  'Oto Elektrik/Elektronik',
+  'Kaporta/Boya',
+  'Cam Filmi/Kaplama',
+  'Oto Çekici/Kurtarıcı',
+  'Oto Yıkama & Detay',
   'Oto Ekspertiz',
 ] as const;
 
-const INITIAL_CANONICAL_BRANDS: string[] = [
-  'Alfa Romeo', 'Audi', 'BMW', 'Chery', 'Chevrolet', 'Citroen', 'Cupra', 'Dacia', 'DS Automobiles', 'Fiat',
-  'Ford', 'Honda', 'Hyundai', 'Jeep', 'Kia', 'Land Rover', 'Mazda', 'Mercedes-Benz', 'MINI', 'Mitsubishi',
-  'Nissan', 'Opel', 'Peugeot', 'Porsche', 'Renault', 'Seat', 'Skoda', 'Subaru', 'Suzuki', 'Tesla',
-  'Togg', 'Toyota', 'Volkswagen', 'Volvo',
+const INITIAL_AUTOMOBILE_BRANDS: string[] = [
+  'Alfa Romeo', 'Audi', 'BMW', 'BYD', 'Chery', 'Chevrolet', 'Citroen', 'Cupra', 'Dacia',
+  'DS Automobiles', 'Fiat', 'Ford', 'Honda', 'Hyundai', 'Jeep', 'Kia', 'Land Rover',
+  'Mazda', 'Mercedes-Benz', 'MG', 'MINI', 'Mitsubishi', 'Nissan', 'Opel', 'Peugeot',
+  'Porsche', 'Renault', 'Seat', 'Skoda', 'SsangYong', 'Subaru', 'Suzuki', 'Tesla',
+  'Tofaş', 'Togg', 'Toyota', 'Volkswagen', 'Volvo',
 ];
+
+const INITIAL_MOTORCYCLE_BRANDS: string[] = [
+  'Aprilia', 'Arora', 'Bajaj', 'Benelli', 'BMW', 'CFMoto', 'Ducati', 'Harley-Davidson',
+  'Hero', 'Honda', 'Husqvarna', 'Indian', 'Kanuni', 'Kawasaki', 'KTM', 'Kuba', 'Kymco',
+  'Mondial', 'Moto Guzzi', 'MV Agusta', 'Piaggio', 'QJMotor', 'RKS', 'Royal Alloy',
+  'Royal Enfield', 'Suzuki', 'SYM', 'Triumph', 'TVS', 'Vespa', 'Voge', 'Yamaha',
+  'Yuki', 'Zontes',
+];
+
+const MOTORCYCLE_BRAND_SET = new Set(
+  INITIAL_MOTORCYCLE_BRANDS.map((b) => b.toLowerCase())
+);
 
 export default function IsiCepteOneriyorScreen() {
   const router = useRouter();
@@ -52,7 +84,12 @@ export default function IsiCepteOneriyorScreen() {
   const initialBrandParam = typeof params.brand === 'string' && params.brand ? params.brand : 'Tüm Markalar';
   const initialCityParam = typeof params.city === 'string' && params.city ? params.city : 'Tüm Şehirler';
   const initialCategoryParam = typeof params.category === 'string' && params.category ? params.category : 'Tüm Kategoriler';
+  const initialVehicleTypeParam: IsiCepteVehicleType =
+    params.vehicleType === 'MOTORCYCLE' || params.category === 'Motosiklet Servisi'
+      ? 'MOTORCYCLE'
+      : 'AUTOMOBILE';
 
+  const [selectedVehicleType, setSelectedVehicleType] = useState<IsiCepteVehicleType>(initialVehicleTypeParam);
   const [items, setItems] = useState<IsiCepteProviderItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [totalShowcase, setTotalShowcase] = useState(0);
@@ -63,10 +100,19 @@ export default function IsiCepteOneriyorScreen() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Available filter options from canonical sources and active pool
+  // Available filter options scoped by Vehicle Type
   const [availableCities, setAvailableCities] = useState<string[]>(['Tüm Şehirler', ...TURKEY_81_PROVINCES]);
-  const [availableBrands, setAvailableBrands] = useState<string[]>(['Tüm Markalar', ...INITIAL_CANONICAL_BRANDS]);
-  const availableCategories = ['Tüm Kategoriler', ...CANONICAL_ISICEPTE_OTO_CATEGORIES];
+  const [autoBrands, setAutoBrands] = useState<string[]>(['Tüm Markalar', ...INITIAL_AUTOMOBILE_BRANDS]);
+  const [motoBrands, setMotoBrands] = useState<string[]>(['Tüm Markalar', ...INITIAL_MOTORCYCLE_BRANDS]);
+
+  const availableBrands = selectedVehicleType === 'MOTORCYCLE' ? motoBrands : autoBrands;
+  const availableCategories = useMemo(
+    () =>
+      selectedVehicleType === 'MOTORCYCLE'
+        ? ['Tüm Kategoriler', ...MOTORCYCLE_CATEGORIES]
+        : ['Tüm Kategoriler', ...AUTOMOBILE_CATEGORIES],
+    [selectedVehicleType]
+  );
 
   // Active filter states
   const [selectedCity, setSelectedCity] = useState<string>(initialCityParam);
@@ -84,6 +130,41 @@ export default function IsiCepteOneriyorScreen() {
   // Session seed for stable randomization per view
   const [sessionSeed] = useState(() => Math.random().toString(36).substring(2, 9));
 
+  // Fetch canonical Otomobil & Motosiklet brand lists from backend
+  useEffect(() => {
+    const loadBrandsByType = async () => {
+      try {
+        const [autoRes, motoRes] = await Promise.all([
+          fetch(`${API_URL}/vehicle-filters/brands?category=AUTOMOBILE`),
+          fetch(`${API_URL}/vehicle-filters/brands?category=MOTORCYCLE`),
+        ]);
+        if (autoRes.ok) {
+          const autoJson = await autoRes.json();
+          if (autoJson.success && Array.isArray(autoJson.data) && autoJson.data.length > 0) {
+            const names = autoJson.data
+              .map((b: any) => (typeof b === 'string' ? b : b.label || b.name || b.value))
+              .filter(Boolean)
+              .sort((a: string, b: string) => a.localeCompare(b, 'tr'));
+            setAutoBrands(['Tüm Markalar', ...Array.from(new Set<string>(names))]);
+          }
+        }
+        if (motoRes.ok) {
+          const motoJson = await motoRes.json();
+          if (motoJson.success && Array.isArray(motoJson.data) && motoJson.data.length > 0) {
+            const names = motoJson.data
+              .map((b: any) => (typeof b === 'string' ? b : b.label || b.name || b.value))
+              .filter(Boolean)
+              .sort((a: string, b: string) => a.localeCompare(b, 'tr'));
+            setMotoBrands(['Tüm Markalar', ...Array.from(new Set<string>(names))]);
+          }
+        }
+      } catch {
+        // Fallback lists already initialized
+      }
+    };
+    loadBrandsByType();
+  }, []);
+
   // Sync params if navigated with brand/city params
   useEffect(() => {
     if (typeof params.brand === 'string' && params.brand) {
@@ -96,7 +177,16 @@ export default function IsiCepteOneriyorScreen() {
     }
   }, [params.brand, params.city]);
 
-  // Fetch recommendations from API (exact parity with Web)
+  // Handle Vasıta Türü switch (Otomobil <-> Motosiklet)
+  const handleVehicleTypeChange = (nextType: IsiCepteVehicleType) => {
+    if (nextType === selectedVehicleType) return;
+    setSelectedVehicleType(nextType);
+    setSelectedBrand('Tüm Markalar');
+    setSelectedCategory('Tüm Kategoriler');
+    setPage(1);
+  };
+
+  // Fetch recommendations from API
   const fetchRecommendations = useCallback(
     async (isRefresh = false) => {
       if (!isRefresh) setLoading(true);
@@ -110,6 +200,9 @@ export default function IsiCepteOneriyorScreen() {
         }
         if (selectedCategory && selectedCategory !== 'Tüm Kategoriler') {
           query.append('category', selectedCategory);
+        } else if (selectedVehicleType === 'MOTORCYCLE' && selectedBrand === 'Tüm Markalar') {
+          // When Motorcycle is selected with "Tüm Kategoriler", prioritize Motosiklet Servisi on API query
+          query.append('category', 'Motosiklet Servisi');
         }
         query.append('scope', scope);
         query.append('page', page.toString());
@@ -119,7 +212,8 @@ export default function IsiCepteOneriyorScreen() {
         const res = await fetch(`${API_URL}/isicepte/recommendations?${query.toString()}`);
         if (res.ok) {
           const data = await res.json();
-          const fetchedItems = Array.isArray(data.items) ? data.items : [];
+          const fetchedItems: IsiCepteProviderItem[] = Array.isArray(data.items) ? data.items : [];
+
           setItems(fetchedItems);
           setTotalCount(data.total || 0);
           setTotalShowcase(data.totalShowcase || 0);
@@ -133,13 +227,6 @@ export default function IsiCepteOneriyorScreen() {
                 : ['Tüm Şehirler', ...data.availableCities]
             );
           }
-          if (Array.isArray(data.availableBrands) && data.availableBrands.length > 0) {
-            setAvailableBrands(
-              data.availableBrands.includes('Tüm Markalar')
-                ? data.availableBrands
-                : ['Tüm Markalar', ...data.availableBrands]
-            );
-          }
 
           // Record impression event for Vitrin analytics if items exist
           if (fetchedItems.length > 0) {
@@ -151,6 +238,7 @@ export default function IsiCepteOneriyorScreen() {
                 city: selectedCity !== 'Tüm Şehirler' ? selectedCity : undefined,
                 brand: selectedBrand !== 'Tüm Markalar' ? selectedBrand : undefined,
                 metadata: {
+                  vehicleType: selectedVehicleType,
                   category: selectedCategory !== 'Tüm Kategoriler' ? selectedCategory : undefined,
                   scope,
                 },
@@ -174,7 +262,7 @@ export default function IsiCepteOneriyorScreen() {
         setRefreshing(false);
       }
     },
-    [selectedCity, selectedBrand, selectedCategory, scope, page, sessionSeed]
+    [selectedVehicleType, selectedCity, selectedBrand, selectedCategory, scope, page, sessionSeed]
   );
 
   useEffect(() => {
@@ -199,6 +287,7 @@ export default function IsiCepteOneriyorScreen() {
     }).catch(() => {});
   };
 
+  // Opens İşi Cepte app directly if installed, otherwise redirects to App Store / Google Play Store
   const handleOutboundClick = async (provider: IsiCepteProviderItem) => {
     fetch(`${API_URL}/isicepte/events`, {
       method: 'POST',
@@ -210,21 +299,7 @@ export default function IsiCepteOneriyorScreen() {
       }),
     }).catch(() => {});
 
-    const webUrl =
-      provider.isicepteProfileUrl ||
-      (provider.slug ? `https://isicepte.com/usta/${provider.slug}` : 'https://isicepte.com');
-    const appDeepLink = `isicepte://usta/${provider.slug || provider.id}`;
-
-    try {
-      const supported = await Linking.canOpenURL(appDeepLink);
-      if (supported) {
-        await Linking.openURL(appDeepLink);
-      } else {
-        await Linking.openURL(webUrl);
-      }
-    } catch {
-      Linking.openURL(webUrl);
-    }
+    await openIsiCepteAppOrStore(provider);
   };
 
   const handleCall = (phone?: string | null) => {
@@ -246,41 +321,61 @@ export default function IsiCepteOneriyorScreen() {
     selectedBrand !== 'Tüm Markalar' ||
     selectedCategory !== 'Tüm Kategoriler';
 
-  // Contextual summary title matching Web
+  // Contextual summary title
   const getContextualSummaryTitle = () => {
+    const vehicleLabel = selectedVehicleType === 'MOTORCYCLE' ? 'Motosiklet' : 'Otomobil';
     const hasCity = selectedCity !== 'Tüm Şehirler';
     const hasBrand = selectedBrand !== 'Tüm Markalar';
     const hasCat = selectedCategory !== 'Tüm Kategoriler';
 
     let descriptor = '';
     if (hasCity && hasBrand && hasCat) {
-      descriptor = `${selectedCity} şehrinde ${selectedBrand} için ${selectedCategory} hizmeti veren`;
+      descriptor = `${selectedCity} • ${selectedBrand} (${selectedCategory})`;
     } else if (hasCity && hasBrand) {
-      descriptor = `${selectedCity} şehrinde ${selectedBrand} uzmanı`;
+      descriptor = `${selectedCity} • ${selectedBrand} uzmanı`;
     } else if (hasCity && hasCat) {
-      descriptor = `${selectedCity} şehrinde ${selectedCategory} hizmeti veren`;
+      descriptor = `${selectedCity} • ${selectedCategory}`;
     } else if (hasBrand && hasCat) {
-      descriptor = `${selectedBrand} için ${selectedCategory} hizmeti veren`;
+      descriptor = `${selectedBrand} • ${selectedCategory}`;
     } else if (hasCity) {
-      descriptor = `${selectedCity} şehrindeki`;
+      descriptor = `${selectedCity} (${vehicleLabel})`;
     } else if (hasBrand) {
       descriptor = `${selectedBrand} uzmanı`;
     } else if (hasCat) {
-      descriptor = `${selectedCategory} hizmeti veren`;
+      descriptor = `${selectedCategory} (${vehicleLabel})`;
+    } else {
+      descriptor = `${vehicleLabel}`;
     }
 
     if (scope === 'SHOWCASE_ONLY') {
-      return descriptor ? `${descriptor} vitrin üyeleri` : 'Tüm Vitrin Üyeleri';
+      return `${descriptor} vitrin üyeleri`;
     } else {
-      return descriptor ? `${descriptor} tüm ustalar ve servisler` : 'Tüm Ustalar ve Servisler';
+      return `${descriptor} tüm ustalar ve servisler`;
     }
   };
 
-  // Client search filter for business names
+  // Client search filter for business names + vehicle type isolation
   const displayedItems = useMemo(() => {
-    if (!searchQuery.trim()) return items;
+    let list = items;
+
+    // When Otomobil is selected and category is "Tüm Kategoriler", exclude motorcycle-only shops if they only do Motosiklet Servisi
+    if (
+      selectedVehicleType === 'AUTOMOBILE' &&
+      selectedCategory === 'Tüm Kategoriler' &&
+      selectedBrand === 'Tüm Markalar'
+    ) {
+      list = list.filter((item) => {
+        const cats = item.serviceCategories || [];
+        if (cats.length === 1 && cats[0] === 'Motosiklet Servisi') {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
-    return items.filter(
+    return list.filter(
       (item) =>
         item.businessName.toLowerCase().includes(q) ||
         item.city.toLowerCase().includes(q) ||
@@ -288,7 +383,7 @@ export default function IsiCepteOneriyorScreen() {
         item.serviceCategories?.some((c) => c.toLowerCase().includes(q)) ||
         item.supportedBrands?.some((b) => b.toLowerCase().includes(q))
     );
-  }, [items, searchQuery]);
+  }, [items, searchQuery, selectedVehicleType, selectedCategory, selectedBrand]);
 
   // Modal list items based on activeFilterModal
   const modalOptions = useMemo(() => {
@@ -347,8 +442,58 @@ export default function IsiCepteOneriyorScreen() {
         </View>
       </View>
 
-      {/* 3-FILTER BAR MATCHING WEB: ŞEHİR | MARKA | KATEGORİ */}
+      {/* FILTER SECTION */}
       <View style={styles.filterSection}>
+        {/* STEP 1: VASITA TÜRÜ SEÇİMİ (SADECE OTOMOBİL VE MOTOSİKLET) */}
+        <View style={styles.vehicleTypeRow}>
+          <TouchableOpacity
+            style={[
+              styles.vehicleTypeBtn,
+              selectedVehicleType === 'AUTOMOBILE' && styles.vehicleTypeBtnActive,
+            ]}
+            onPress={() => handleVehicleTypeChange('AUTOMOBILE')}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="car-sport"
+              size={16}
+              color={selectedVehicleType === 'AUTOMOBILE' ? '#ffffff' : '#475569'}
+            />
+            <Text
+              style={[
+                styles.vehicleTypeBtnText,
+                selectedVehicleType === 'AUTOMOBILE' && styles.vehicleTypeBtnTextActive,
+              ]}
+            >
+              Otomobil
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.vehicleTypeBtn,
+              selectedVehicleType === 'MOTORCYCLE' && styles.vehicleTypeBtnActive,
+            ]}
+            onPress={() => handleVehicleTypeChange('MOTORCYCLE')}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="bicycle"
+              size={16}
+              color={selectedVehicleType === 'MOTORCYCLE' ? '#ffffff' : '#475569'}
+            />
+            <Text
+              style={[
+                styles.vehicleTypeBtnText,
+                selectedVehicleType === 'MOTORCYCLE' && styles.vehicleTypeBtnTextActive,
+              ]}
+            >
+              Motosiklet
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* STEP 2: 3-FILTER BAR: ŞEHİR | MARKA | KATEGORİ */}
         <View style={styles.threeFilterRow}>
           {/* 1. Şehir */}
           <TouchableOpacity
@@ -383,7 +528,9 @@ export default function IsiCepteOneriyorScreen() {
             onPress={() => openFilterModal('brand')}
             activeOpacity={0.8}
           >
-            <Text style={styles.filterDropdownLabel}>MARKA</Text>
+            <Text style={styles.filterDropdownLabel}>
+              {selectedVehicleType === 'MOTORCYCLE' ? 'MOTO MARKA' : 'MARKA'}
+            </Text>
             <View style={styles.filterDropdownValueRow}>
               <Text
                 style={[
@@ -451,7 +598,11 @@ export default function IsiCepteOneriyorScreen() {
               setPage(1);
             }}
           >
-            <Text style={{ fontSize: 12 }}>👑</Text>
+            <Ionicons
+              name="star"
+              size={13}
+              color={scope === 'SHOWCASE_ONLY' ? '#ea580c' : '#64748b'}
+            />
             <Text style={[styles.scopeTabText, scope === 'SHOWCASE_ONLY' && styles.scopeTabTextActive]}>
               Vitrin Üyeleri {totalShowcase > 0 ? `(${totalShowcase})` : ''}
             </Text>
@@ -474,35 +625,9 @@ export default function IsiCepteOneriyorScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-
-        {/* QUICK CATEGORY CHIPS SCROLL */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsScrollContent}
-        >
-          {availableCategories.map((cat) => {
-            const isSelected = selectedCategory === cat;
-            return (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.categoryChip, isSelected && styles.categoryChipActive]}
-                onPress={() => {
-                  setSelectedCategory(cat);
-                  setPage(1);
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.categoryChipText, isSelected && styles.categoryChipTextActive]}>
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
       </View>
 
-      {/* FILTERED MODE CONTEXT BAR & REMOVABLE CHIPS (MATCHING WEB) */}
+      {/* FILTERED MODE CONTEXT BAR & REMOVABLE CHIPS */}
       {(isFiltered || scope === 'ALL_ELIGIBLE') && (
         <View style={styles.contextSummaryBar}>
           <View style={styles.contextTitleRow}>
@@ -589,21 +714,27 @@ export default function IsiCepteOneriyorScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconCircle}>
-                <Ionicons name="search" size={28} color="#ea580c" />
+                <Ionicons
+                  name={selectedVehicleType === 'MOTORCYCLE' ? 'bicycle' : 'search'}
+                  size={28}
+                  color="#ea580c"
+                />
               </View>
               <Text style={styles.emptyTitle}>
                 {scope === 'SHOWCASE_ONLY'
-                  ? 'Bu filtrelere uygun aktif Vitrin üyesi bulunmuyor.'
+                  ? `Seçili kriterlere uygun aktif ${
+                      selectedVehicleType === 'MOTORCYCLE' ? 'Motosiklet' : 'Otomobil'
+                    } Vitrin üyesi bulunmuyor.`
                   : isFiltered
                   ? 'Seçtiğiniz şehir, marka ve kategoriye uygun işletme bulunamadı.'
-                  : 'Şu anda İşiCepte Öneriyor bölümünde aktif işletme bulunmuyor.'}
+                  : 'Şu anda bu bölümde aktif işletme bulunmuyor.'}
               </Text>
               <Text style={styles.emptyDesc}>
                 {scope === 'SHOWCASE_ONLY' && totalAll > 0
                   ? `Bu filtrelerle eşleşen ${totalAll} standart usta ve servis bulunuyor. "Tüm Ustaları Gör" butonuna tıklayarak erişebilirsiniz.`
                   : isFiltered
                   ? 'Filtreleri değiştirerek veya temizleyerek diğer servisleri görebilirsiniz.'
-                  : 'Yeni üye otomotiv servisleri eklendikçe burada listelenecektir.'}
+                  : 'Yeni üye servisler eklendikçe burada listelenecektir.'}
               </Text>
 
               <View style={styles.emptyActionsRow}>
@@ -636,7 +767,7 @@ export default function IsiCepteOneriyorScreen() {
           }
           ListFooterComponent={
             <>
-              {/* Under Vitrin Section CTA: "TÜM USTALARI GÖR" Button in Showcase View (Matching Web) */}
+              {/* Under Vitrin Section CTA: "TÜM USTALARI GÖR" Button in Showcase View */}
               {scope === 'SHOWCASE_ONLY' && displayedItems.length > 0 && totalAll > 0 && (
                 <View style={styles.allEligibleBannerCard}>
                   <View style={{ flex: 1 }}>
@@ -662,7 +793,7 @@ export default function IsiCepteOneriyorScreen() {
                 </View>
               )}
 
-              {/* Pagination Controls (Matching Web) */}
+              {/* Pagination Controls */}
               {totalPages > 1 && (
                 <View style={styles.paginationRow}>
                   <TouchableOpacity
@@ -690,7 +821,7 @@ export default function IsiCepteOneriyorScreen() {
           }
           renderItem={({ item }) => (
             <View style={styles.card}>
-              {/* Card Top: Cover Image Area & Showcase Badge (Matching Web) */}
+              {/* Card Top: Cover Image Area & High-Contrast Showcase Badge */}
               <TouchableOpacity
                 style={styles.cardCoverArea}
                 activeOpacity={0.9}
@@ -713,10 +844,11 @@ export default function IsiCepteOneriyorScreen() {
                   </View>
                 )}
 
-                {/* Vitrin Üyesi Badge */}
+                {/* High-Contrast Vitrin Üyesi Badge */}
                 {item.isShowcase && (
                   <View style={styles.cardVitrinOverlayBadge}>
-                    <Text style={styles.cardVitrinOverlayBadgeText}>👑 VİTRİN ÜYESİ</Text>
+                    <Ionicons name="star" size={11} color="#fbbf24" />
+                    <Text style={styles.cardVitrinOverlayBadgeText}>VİTRİN ÜYESİ</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -752,11 +884,35 @@ export default function IsiCepteOneriyorScreen() {
                   </Text>
                 </View>
 
-                {/* Supported Brands */}
+                {/* Supported Brands with Official Brand Logos */}
                 {item.supportedBrands && item.supportedBrands.length > 0 ? (
-                  <Text style={styles.cardBrandsJoined} numberOfLines={2}>
-                    {item.supportedBrands.join(' • ')}
-                  </Text>
+                  <View style={styles.cardBrandPillsRow}>
+                    {item.supportedBrands.slice(0, 5).map((brandName, idx) => {
+                      const logoUri = getBrandLogoUrl(
+                        brandName,
+                        MOTORCYCLE_BRAND_SET.has(brandName.toLowerCase())
+                          ? 'MOTORCYCLE'
+                          : selectedVehicleType
+                      );
+                      return (
+                        <View key={idx} style={styles.cardBrandPillWithLogo}>
+                          {logoUri ? (
+                            <Image
+                              source={{ uri: logoUri }}
+                              style={styles.cardBrandMiniLogo}
+                              resizeMode="contain"
+                            />
+                          ) : null}
+                          <Text style={styles.cardBrandPillText}>{brandName}</Text>
+                        </View>
+                      );
+                    })}
+                    {item.supportedBrands.length > 5 && (
+                      <Text style={styles.cardMoreBrandsText}>
+                        +{item.supportedBrands.length - 5}
+                      </Text>
+                    )}
+                  </View>
                 ) : null}
 
                 {/* Canonical Service Categories Chips */}
@@ -770,7 +926,7 @@ export default function IsiCepteOneriyorScreen() {
                   </View>
                 ) : null}
 
-                {/* Card Actions: Profili Gör & İşiCepte'de Aç (Matching Web) */}
+                {/* Card Actions: Profili Gör & İşiCepte'de Aç (App/Store) & Ara */}
                 <View style={styles.cardActionRow}>
                   <TouchableOpacity
                     style={styles.cardProfileBtn}
@@ -785,7 +941,11 @@ export default function IsiCepteOneriyorScreen() {
                     onPress={() => handleOutboundClick(item)}
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="open-outline" size={14} color="#ffffff" />
+                    <Image
+                      source={ISICEPTE_LOGO}
+                      style={{ width: 16, height: 16, borderRadius: 4 }}
+                      resizeMode="contain"
+                    />
                     <Text style={styles.cardOutboundBtnText}>İşiCepte'de Aç</Text>
                   </TouchableOpacity>
 
@@ -795,7 +955,8 @@ export default function IsiCepteOneriyorScreen() {
                       onPress={() => handleCall(item.phone)}
                       activeOpacity={0.85}
                     >
-                      <Ionicons name="call" size={16} color="#ea580c" />
+                      <Ionicons name="call" size={14} color="#ea580c" />
+                      <Text style={styles.cardCallBtnLabel}>Ara</Text>
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -821,8 +982,10 @@ export default function IsiCepteOneriyorScreen() {
                 {activeFilterModal === 'city'
                   ? 'Şehir Seçin'
                   : activeFilterModal === 'brand'
-                  ? 'Marka Seçin'
-                  : 'Kategori Seçin'}
+                  ? selectedVehicleType === 'MOTORCYCLE'
+                    ? 'Motosiklet Markası Seçin'
+                    : 'Otomobil Markası Seçin'
+                  : 'Hizmet Kategorisi Seçin'}
               </Text>
               <TouchableOpacity
                 onPress={() => setActiveFilterModal(null)}
@@ -841,7 +1004,9 @@ export default function IsiCepteOneriyorScreen() {
                   activeFilterModal === 'city'
                     ? 'Şehir ara (örn: İstanbul, İzmir, Ankara)...'
                     : activeFilterModal === 'brand'
-                    ? 'Marka ara (örn: BMW, Renault, Fiat)...'
+                    ? selectedVehicleType === 'MOTORCYCLE'
+                      ? 'Motosiklet markası ara (örn: Honda, Yamaha)...'
+                      : 'Otomobil markası ara (örn: BMW, Renault, Fiat)...'
                     : 'Kategori ara...'
                 }
                 placeholderTextColor="#94a3b8"
@@ -864,14 +1029,39 @@ export default function IsiCepteOneriyorScreen() {
                   (activeFilterModal === 'city' && selectedCity === item) ||
                   (activeFilterModal === 'brand' && selectedBrand === item) ||
                   (activeFilterModal === 'category' && selectedCategory === item);
+
+                const brandLogoUri =
+                  activeFilterModal === 'brand' && item !== 'Tüm Markalar'
+                    ? getBrandLogoUrl(item, selectedVehicleType)
+                    : null;
+
                 return (
                   <TouchableOpacity
                     style={[styles.cityItem, isSelected && styles.cityItemActive]}
                     onPress={() => handleSelectModalOption(item)}
                   >
-                    <Text style={[styles.cityItemText, isSelected && styles.cityItemTextActive]}>
-                      {item}
-                    </Text>
+                    <View style={styles.modalOptionLeft}>
+                      {activeFilterModal === 'brand' && (
+                        <View style={styles.modalBrandLogoBox}>
+                          {brandLogoUri ? (
+                            <Image
+                              source={{ uri: brandLogoUri }}
+                              style={styles.modalBrandLogoImg}
+                              resizeMode="contain"
+                            />
+                          ) : (
+                            <Ionicons
+                              name={selectedVehicleType === 'MOTORCYCLE' ? 'bicycle' : 'car-sport'}
+                              size={16}
+                              color="#64748b"
+                            />
+                          )}
+                        </View>
+                      )}
+                      <Text style={[styles.cityItemText, isSelected && styles.cityItemTextActive]}>
+                        {item}
+                      </Text>
+                    </View>
                     {isSelected && <Ionicons name="checkmark" size={18} color="#ea580c" />}
                   </TouchableOpacity>
                 );
@@ -882,7 +1072,7 @@ export default function IsiCepteOneriyorScreen() {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* PROVIDER DETAIL MODAL (MATCHING WEB MODAL) */}
+      {/* PROVIDER DETAIL MODAL */}
       {/* ========================================================================= */}
       <Modal
         visible={Boolean(detailModalProvider)}
@@ -899,7 +1089,8 @@ export default function IsiCepteOneriyorScreen() {
                   <View style={{ flex: 1, paddingRight: 10 }}>
                     {detailModalProvider.isShowcase ? (
                       <View style={styles.detailShowcaseTag}>
-                        <Text style={styles.detailShowcaseTagText}>👑 İŞİCEPTE VİTRİN ÜYESİ</Text>
+                        <Ionicons name="star" size={11} color="#ea580c" />
+                        <Text style={styles.detailShowcaseTagText}>İŞİCEPTE VİTRİN ÜYESİ</Text>
                       </View>
                     ) : (
                       <View style={styles.detailVerifiedTag}>
@@ -944,7 +1135,7 @@ export default function IsiCepteOneriyorScreen() {
                   )}
                 </View>
 
-                {/* Rating & Reviews (Only if real data exists, matching Web) */}
+                {/* Rating & Reviews */}
                 {detailModalProvider.rating > 0 && (
                   <View style={styles.detailRatingBox}>
                     <View>
@@ -975,16 +1166,31 @@ export default function IsiCepteOneriyorScreen() {
                   </Text>
                 </View>
 
-                {/* Supported Brands */}
+                {/* Supported Brands with Logos */}
                 {detailModalProvider.supportedBrands && detailModalProvider.supportedBrands.length > 0 ? (
                   <View style={styles.detailFieldBlock}>
                     <Text style={styles.detailFieldLabel}>HİZMET VERİLEN ARAÇ MARKALARI</Text>
                     <View style={styles.detailTagsGrid}>
-                      {detailModalProvider.supportedBrands.map((b, idx) => (
-                        <View key={idx} style={styles.detailBrandBadge}>
-                          <Text style={styles.detailBrandBadgeText}>{b}</Text>
-                        </View>
-                      ))}
+                      {detailModalProvider.supportedBrands.map((b, idx) => {
+                        const logoUri = getBrandLogoUrl(
+                          b,
+                          MOTORCYCLE_BRAND_SET.has(b.toLowerCase())
+                            ? 'MOTORCYCLE'
+                            : selectedVehicleType
+                        );
+                        return (
+                          <View key={idx} style={styles.detailBrandBadge}>
+                            {logoUri ? (
+                              <Image
+                                source={{ uri: logoUri }}
+                                style={{ width: 15, height: 15 }}
+                                resizeMode="contain"
+                              />
+                            ) : null}
+                            <Text style={styles.detailBrandBadgeText}>{b}</Text>
+                          </View>
+                        );
+                      })}
                     </View>
                   </View>
                 ) : null}
@@ -1023,7 +1229,7 @@ export default function IsiCepteOneriyorScreen() {
                   </TouchableOpacity>
                 ) : null}
 
-                {/* Modal Actions: Kapat & İşiCepte'de Profili Aç (Matching Web) */}
+                {/* Modal Actions: Kapat & İşiCepte'de Aç (App or Store) */}
                 <View style={styles.detailCtaRow}>
                   <TouchableOpacity
                     style={styles.detailCloseActionBtn}
@@ -1038,8 +1244,12 @@ export default function IsiCepteOneriyorScreen() {
                     onPress={() => handleOutboundClick(detailModalProvider)}
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="open-outline" size={16} color="#ffffff" />
-                    <Text style={styles.detailIsiCepteBtnText}>İşiCepte'de Profili Aç</Text>
+                    <Image
+                      source={ISICEPTE_LOGO}
+                      style={{ width: 18, height: 18, borderRadius: 4 }}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.detailIsiCepteBtnText}>İşiCepte'de Aç</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -1119,6 +1329,36 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 10,
   },
+  vehicleTypeRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    gap: 8,
+    marginBottom: 8,
+  },
+  vehicleTypeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingVertical: 8.5,
+    borderRadius: 12,
+  },
+  vehicleTypeBtnActive: {
+    backgroundColor: '#0f172a',
+    borderColor: '#0f172a',
+  },
+  vehicleTypeBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  vehicleTypeBtnTextActive: {
+    color: '#ffffff',
+  },
   threeFilterRow: {
     flexDirection: 'row',
     paddingHorizontal: 14,
@@ -1184,7 +1424,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 14,
     gap: 8,
-    marginBottom: 8,
   },
   scopeTab: {
     flex: 1,
@@ -1209,31 +1448,6 @@ const styles = StyleSheet.create({
   },
   scopeTabTextActive: {
     color: '#ea580c',
-    fontWeight: '800',
-  },
-  chipsScrollContent: {
-    paddingHorizontal: 14,
-    gap: 6,
-  },
-  categoryChip: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  categoryChipActive: {
-    backgroundColor: '#ea580c',
-    borderColor: '#ea580c',
-  },
-  categoryChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  categoryChipTextActive: {
-    color: '#ffffff',
     fontWeight: '800',
   },
   contextSummaryBar: {
@@ -1362,7 +1576,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     left: 12,
-    backgroundColor: '#f97316',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
@@ -1421,11 +1640,36 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontWeight: '500',
   },
-  cardBrandsJoined: {
-    fontSize: 12,
+  cardBrandPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardBrandPillWithLogo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+  },
+  cardBrandMiniLogo: {
+    width: 14,
+    height: 14,
+  },
+  cardBrandPillText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#334155',
-    lineHeight: 17,
+    color: '#9a3412',
+  },
+  cardMoreBrandsText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
   },
   cardCategoriesRow: {
     flexDirection: 'row',
@@ -1468,29 +1712,36 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   cardOutboundBtn: {
-    flex: 1,
+    flex: 1.15,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    backgroundColor: '#1e293b',
+    gap: 6,
+    backgroundColor: '#0f172a',
     paddingVertical: 11,
     borderRadius: 12,
   },
   cardOutboundBtnText: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '800',
     color: '#ffffff',
   },
   cardCallIconBtn: {
-    width: 40,
-    height: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
     borderRadius: 12,
     backgroundColor: '#fff7ed',
     borderWidth: 1,
     borderColor: '#fed7aa',
-    alignItems: 'center',
-    justifyContent: 'center',
+  },
+  cardCallBtnLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ea580c',
   },
   allEligibleBannerCard: {
     backgroundColor: '#0f172a',
@@ -1674,7 +1925,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 11,
     paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
@@ -1682,6 +1933,26 @@ const styles = StyleSheet.create({
   cityItemActive: {
     backgroundColor: '#fff7ed',
     borderRadius: 10,
+  },
+  modalOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  modalBrandLogoBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBrandLogoImg: {
+    width: 20,
+    height: 20,
   },
   cityItemText: {
     fontSize: 14,
@@ -1720,6 +1991,9 @@ const styles = StyleSheet.create({
   },
   detailShowcaseTag: {
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#fff7ed',
     borderWidth: 1,
     borderColor: '#fed7aa',
@@ -1831,6 +2105,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   detailBrandBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     backgroundColor: '#eff6ff',
     borderWidth: 1,
     borderColor: '#bfdbfe',
@@ -1911,7 +2188,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#ea580c',
+    backgroundColor: '#0f172a',
     paddingVertical: 13,
     borderRadius: 12,
   },

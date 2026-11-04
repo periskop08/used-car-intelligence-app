@@ -17,8 +17,45 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 const ISICEPTE_LOGO = require('../../assets/images/isicepte-logo.png');
-
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
+
+export const ISICEPTE_IOS_STORE_URL = 'https://apps.apple.com/tr/app/i%C5%9Fi-cepte/id6736539281';
+export const ISICEPTE_ANDROID_MARKET_URL = 'market://details?id=com.mefe.isicepte';
+export const ISICEPTE_ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.mefe.isicepte';
+
+export async function openIsiCepteAppOrStore(provider?: { id?: string; slug?: string | null }) {
+  const slugOrId = provider?.slug || provider?.id || '';
+  const appDeepLink = slugOrId ? `isicepte://usta/${slugOrId}` : 'isicepte://';
+
+  try {
+    const canOpenDeepLink = await Linking.canOpenURL(appDeepLink).catch(() => false);
+    if (canOpenDeepLink) {
+      await Linking.openURL(appDeepLink);
+      return;
+    }
+
+    const canOpenRootScheme = await Linking.canOpenURL('isicepte://').catch(() => false);
+    if (canOpenRootScheme) {
+      await Linking.openURL(appDeepLink);
+      return;
+    }
+  } catch {
+    // Fallback to store below
+  }
+
+  if (Platform.OS === 'ios') {
+    await Linking.openURL(ISICEPTE_IOS_STORE_URL).catch(() => {});
+  } else {
+    const canOpenMarket = await Linking.canOpenURL(ISICEPTE_ANDROID_MARKET_URL).catch(() => false);
+    if (canOpenMarket) {
+      await Linking.openURL(ISICEPTE_ANDROID_MARKET_URL).catch(() =>
+        Linking.openURL(ISICEPTE_ANDROID_STORE_URL)
+      );
+    } else {
+      await Linking.openURL(ISICEPTE_ANDROID_STORE_URL).catch(() => {});
+    }
+  }
+}
 
 export const TURKEY_81_PROVINCES: string[] = [
   'Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Aksaray', 'Amasya', 'Ankara', 'Antalya', 'Ardahan', 'Artvin',
@@ -110,21 +147,7 @@ export default function IsiCepteRecommendationWidget({
   };
 
   const handleOpenIsiCepte = async (provider: IsiCepteProviderItem) => {
-    const webUrl =
-      provider.isicepteProfileUrl ||
-      (provider.slug ? `https://isicepte.com/usta/${provider.slug}` : 'https://isicepte.com');
-    const appDeepLink = `isicepte://usta/${provider.slug || provider.id}`;
-
-    try {
-      const supported = await Linking.canOpenURL(appDeepLink);
-      if (supported) {
-        await Linking.openURL(appDeepLink);
-      } else {
-        await Linking.openURL(webUrl);
-      }
-    } catch (e) {
-      Linking.openURL(webUrl);
-    }
+    await openIsiCepteAppOrStore(provider);
   };
 
   const filteredCities = TURKEY_81_PROVINCES.filter((c) =>
