@@ -57,12 +57,18 @@ const MOTORCYCLE_CATEGORIES = [
   'Oto Ekspertiz',
 ] as const;
 
+// Kapsam: Otomobil + Arazi, SUV & Pickup + Minivan & Panelvan markalarının tamamı
 const INITIAL_AUTOMOBILE_BRANDS: string[] = [
-  'Alfa Romeo', 'Audi', 'BMW', 'BYD', 'Chery', 'Chevrolet', 'Citroen', 'Cupra', 'Dacia',
-  'DS Automobiles', 'Fiat', 'Ford', 'Honda', 'Hyundai', 'Jeep', 'Kia', 'Land Rover',
-  'Mazda', 'Mercedes-Benz', 'MG', 'MINI', 'Mitsubishi', 'Nissan', 'Opel', 'Peugeot',
-  'Porsche', 'Renault', 'Seat', 'Skoda', 'SsangYong', 'Subaru', 'Suzuki', 'Tesla',
-  'Tofaş', 'Togg', 'Toyota', 'Volkswagen', 'Volvo',
+  'Alfa Romeo', 'Aston Martin', 'Audi', 'Bentley', 'BMC', 'BMW', 'BYD', 'Cadillac',
+  'Chery', 'Chevrolet', 'Chrysler', 'Citroen', 'Cupra', 'Dacia', 'Daewoo', 'Daihatsu',
+  'DFM', 'DFSK', 'Dodge', 'DS Automobiles', 'Ferrari', 'Fiat', 'Ford', 'Gaz', 'Geely',
+  'GMC', 'Honda', 'Hummer', 'Hyundai', 'Infiniti', 'Isuzu', 'Iveco', 'Jaguar', 'Jeep',
+  'Karsan', 'Kia', 'Lada', 'Lamborghini', 'Lancia', 'Land Rover', 'Lexus', 'Lincoln',
+  'Lotus', 'MAN', 'Maserati', 'Maxus', 'Mazda', 'McLaren', 'Mercedes-Benz', 'MG', 'MINI',
+  'Mitsubishi', 'Nissan', 'Opel', 'Otokar', 'Peugeot', 'Porsche', 'Proton', 'RAM',
+  'Renault', 'Rolls-Royce', 'Rover', 'Saab', 'Seat', 'Skoda', 'Skywell', 'Smart',
+  'SsangYong', 'Subaru', 'Suzuki', 'Tata', 'Tesla', 'Tofaş', 'Togg', 'Toyota',
+  'Volkswagen', 'Volvo',
 ];
 
 const INITIAL_MOTORCYCLE_BRANDS: string[] = [
@@ -130,33 +136,44 @@ export default function IsiCepteOneriyorScreen() {
   // Session seed for stable randomization per view
   const [sessionSeed] = useState(() => Math.random().toString(36).substring(2, 9));
 
-  // Fetch canonical Otomobil & Motosiklet brand lists from backend
+  // Fetch canonical Otomobil (Otomobil + Arazi, SUV & Pickup + Minivan & Panelvan) & Motosiklet brand lists from backend
   useEffect(() => {
+    const extractBrandNames = (json: any): string[] => {
+      if (!json || !json.success || !Array.isArray(json.data)) return [];
+      return json.data
+        .map((b: any) => (typeof b === 'string' ? b : b.label || b.name || b.value))
+        .filter(Boolean);
+    };
+
     const loadBrandsByType = async () => {
       try {
-        const [autoRes, motoRes] = await Promise.all([
-          fetch(`${API_URL}/vehicle-filters/brands?category=AUTOMOBILE`),
-          fetch(`${API_URL}/vehicle-filters/brands?category=MOTORCYCLE`),
+        const [autoRes, suvRes, vanRes, motoRes] = await Promise.all([
+          fetch(`${API_URL}/vehicle-filters/brands?category=AUTOMOBILE`).catch(() => null),
+          fetch(`${API_URL}/vehicle-filters/brands?category=SUV_PICKUP`).catch(() => null),
+          fetch(`${API_URL}/vehicle-filters/brands?category=MINIVAN_PANELVAN`).catch(() => null),
+          fetch(`${API_URL}/vehicle-filters/brands?category=MOTORCYCLE`).catch(() => null),
         ]);
-        if (autoRes.ok) {
-          const autoJson = await autoRes.json();
-          if (autoJson.success && Array.isArray(autoJson.data) && autoJson.data.length > 0) {
-            const names = autoJson.data
-              .map((b: any) => (typeof b === 'string' ? b : b.label || b.name || b.value))
-              .filter(Boolean)
-              .sort((a: string, b: string) => a.localeCompare(b, 'tr'));
-            setAutoBrands(['Tüm Markalar', ...Array.from(new Set<string>(names))]);
+
+        const combinedAutoNames = new Set<string>(INITIAL_AUTOMOBILE_BRANDS);
+        for (const res of [autoRes, suvRes, vanRes]) {
+          if (res && res.ok) {
+            const json = await res.json();
+            for (const name of extractBrandNames(json)) {
+              combinedAutoNames.add(name);
+            }
           }
         }
-        if (motoRes.ok) {
+        const sortedAuto = Array.from(combinedAutoNames).sort((a, b) => a.localeCompare(b, 'tr'));
+        setAutoBrands(['Tüm Markalar', ...sortedAuto]);
+
+        if (motoRes && motoRes.ok) {
           const motoJson = await motoRes.json();
-          if (motoJson.success && Array.isArray(motoJson.data) && motoJson.data.length > 0) {
-            const names = motoJson.data
-              .map((b: any) => (typeof b === 'string' ? b : b.label || b.name || b.value))
-              .filter(Boolean)
-              .sort((a: string, b: string) => a.localeCompare(b, 'tr'));
-            setMotoBrands(['Tüm Markalar', ...Array.from(new Set<string>(names))]);
-          }
+          const combinedMotoNames = new Set<string>([
+            ...INITIAL_MOTORCYCLE_BRANDS,
+            ...extractBrandNames(motoJson),
+          ]);
+          const sortedMoto = Array.from(combinedMotoNames).sort((a, b) => a.localeCompare(b, 'tr'));
+          setMotoBrands(['Tüm Markalar', ...sortedMoto]);
         }
       } catch {
         // Fallback lists already initialized
@@ -226,6 +243,24 @@ export default function IsiCepteOneriyorScreen() {
                 ? data.availableCities
                 : ['Tüm Şehirler', ...data.availableCities]
             );
+          }
+
+          if (Array.isArray(data.availableBrands) && data.availableBrands.length > 0) {
+            const dualBrands = new Set(['bmw', 'honda', 'suzuki', 'peugeot']);
+            const extraAutoBrands = data.availableBrands.filter((b: string) => {
+              if (!b || b === 'Tüm Markalar') return false;
+              const lower = b.toLowerCase().trim();
+              if (MOTORCYCLE_BRAND_SET.has(lower) && !dualBrands.has(lower)) return false;
+              return true;
+            });
+            if (extraAutoBrands.length > 0) {
+              setAutoBrands((prev) => {
+                const merged = new Set(prev.filter((x) => x !== 'Tüm Markalar'));
+                for (const b of extraAutoBrands) merged.add(b);
+                const sorted = Array.from(merged).sort((a, b) => a.localeCompare(b, 'tr'));
+                return ['Tüm Markalar', ...sorted];
+              });
+            }
           }
 
           // Record impression event for Vitrin analytics if items exist
