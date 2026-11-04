@@ -28,11 +28,11 @@ import {
   TURKEY_81_PROVINCES,
   IsiCepteProviderItem,
   openIsiCepteAppOrStore,
-} from '../../components/IsiCepteRecommendationWidget';
-import { getBrandLogoUrl } from '../../constants/brandLogos';
+} from '../components/IsiCepteRecommendationWidget';
+import { getBrandLogoUrl } from '../constants/brandLogos';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
-const ISICEPTE_LOGO = require('../../../assets/images/isicepte-logo.png');
+const ISICEPTE_LOGO = require('../../assets/images/isicepte-logo.png');
 
 export type IsiCepteVehicleType = 'AUTOMOBILE' | 'MOTORCYCLE';
 

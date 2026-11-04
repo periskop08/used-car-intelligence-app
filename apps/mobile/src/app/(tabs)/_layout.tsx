@@ -13,6 +13,7 @@ import {
   PanResponder,
   Dimensions,
 } from 'react-native';
+import HomeScreen from './index';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -23,6 +24,12 @@ export default function TabsLayout() {
   const swipeTranslateX = useRef(new Animated.Value(0)).current;
 
   const isHomeTab = pathname === '/' || pathname === '/index' || pathname === '/(tabs)' || pathname === '/(tabs)/index';
+
+  const underlayTranslateX = swipeTranslateX.interpolate({
+    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+    outputRange: [SCREEN_WIDTH * 0.25, -SCREEN_WIDTH * 0.25, 0],
+    extrapolate: 'clamp',
+  });
 
   useEffect(() => {
     swipeTranslateX.setValue(0);
@@ -177,17 +184,33 @@ export default function TabsLayout() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#e2e8f0' }}>
+    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      {/* Live Underlay Preview of Home Screen when swiping back inside (tabs) */}
+      {!isHomeTab && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              transform: [{ translateX: underlayTranslateX }],
+              opacity: 0.92,
+            },
+          ]}
+        >
+          <HomeScreen />
+        </Animated.View>
+      )}
+
       <Animated.View
         style={{
           flex: 1,
           backgroundColor: '#f8fafc',
           transform: [{ translateX: swipeTranslateX }],
           shadowColor: '#000',
-          shadowOffset: { width: -4, height: 0 },
-          shadowOpacity: 0.12,
-          shadowRadius: 10,
-          elevation: 6,
+          shadowOffset: { width: -6, height: 0 },
+          shadowOpacity: 0.16,
+          shadowRadius: 14,
+          elevation: 8,
         }}
       >
         <Tabs
@@ -248,14 +271,6 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="isicepte"
-          options={{
-            headerShown: false,
-            tabBarButton: () => null,
-            tabBarItemStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
           name="listings"
           listeners={{
             tabPress: (e) => {
@@ -272,21 +287,6 @@ export default function TabsLayout() {
                 <Ionicons name="car-sport" size={24} color="#ffffff" />
               </View>
             ),
-          }}
-        />
-        <Tabs.Screen
-          name="aracini-bul"
-          options={{
-            tabBarButton: () => null,
-            tabBarItemStyle: { display: 'none' },
-          }}
-        />
-        <Tabs.Screen
-          name="vehicle-guide"
-          options={{
-            title: 'Araç Rehberi',
-            tabBarButton: () => null,
-            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen

@@ -51,7 +51,7 @@ const formatCloudflareImageUrl = (url?: string | null): string => {
   return url;
 };
 
-import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
+import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
 
 const resolveVehicleImageUrl = (
   url?: string | null,

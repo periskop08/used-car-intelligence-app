@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import IsiCepteOneriyorScreen from './(tabs)/isicepte';
+import IsiCepteOneriyorScreen from '../screens/IsiCepteScreen';
 import { BottomTabBarFooter } from '../components/BottomTabBarFooter';
 
 export default function IsiCepteStackScreen() {
@@ -13,3 +13,4 @@ export default function IsiCepteStackScreen() {
     </View>
   );
 }
+

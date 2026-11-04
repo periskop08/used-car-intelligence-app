@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import VehicleGuideScreen from './(tabs)/vehicle-guide';
+import VehicleGuideScreen from '../screens/VehicleGuideScreen';
 import { BottomTabBarFooter } from '../components/BottomTabBarFooter';
 
 export default function VehicleGuideStackScreen() {
@@ -51,3 +51,4 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
 });
+
