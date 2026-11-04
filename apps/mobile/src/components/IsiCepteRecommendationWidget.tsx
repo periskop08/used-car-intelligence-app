@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,6 +12,8 @@ import {
   TextInput,
   Platform,
   Image,
+  PanResponder,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -108,6 +110,36 @@ export default function IsiCepteRecommendationWidget({
   const [isCityModalVisible, setIsCityModalVisible] = useState(false);
   const [citySearchQuery, setCitySearchQuery] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<IsiCepteProviderItem | null>(null);
+
+  const cityModalSwipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, g) =>
+          Math.abs(g.dx) > 16 || (g.dy > 14 && Math.abs(g.dy) > Math.abs(g.dx)),
+        onPanResponderRelease: (_, g) => {
+          if (Math.abs(g.dx) > 45 || g.dy > 45 || g.vy > 0.4 || Math.abs(g.vx) > 0.4) {
+            setIsCityModalVisible(false);
+          }
+        },
+      }),
+    []
+  );
+
+  const providerModalSwipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, g) =>
+          Math.abs(g.dx) > 16 || (g.dy > 14 && Math.abs(g.dy) > Math.abs(g.dx)),
+        onPanResponderRelease: (_, g) => {
+          if (Math.abs(g.dx) > 45 || g.dy > 45 || g.vy > 0.4 || Math.abs(g.vx) > 0.4) {
+            setSelectedProvider(null);
+          }
+        },
+      }),
+    []
+  );
 
   const fetchRecommendations = useCallback(async () => {
     setLoading(true);
@@ -344,15 +376,32 @@ export default function IsiCepteRecommendationWidget({
         onRequestClose={() => setIsCityModalVisible(false)}
       >
         <View style={styles.cityModalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setIsCityModalVisible(false)}
+          />
+          <View
+            style={styles.modalEdgeSwipeZoneLeft}
+            {...cityModalSwipeResponder.panHandlers}
+          />
+          <View
+            style={styles.modalEdgeSwipeZoneRight}
+            {...cityModalSwipeResponder.panHandlers}
+          />
           <View style={styles.cityModalContainer}>
-            <View style={styles.cityModalHeader}>
-              <Text style={styles.cityModalTitle}>Şehir Seçin</Text>
-              <TouchableOpacity
-                onPress={() => setIsCityModalVisible(false)}
-                style={styles.cityModalCloseBtn}
-              >
-                <Ionicons name="close" size={22} color="#0f172a" />
-              </TouchableOpacity>
+            <View {...cityModalSwipeResponder.panHandlers}>
+              <View style={styles.modalDragHandleWrap}>
+                <View style={styles.modalDragHandleBar} />
+              </View>
+              <View style={styles.cityModalHeader}>
+                <Text style={styles.cityModalTitle}>Şehir Seçin</Text>
+                <TouchableOpacity
+                  onPress={() => setIsCityModalVisible(false)}
+                  style={styles.cityModalCloseBtn}
+                >
+                  <Ionicons name="close" size={22} color="#0f172a" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Search Input */}
@@ -427,10 +476,31 @@ export default function IsiCepteRecommendationWidget({
         onRequestClose={() => setSelectedProvider(null)}
       >
         <View style={styles.detailModalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setSelectedProvider(null)}
+          />
+          <View
+            style={styles.modalEdgeSwipeZoneLeft}
+            {...providerModalSwipeResponder.panHandlers}
+          />
+          <View
+            style={styles.modalEdgeSwipeZoneRight}
+            {...providerModalSwipeResponder.panHandlers}
+          />
           <View style={styles.detailModalCard}>
+            <View
+              style={styles.modalDragHandleWrap}
+              {...providerModalSwipeResponder.panHandlers}
+            >
+              <View style={styles.modalDragHandleBar} />
+            </View>
             {selectedProvider && (
               <>
-                <View style={styles.detailModalHeader}>
+                <View
+                  style={styles.detailModalHeader}
+                  {...providerModalSwipeResponder.panHandlers}
+                >
                   <Image
                     source={ISICEPTE_LOGO}
                     style={{ width: 46, height: 46, borderRadius: 12 }}
@@ -1069,5 +1139,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  modalEdgeSwipeZoneLeft: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 26,
+    zIndex: 50,
+  },
+  modalEdgeSwipeZoneRight: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: 26,
+    zIndex: 50,
+  },
+  modalDragHandleWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  modalDragHandleBar: {
+    width: 40,
+    height: 4.5,
+    borderRadius: 3,
+    backgroundColor: '#cbd5e1',
   },
 });

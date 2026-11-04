@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Tabs, useRouter } from 'expo-router';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Tabs, useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
   View,
@@ -10,11 +10,55 @@ import {
   Modal,
   Pressable,
   Animated,
+  PanResponder,
 } from 'react-native';
 
 export default function TabsLayout() {
   const router = useRouter();
+  const pathname = usePathname();
   const [menuVisible, setMenuVisible] = useState(false);
+
+  const isHomeTab = pathname === '/' || pathname === '/index' || pathname === '/(tabs)' || pathname === '/(tabs)/index';
+
+  const triggerSwipeBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else if (!isHomeTab) {
+      router.replace('/(tabs)' as any);
+    }
+  };
+
+  // Left edge swipe-back gesture (iOS & Android standard left-to-right edge swipe)
+  const leftEdgePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          gestureState.dx > 14 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3,
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dx > 45 || (gestureState.dx > 25 && gestureState.vx > 0.35)) {
+            triggerSwipeBack();
+          }
+        },
+      }),
+    [pathname]
+  );
+
+  // Right edge swipe-back gesture (Android standard right-to-left edge swipe)
+  const rightEdgePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          gestureState.dx < -14 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.3,
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dx < -45 || (gestureState.dx < -25 && gestureState.vx < -0.35)) {
+            triggerSwipeBack();
+          }
+        },
+      }),
+    [pathname]
+  );
 
   // Animations for the 3 floating bubbles
   const scaleAnim1 = useRef(new Animated.Value(0)).current;
@@ -73,8 +117,9 @@ export default function TabsLayout() {
   };
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <Tabs
+        backBehavior="history"
         screenOptions={{
           tabBarStyle: {
             backgroundColor: '#ffffff',
@@ -211,6 +256,20 @@ export default function TabsLayout() {
         />
       </Tabs>
 
+      {/* EDGE SWIPE BACK GESTURE ZONES FOR NON-HOME TAB SCREENS (iOS & Android) */}
+      {!isHomeTab && (
+        <>
+          <View
+            style={styles.leftEdgeSwipeZone}
+            {...leftEdgePanResponder.panHandlers}
+          />
+          <View
+            style={styles.rightEdgeSwipeZone}
+            {...rightEdgePanResponder.panHandlers}
+          />
+        </>
+      )}
+
       {/* ========================================================================= */}
       {/* 🎈 3 FLOATING BUBBLES POPUP (BALONCUK MENÜ) 🎈 */}
       {/* ========================================================================= */}
@@ -294,11 +353,27 @@ export default function TabsLayout() {
           </View>
         </Pressable>
       </Modal>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  leftEdgeSwipeZone: {
+    position: 'absolute',
+    top: 80,
+    bottom: 90,
+    left: 0,
+    width: 24,
+    zIndex: 999,
+  },
+  rightEdgeSwipeZone: {
+    position: 'absolute',
+    top: 80,
+    bottom: 90,
+    right: 0,
+    width: 24,
+    zIndex: 999,
+  },
   centerTabBadge: {
     width: 46,
     height: 46,

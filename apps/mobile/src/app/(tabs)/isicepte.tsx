@@ -15,6 +15,8 @@ import {
   StatusBar,
   RefreshControl,
   Image,
+  PanResponder,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -132,6 +134,37 @@ export default function IsiCepteOneriyorScreen() {
 
   // Selected Provider Detail Modal
   const [detailModalProvider, setDetailModalProvider] = useState<IsiCepteProviderItem | null>(null);
+
+  // Swipe-to-close gesture helper (supports edge swipe left/right AND pull-down)
+  const filterModalSwipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, g) =>
+          Math.abs(g.dx) > 16 || (g.dy > 14 && Math.abs(g.dy) > Math.abs(g.dx)),
+        onPanResponderRelease: (_, g) => {
+          if (Math.abs(g.dx) > 45 || g.dy > 45 || g.vy > 0.4 || Math.abs(g.vx) > 0.4) {
+            setActiveFilterModal(null);
+          }
+        },
+      }),
+    []
+  );
+
+  const detailModalSwipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, g) =>
+          Math.abs(g.dx) > 16 || (g.dy > 14 && Math.abs(g.dy) > Math.abs(g.dx)),
+        onPanResponderRelease: (_, g) => {
+          if (Math.abs(g.dx) > 45 || g.dy > 45 || g.vy > 0.4 || Math.abs(g.vx) > 0.4) {
+            setDetailModalProvider(null);
+          }
+        },
+      }),
+    []
+  );
 
   // Session seed for stable randomization per view
   const [sessionSeed] = useState(() => Math.random().toString(36).substring(2, 9));
@@ -1011,23 +1044,44 @@ export default function IsiCepteOneriyorScreen() {
         onRequestClose={() => setActiveFilterModal(null)}
       >
         <View style={styles.cityModalOverlay}>
+          {/* Tap outside backdrop to close */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setActiveFilterModal(null)}
+          />
+          {/* Left & Right Edge Swipe Zones inside Modal */}
+          <View
+            style={styles.modalEdgeSwipeZoneLeft}
+            {...filterModalSwipeResponder.panHandlers}
+          />
+          <View
+            style={styles.modalEdgeSwipeZoneRight}
+            {...filterModalSwipeResponder.panHandlers}
+          />
+
           <View style={styles.cityModalContainer}>
-            <View style={styles.cityModalHeader}>
-              <Text style={styles.cityModalTitle}>
-                {activeFilterModal === 'city'
-                  ? 'Şehir Seçin'
-                  : activeFilterModal === 'brand'
-                  ? selectedVehicleType === 'MOTORCYCLE'
-                    ? 'Motosiklet Markası Seçin'
-                    : 'Otomobil Markası Seçin'
-                  : 'Hizmet Kategorisi Seçin'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setActiveFilterModal(null)}
-                style={styles.cityModalCloseBtn}
-              >
-                <Ionicons name="close" size={22} color="#0f172a" />
-              </TouchableOpacity>
+            {/* Drag Handle & Header (Swipe Down or Edge Swipe to Close) */}
+            <View {...filterModalSwipeResponder.panHandlers}>
+              <View style={styles.modalDragHandleWrap}>
+                <View style={styles.modalDragHandleBar} />
+              </View>
+              <View style={styles.cityModalHeader}>
+                <Text style={styles.cityModalTitle}>
+                  {activeFilterModal === 'city'
+                    ? 'Şehir Seçin'
+                    : activeFilterModal === 'brand'
+                    ? selectedVehicleType === 'MOTORCYCLE'
+                      ? 'Motosiklet Markası Seçin'
+                      : 'Otomobil Markası Seçin'
+                    : 'Hizmet Kategorisi Seçin'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setActiveFilterModal(null)}
+                  style={styles.cityModalCloseBtn}
+                >
+                  <Ionicons name="close" size={22} color="#0f172a" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Search Input */}
@@ -1116,11 +1170,37 @@ export default function IsiCepteOneriyorScreen() {
         onRequestClose={() => setDetailModalProvider(null)}
       >
         <View style={styles.detailModalOverlay}>
+          {/* Tap outside backdrop to close */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setDetailModalProvider(null)}
+          />
+          {/* Left & Right Edge Swipe Zones inside Modal */}
+          <View
+            style={styles.modalEdgeSwipeZoneLeft}
+            {...detailModalSwipeResponder.panHandlers}
+          />
+          <View
+            style={styles.modalEdgeSwipeZoneRight}
+            {...detailModalSwipeResponder.panHandlers}
+          />
+
           <View style={styles.detailModalCard}>
+            {/* Drag Handle Bar (Swipe Down or Edge Swipe to Close) */}
+            <View
+              style={styles.modalDragHandleWrap}
+              {...detailModalSwipeResponder.panHandlers}
+            >
+              <View style={styles.modalDragHandleBar} />
+            </View>
+
             {detailModalProvider && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Modal Header */}
-                <View style={styles.detailModalHeader}>
+                {/* Modal Header (Swipeable to Close) */}
+                <View
+                  style={styles.detailModalHeader}
+                  {...detailModalSwipeResponder.panHandlers}
+                >
                   <View style={{ flex: 1, paddingRight: 10 }}>
                     {detailModalProvider.isShowcase ? (
                       <View style={styles.detailShowcaseTag}>
@@ -2231,5 +2311,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  modalEdgeSwipeZoneLeft: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 26,
+    zIndex: 50,
+  },
+  modalEdgeSwipeZoneRight: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: 26,
+    zIndex: 50,
+  },
+  modalDragHandleWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  modalDragHandleBar: {
+    width: 40,
+    height: 4.5,
+    borderRadius: 3,
+    backgroundColor: '#cbd5e1',
   },
 });

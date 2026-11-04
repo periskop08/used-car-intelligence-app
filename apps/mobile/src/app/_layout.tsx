@@ -9,6 +9,10 @@ export default function RootLayout() {
       <View style={styles.container}>
         <Stack
         screenOptions={{
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+          gestureDirection: 'horizontal',
+          animation: 'slide_from_right',
           headerStyle: {
             backgroundColor: '#ffffff',
           },
