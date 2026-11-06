@@ -25,10 +25,12 @@ import { useRouter } from 'expo-router';
 const ISICEPTE_LOGO = require('../../assets/images/isicepte-logo.png');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
-export const ISICEPTE_IOS_STORE_URL = 'itms-apps://apps.apple.com/tr/search?term=%C4%B0%C5%9Fi%20Cepte';
-export const ISICEPTE_IOS_WEB_STORE_URL = 'https://apps.apple.com/tr/search?term=%C4%B0%C5%9Fi%20Cepte';
-export const ISICEPTE_ANDROID_MARKET_URL = 'market://search?q=%C4%B0%C5%9Fi%20Cepte&c=apps';
-export const ISICEPTE_ANDROID_STORE_URL = 'https://play.google.com/store/search?q=%C4%B0%C5%9Fi%20Cepte&c=apps';
+export const ISICEPTE_IOS_STORE_URL = 'itms-apps://apps.apple.com/tr/app/i-%C5%9Fi-cepte/id6758517468?l=tr';
+export const ISICEPTE_IOS_WEB_STORE_URL = 'https://apps.apple.com/tr/app/i-%C5%9Fi-cepte/id6758517468?l=tr';
+export const ISICEPTE_ANDROID_MARKET_URL = 'market://details?id=com.isicepte.app';
+export const ISICEPTE_ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.isicepte.app';
+export const ISICEPTE_ANDROID_INTENT_URL =
+  'intent://#Intent;package=com.isicepte.app;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.isicepte.app;end';
 
 export async function openIsiCepteAppOrStore(provider?: {
   id?: string;
@@ -37,14 +39,21 @@ export async function openIsiCepteAppOrStore(provider?: {
 }) {
   const slugOrId = provider?.slug || provider?.id || '';
   const candidateDeepLinks = [
-    ...(slugOrId ? [`isicepte://usta/${slugOrId}`, `isicepte://profile/${slugOrId}`] : []),
+    ...(slugOrId
+      ? [
+          `isicepte://usta/${slugOrId}`,
+          `isicepte://profile/${slugOrId}`,
+          `com.isicepte.app://usta/${slugOrId}`,
+        ]
+      : []),
     'isicepte://',
-    'isicepte://home',
+    'com.isicepte.app://',
+    'exp+isicepte://',
+    'app-1-749930378228-ios-10dd40fce0a4ee22fabfa1://',
+    ...(Platform.OS === 'android' ? [ISICEPTE_ANDROID_INTENT_URL] : []),
   ];
 
-  // IMPORTANT: On iOS (especially inside Expo Go), Linking.canOpenURL('isicepte://')
-  // always returns false because Expo Go's Info.plist does not include 'isicepte' in LSApplicationQueriesSchemes.
-  // Calling Linking.openURL() directly bypasses LSApplicationQueriesSchemes and opens the installed app!
+  // Try opening the installed İşi Cepte app directly via registered URL schemes / Android package intent
   for (const deepLink of candidateDeepLinks) {
     try {
       await Linking.openURL(deepLink);
@@ -54,7 +63,8 @@ export async function openIsiCepteAppOrStore(provider?: {
     }
   }
 
-  // Fallback if the app is not installed on the device: open App Store (iOS) or Play Store (Android)
+  // Fallback when the app is not installed (or custom scheme is not yet active on iOS):
+  // Open the exact official İşi Cepte page on App Store (id6758517468) or Google Play Store (com.isicepte.app)
   if (Platform.OS === 'ios') {
     try {
       await Linking.openURL(ISICEPTE_IOS_STORE_URL);

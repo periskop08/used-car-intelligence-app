@@ -14,7 +14,11 @@
       "bundleIdentifier": "com.torquescout.mobile",
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
-          "isicepte"
+          "isicepte",
+          "com.isicepte.app",
+          "exp+isicepte",
+          "app-1-749930378228-ios-10dd40fce0a4ee22fabfa1",
+          "itms-apps"
         ]
       }
     },
