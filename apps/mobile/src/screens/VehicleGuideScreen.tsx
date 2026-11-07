@@ -10,6 +10,38 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
+import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
+
+const BrandLogo = ({ brandName, size = 24 }: { brandName?: string; size?: number }) => {
+  const [imgError, setImgError] = useState(false);
+  const logoSrc = resolveBrandLogo(brandName) || getCanonicalBrandLogoUrl(brandName);
+
+  if (logoSrc && !imgError) {
+    const source = typeof logoSrc === 'number' ? logoSrc : { uri: String(logoSrc) };
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 6,
+          backgroundColor: '#ffffff',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 2,
+        }}
+      >
+        <Image
+          source={source}
+          style={{ width: size - 4, height: size - 4 }}
+          resizeMode="contain"
+          onError={() => setImgError(true)}
+        />
+      </View>
+    );
+  }
+  return null;
+};
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const { width } = Dimensions.get('window');
@@ -236,7 +268,8 @@ export default function VehicleGuideScreen() {
             ) : null}
             <View style={styles.imageDarkGradient} />
             <View style={styles.titleOverlay}>
-              <View style={styles.brandBadge}>
+              <View style={[styles.brandBadge, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                <BrandLogo brandName={card.brand} size={18} />
                 <Text style={styles.brandBadgeText}>{card.brand.toUpperCase()}</Text>
               </View>
               <Text style={styles.brandTitle}>

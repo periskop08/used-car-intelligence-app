@@ -12,18 +12,79 @@ import {
   ScrollView,
   Alert,
   Share,
+  Image,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TURKEY_81_PROVINCES, getDistrictsForCity } from '@used-car-intelligence/shared';
+import {
+  TURKEY_81_PROVINCES,
+  getDistrictsForCity,
+  getCanonicalBrandLogoUrl,
+  getBrandMonogram,
+} from '@used-car-intelligence/shared';
+import { getBrandLogoUrl as resolveBrandLogo } from '../../constants/brandLogos';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
+
+function BrandLogo({ brandName, size = 30 }: { brandName?: string; size?: number }) {
+  const [hasError, setHasError] = useState(false);
+  const logoUrl = resolveBrandLogo(brandName) || getCanonicalBrandLogoUrl(brandName) || '';
+  const monogram = getBrandMonogram(brandName);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [brandName]);
+
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: Math.round(size * 0.28),
+        backgroundColor: '#ffffff',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      {!hasError && !!logoUrl ? (
+        <Image
+          source={{ uri: logoUrl }}
+          style={{ width: Math.round(size * 0.74), height: Math.round(size * 0.74) }}
+          resizeMode="contain"
+          onError={() => setHasError(true)}
+        />
+      ) : (
+        <View
+          style={{
+            width: Math.round(size * 0.82),
+            height: Math.round(size * 0.82),
+            borderRadius: 6,
+            borderWidth: 1,
+            backgroundColor: monogram.bgColor,
+            borderColor: monogram.borderColor,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Text
+            style={{ fontSize: Math.max(9, Math.round(size * 0.34)), fontWeight: '900', color: monogram.textColor }}
+            numberOfLines={1}
+          >
+            {monogram.initials}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
 
 const TURKISH_CITIES = [
   'Tümü',
@@ -272,6 +333,13 @@ export default function ListingsScreen() {
   const [districtPickerVisible, setDistrictPickerVisible] = useState(false);
   const [citySearchQuery, setCitySearchQuery] = useState('');
   const [districtSearchQuery, setDistrictSearchQuery] = useState('');
+  const [brandSearchQuery, setBrandSearchQuery] = useState('');
+
+  const filteredBrands = useMemo(() => {
+    const q = brandSearchQuery.trim().toLocaleLowerCase('tr-TR');
+    if (!q) return brands;
+    return brands.filter((b) => b.name.toLocaleLowerCase('tr-TR').includes(q));
+  }, [brands, brandSearchQuery]);
 
   const filteredCities = useMemo(() => {
     const q = citySearchQuery.trim().toLocaleLowerCase('tr-TR');
@@ -739,9 +807,12 @@ export default function ListingsScreen() {
           <Text style={styles.cardTitle} numberOfLines={1}>
             {item.title}
           </Text>
-          <Text style={styles.vehicleSpecText} numberOfLines={1}>
-            {brandName} {modelName} {trimName ? `• ${trimName}` : ''}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {!!brandName && <BrandLogo brandName={brandName} size={22} />}
+            <Text style={[styles.vehicleSpecText, { flex: 1 }]} numberOfLines={1}>
+              {brandName} {modelName} {trimName ? `• ${trimName}` : ''}
+            </Text>
+          </View>
           <View style={styles.cardFooterRow}>
             <Text style={styles.locationText}>
               {item.city ? `${item.city}${item.district ? ` / ${item.district}` : ''}` : 'Türkiye'}
@@ -887,6 +958,7 @@ export default function ListingsScreen() {
                 style={styles.filterTagPill}
                 onPress={() => setSelectedBrand(null)}
               >
+                <BrandLogo brandName={selectedBrand.name} size={18} />
                 <Text style={styles.filterTagPillText}>{selectedBrand.name}</Text>
                 <Ionicons name="close" size={12} color="#ea580c" />
               </TouchableOpacity>
@@ -1082,16 +1154,24 @@ export default function ListingsScreen() {
               <Text style={styles.filterCardTitle}>🚗 MARKA & MODEL</Text>
               <TouchableOpacity
                 style={styles.dropdownSelector}
-                onPress={() => setBrandPickerVisible(true)}
+                onPress={() => {
+                  setBrandSearchQuery('');
+                  setBrandPickerVisible(true);
+                }}
               >
-                <Text
-                  style={[
-                    styles.dropdownSelectorText,
-                    !!selectedBrand && styles.dropdownSelectedText,
-                  ]}
-                >
-                  {selectedBrand ? selectedBrand.name : 'Marka Seçin'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                  {selectedBrand ? (
+                    <BrandLogo brandName={selectedBrand.name} size={28} />
+                  ) : null}
+                  <Text
+                    style={[
+                      styles.dropdownSelectorText,
+                      !!selectedBrand && styles.dropdownSelectedText,
+                    ]}
+                  >
+                    {selectedBrand ? selectedBrand.name : 'Marka Seçin'}
+                  </Text>
+                </View>
                 <Ionicons name="chevron-down" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
@@ -1583,37 +1663,79 @@ export default function ListingsScreen() {
                   <Text style={styles.modalTitle}>Marka Seçin</Text>
                   <TouchableOpacity
                     style={styles.modalCloseCircle}
-                    onPress={() => setBrandPickerVisible(false)}
+                    onPress={() => {
+                      setBrandPickerVisible(false);
+                      setBrandSearchQuery('');
+                    }}
                   >
                     <Ionicons name="close" size={18} color="#64748b" />
                   </TouchableOpacity>
                 </View>
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#f1f5f9',
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    marginHorizontal: 14,
+                    marginTop: 6,
+                    marginBottom: 4,
+                    gap: 8,
+                  }}
+                >
+                  <Ionicons name="search" size={16} color="#94a3b8" />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      color: '#0f172a',
+                      paddingVertical: 0,
+                    }}
+                    placeholder="Marka ara... (Örn: BMW, Toyota, Honda)"
+                    placeholderTextColor="#94a3b8"
+                    value={brandSearchQuery}
+                    onChangeText={setBrandSearchQuery}
+                    autoCorrect={false}
+                  />
+                  {brandSearchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setBrandSearchQuery('')}>
+                      <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
                 <ScrollView
                   style={{ maxHeight: 420 }}
                   contentContainerStyle={{ padding: 14, gap: 8 }}
                   keyboardShouldPersistTaps="handled"
                 >
-                  <TouchableOpacity
-                    style={[styles.pickerItem, !selectedBrand && styles.pickerItemSelected]}
-                    onPress={() => {
-                      setSelectedBrand(null);
-                      setSelectedModel(null);
-                      setBrandPickerVisible(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.pickerItemText,
-                        !selectedBrand && styles.pickerItemTextSelected,
-                      ]}
+                  {!brandSearchQuery.trim() && (
+                    <TouchableOpacity
+                      style={[styles.pickerItem, !selectedBrand && styles.pickerItemSelected]}
+                      onPress={() => {
+                        setSelectedBrand(null);
+                        setSelectedModel(null);
+                        setBrandPickerVisible(false);
+                        setBrandSearchQuery('');
+                      }}
                     >
-                      Tüm Markalar
-                    </Text>
-                    {!selectedBrand && (
-                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
-                    )}
-                  </TouchableOpacity>
-                  {brands.map((b) => {
+                      <Text
+                        style={[
+                          styles.pickerItemText,
+                          !selectedBrand && styles.pickerItemTextSelected,
+                        ]}
+                      >
+                        Tüm Markalar
+                      </Text>
+                      {!selectedBrand && (
+                        <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  {filteredBrands.map((b) => {
                     const isSelected = selectedBrand?.id === b.id;
                     return (
                       <TouchableOpacity
@@ -1623,18 +1745,25 @@ export default function ListingsScreen() {
                           setSelectedBrand(b);
                           setSelectedModel(null);
                           setBrandPickerVisible(false);
+                          setBrandSearchQuery('');
                         }}
                       >
-                        <Text
-                          style={[
-                            styles.pickerItemText,
-                            isSelected && styles.pickerItemTextSelected,
-                          ]}
-                        >
-                          {b.name}
-                        </Text>
-                        {isSelected && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                          <BrandLogo brandName={b.name} size={32} />
+                          <Text
+                            style={[
+                              styles.pickerItemText,
+                              isSelected && styles.pickerItemTextSelected,
+                              { flex: 1 },
+                            ]}
+                          >
+                            {b.name}
+                          </Text>
+                        </View>
+                        {isSelected ? (
                           <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                        ) : (
+                          <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
                         )}
                       </TouchableOpacity>
                     );
@@ -1651,9 +1780,12 @@ export default function ListingsScreen() {
             <View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}>
               <View style={styles.pickerSheet}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>
-                    {selectedBrand ? `${selectedBrand.name} Modelleri` : 'Model Seçin'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    {selectedBrand && <BrandLogo brandName={selectedBrand.name} size={28} />}
+                    <Text style={styles.modalTitle} numberOfLines={1}>
+                      {selectedBrand ? `${selectedBrand.name} Modelleri` : 'Model Seçin'}
+                    </Text>
+                  </View>
                   <TouchableOpacity
                     style={styles.modalCloseCircle}
                     onPress={() => setModelPickerVisible(false)}

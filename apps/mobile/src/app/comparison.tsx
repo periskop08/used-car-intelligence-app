@@ -1142,9 +1142,12 @@ export default function ComparisonScreen() {
                       isWinner && styles.topSummaryCardWinner,
                     ]}
                   >
-                    <Text style={styles.topSummaryTitle} numberOfLines={1}>
-                      {ev.vehicleName}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <BrandLogo brandName={String(ev.vehicleName || '').replace(/^\d{4}\s+/, '').split(' ')[0] || ''} />
+                      <Text style={[styles.topSummaryTitle, { flex: 1 }]} numberOfLines={1}>
+                        {ev.vehicleName}
+                      </Text>
+                    </View>
                     <Text
                       style={[
                         styles.topSummaryRank,
@@ -1653,7 +1656,12 @@ export default function ComparisonScreen() {
               </TouchableOpacity>
 
               <View style={{ alignItems: 'center' }}>
-                <Text style={styles.modalTitle}>{getStepTitle(step)}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {step >= 2 && activeSlot?.brand ? (
+                    <BrandLogo brandName={activeSlot.brand} />
+                  ) : null}
+                  <Text style={styles.modalTitle}>{getStepTitle(step)}</Text>
+                </View>
                 <Text style={styles.modalStepBadge}>Adım {step} / 8</Text>
               </View>
 

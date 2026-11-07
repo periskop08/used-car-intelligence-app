@@ -24,6 +24,40 @@ import UrgentBadge from '../../components/UrgentBadge';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
 import VehicleConditionVisualizer from '../../components/VehicleConditionVisualizer';
 import IsiCepteRecommendationWidget from '../../components/IsiCepteRecommendationWidget';
+import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
+import { getBrandLogoUrl as resolveBrandLogo } from '../../constants/brandLogos';
+
+const BrandLogo = ({ brandName, size = 20 }: { brandName?: string; size?: number }) => {
+  const [imgError, setImgError] = useState(false);
+  const logoSrc = resolveBrandLogo(brandName) || getCanonicalBrandLogoUrl(brandName);
+
+  if (logoSrc && !imgError) {
+    const source = typeof logoSrc === 'number' ? logoSrc : { uri: String(logoSrc) };
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 5,
+          backgroundColor: '#ffffff',
+          borderWidth: 1,
+          borderColor: '#e2e8f0',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 1.5,
+        }}
+      >
+        <ExpoImage
+          source={source}
+          style={{ width: size - 4, height: size - 4 }}
+          contentFit="contain"
+          onError={() => setImgError(true)}
+        />
+      </View>
+    );
+  }
+  return null;
+};
 
 const { width, height } = Dimensions.get('window');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -506,11 +540,14 @@ export default function ListingDetailScreen() {
             <Text style={styles.sellerHighlightName}>{sellerFullName}</Text>
           </View>
 
-          <Text style={styles.breadcrumbText} numberOfLines={1}>
-            {['Vasıta', 'Otomobil', brandName, modelFamilyName, engineName, trimName]
-              .filter(Boolean)
-              .join(' > ')}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <BrandLogo brandName={brandName} size={18} />
+            <Text style={[styles.breadcrumbText, { flex: 1 }]} numberOfLines={1}>
+              {['Vasıta', 'Otomobil', brandName, modelFamilyName, engineName, trimName]
+                .filter(Boolean)
+                .join(' > ')}
+            </Text>
+          </View>
 
           <Text style={styles.locationSubText}>
             {cityVal}{districtVal}
@@ -579,7 +616,10 @@ export default function ListingDetailScreen() {
 
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Marka</Text>
-                <Text style={styles.tableValue}>{brandName || '-'}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <BrandLogo brandName={brandName} size={20} />
+                  <Text style={styles.tableValue}>{brandName || '-'}</Text>
+                </View>
               </View>
 
               <View style={styles.tableRow}>

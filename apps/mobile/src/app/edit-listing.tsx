@@ -17,7 +17,56 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TURKEY_81_PROVINCES, getDistrictsForCity } from '@used-car-intelligence/shared';
+import { Image as ExpoImage } from 'expo-image';
+import { TURKEY_81_PROVINCES, getDistrictsForCity, getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
+import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
+
+const BrandLogo = ({ brandName, size = 34 }: { brandName?: string; size?: number }) => {
+  const [imgError, setImgError] = useState(false);
+  const logoSrc = resolveBrandLogo(brandName) || getCanonicalBrandLogoUrl(brandName);
+
+  if (logoSrc && !imgError) {
+    const source = typeof logoSrc === 'number' ? logoSrc : { uri: String(logoSrc) };
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 10,
+          backgroundColor: '#ffffff',
+          borderWidth: 1,
+          borderColor: '#fed7aa',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 3,
+        }}
+      >
+        <ExpoImage
+          source={source}
+          style={{ width: size - 6, height: size - 6 }}
+          contentFit="contain"
+          onError={() => setImgError(true)}
+        />
+      </View>
+    );
+  }
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 10,
+        backgroundColor: '#fff7ed',
+        borderWidth: 1,
+        borderColor: '#fed7aa',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Ionicons name="car-sport" size={22} color="#ea580c" />
+    </View>
+  );
+};
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -266,9 +315,7 @@ export default function EditListingScreen() {
           {/* Araç Kimlik Kartı */}
           <View style={styles.vehicleIdentityCard}>
             <View style={styles.vehicleIdentityLeft}>
-              <View style={styles.carIconBox}>
-                <Ionicons name="car-sport" size={24} color="#ea580c" />
-              </View>
+              <BrandLogo brandName={listing?.brand?.name || listing?.vehicleVariant?.brand?.name} size={42} />
               <View>
                 <Text style={styles.vehicleIdentityTitle}>
                   {listing?.brand?.name} {listing?.model?.name} {listing?.year}
