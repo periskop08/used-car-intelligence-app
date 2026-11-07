@@ -25,6 +25,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const CLUB_TAB_ICON = require('../../../assets/images/club-tab-icon.png');
+const CLUB_HEADER_LOGO = require('../../../assets/images/torkscout-club-header-logo.png');
 const { width: windowWidth } = Dimensions.get('window');
 
 const resolvePostMediaUrl = (url?: string | null): string => {
@@ -495,8 +496,12 @@ export default function TorqueScoutClubScreen() {
             />
           </View>
           <View>
-            <Text style={styles.clubMainTitle}>TorqueScout <Text style={styles.clubAccentTitle}>Club</Text></Text>
-            <Text style={styles.clubSubTitle}>Otomobil Tutkunları Topluluğu</Text>
+            <Image
+              source={CLUB_HEADER_LOGO}
+              style={{ width: 170, height: 22 }}
+              resizeMode="contain"
+            />
+            <Text style={[styles.clubSubTitle, { marginTop: 2 }]}>Otomobil Tutkunları Topluluğu</Text>
           </View>
         </View>
 
