@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ListingFilters from "@/components/listings/ListingFilters";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 import ShowcaseBadge from "@/components/listings/ShowcaseBadge";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Car, Compass, Truck, Bike, LayoutGrid, ChevronLeft, ArrowRight, Info, CheckCircle2 } from "lucide-react";
 import { formatCurrency } from "@/utils/formatters";
 import { formatImageUrl } from "@/utils/media";
 import {
@@ -27,6 +27,33 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 const TURKISH_CITIES = TURKEY_81_PROVINCES;
 
 export type ViewMode = "list" | "gallery";
+export type WebListingCategory = "ALL" | "AUTOMOBILE" | "SUV_PICKUP" | "MINIVAN_PANELVAN" | "MOTORCYCLE";
+
+const WEB_CATEGORY_ITEMS: {
+  id: Exclude<WebListingCategory, "ALL">;
+  name: string;
+  Icon: any;
+}[] = [
+  { id: "AUTOMOBILE", name: "Otomobil", Icon: Car },
+  { id: "SUV_PICKUP", name: "Arazi, SUV & Pickup", Icon: Compass },
+  { id: "MINIVAN_PANELVAN", name: "Minivan & Panelvan", Icon: Truck },
+  { id: "MOTORCYCLE", name: "Motosiklet", Icon: Bike },
+];
+
+function matchesWebListingCategory(item: any, cat: WebListingCategory): boolean {
+  if (!cat || cat === "ALL") return true;
+  const vType = (item.vehicleVariant?.vehicleType || item.vehicleVariant?.model?.vehicleType || "").toUpperCase();
+  const bType = (item.bodyType || item.vehicleVariant?.bodyType || "").toUpperCase();
+  if (cat === "MOTORCYCLE") return vType === "MOTORCYCLE";
+  if (cat === "MINIVAN_PANELVAN") return vType === "MINIVAN_PANELVAN" || bType === "MINIVAN" || bType === "VAN";
+  if (cat === "SUV_PICKUP") return vType === "SUV_PICKUP" || bType === "SUV" || bType === "PICKUP";
+  if (cat === "AUTOMOBILE") {
+    if (vType === "MOTORCYCLE" || vType === "MINIVAN_PANELVAN" || vType === "SUV_PICKUP") return false;
+    if (bType === "SUV" || bType === "PICKUP" || bType === "MINIVAN" || bType === "VAN") return false;
+    return true;
+  }
+  return true;
+}
 
 function formatDateTr(dateStr: string | Date | undefined | null): string {
   if (!dateStr) return "-";
@@ -54,6 +81,10 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
   const [loadingEngines, setLoadingEngines] = useState(false);
   const [loadingTrims, setLoadingTrims] = useState(false);
 
+  const [selectedCategory, setSelectedCategory] = useState<WebListingCategory>("ALL");
+  const [showCategoryGate, setShowCategoryGate] = useState<boolean>(
+    !isUrgentPage && !isShowcasePage && !searchParams.get("category") && !searchParams.get("brandId") && !searchParams.get("brand") && !searchParams.get("vehicleVariantId")
+  );
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedEngineId, setSelectedEngineId] = useState("");
@@ -128,18 +159,19 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
   const [preferenceProfileId, setPreferenceProfileId] = useState("");
   const [prefSessionId, setPrefSessionId] = useState("");
 
-  // Fetch Brands on mount
+  // Fetch Brands on mount and when selectedCategory changes
   useEffect(() => {
     const savedToken = localStorage.getItem("accessToken");
     if (savedToken) setToken(savedToken);
 
-    fetch(`${API_URL}/vehicles/brands`)
+    const catParam = selectedCategory && selectedCategory !== "ALL" ? `?category=${selectedCategory}` : `?category=ALL`;
+    fetch(`${API_URL}/vehicles/brands${catParam}`)
       .then((res) => res.json())
       .then((data) => setBrands(Array.isArray(data) ? data : []))
       .catch((e) => console.error("Error fetching brands:", e));
-  }, []);
+  }, [selectedCategory]);
 
-  // Fetch Models when selectedBrand changes
+  // Fetch Models when selectedBrand or selectedCategory changes
   useEffect(() => {
     if (!selectedBrand) {
       setModels([]);
@@ -150,11 +182,12 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
       setSelectedTrimId("");
       return;
     }
-    fetch(`${API_URL}/vehicles/models?brandId=${selectedBrand}`)
+    const catParam = selectedCategory && selectedCategory !== "ALL" ? `&category=${selectedCategory}` : `&category=ALL`;
+    fetch(`${API_URL}/vehicles/models?brandId=${selectedBrand}${catParam}`)
       .then((res) => res.json())
       .then((data) => setModels(Array.isArray(data) ? data : []))
       .catch((e) => console.error("Error fetching models:", e));
-  }, [selectedBrand]);
+  }, [selectedBrand, selectedCategory]);
 
   // Fetch Engines when selectedModel or year range changes
   useEffect(() => {
@@ -275,11 +308,21 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
 
   // Read URL parameters on load
   useEffect(() => {
+    const catParam = searchParams.get("category") as WebListingCategory | null;
     const brandParam = searchParams.get("brandId") || searchParams.get("brand");
     const modelParam = searchParams.get("modelId") || searchParams.get("model");
     const engineVal = searchParams.get("engineId");
     const trimVal = searchParams.get("trimId");
     const variantId = searchParams.get("vehicleVariantId");
+
+    if (catParam && ["ALL", "AUTOMOBILE", "SUV_PICKUP", "MINIVAN_PANELVAN", "MOTORCYCLE"].includes(catParam)) {
+      setSelectedCategory(catParam);
+      setShowCategoryGate(false);
+    } else if (!isUrgentPage && !isShowcasePage && !brandParam && !modelParam && !variantId) {
+      setShowCategoryGate(true);
+    } else {
+      setShowCategoryGate(false);
+    }
     const bodyVal = searchParams.get("bodyType");
     const fuelVal = searchParams.get("fuelType");
     const transVal = searchParams.get("transmission");
@@ -376,6 +419,7 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
   const fetchListings = () => {
     setLoading(true);
     let query = `?page=${page}&limit=12&sort=${sort}`;
+    if (selectedCategory && selectedCategory !== "ALL") query += `&category=${selectedCategory}`;
     if (selectedBrand) query += `&brandId=${selectedBrand}`;
     if (selectedModel) query += `&modelId=${selectedModel}`;
     if (selectedEngineId) query += `&engineId=${selectedEngineId}`;
@@ -418,8 +462,12 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
     fetch(`${API_URL}/listings${query}`, { headers })
       .then((res) => res.json())
       .then((data) => {
-        setListings(Array.isArray(data.items) ? data.items : []);
-        setTotal(data.total || 0);
+        let items = Array.isArray(data.items) ? data.items : [];
+        if (selectedCategory && selectedCategory !== "ALL") {
+          items = items.filter((i: any) => matchesWebListingCategory(i, selectedCategory));
+        }
+        setListings(items);
+        setTotal(selectedCategory && selectedCategory !== "ALL" && data.total !== items.length && page === 1 ? items.length : (data.total || 0));
         setTotalPages(data.totalPages || 1);
         setLoading(false);
       })
@@ -436,6 +484,7 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
     isUrlHydrating,
     page,
     sort,
+    selectedCategory,
     selectedBrand,
     selectedModel,
     selectedEngineId,
@@ -519,12 +568,27 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
       .catch((err) => console.error("Error toggling favorite:", err));
   };
 
+  const handleSelectCategoryGate = (cat: WebListingCategory) => {
+    if (cat !== selectedCategory) {
+      setSelectedBrand("");
+      setSelectedModel("");
+      setSelectedEngineId("");
+      setSelectedTrimId("");
+    }
+    setSelectedCategory(cat);
+    setShowCategoryGate(false);
+    setPage(1);
+    const basePath = isUrgentPage ? "/listings/urgent" : (isShowcasePage ? "/listings/showcase" : "/listings");
+    router.push(`${basePath}?category=${cat}`);
+  };
+
   const handleFilterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
 
     // Sync URL query state so that active filters survive pagination, refresh, and browser back/forward
     const params = new URLSearchParams();
+    if (selectedCategory) params.set("category", selectedCategory);
     if (selectedBrand) params.set("brandId", selectedBrand);
     if (selectedModel) params.set("modelId", selectedModel);
     if (selectedEngineId) params.set("engineId", selectedEngineId);
@@ -567,6 +631,7 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
     setPendingBrandQuery(null);
     setPendingModelQuery(null);
     setIsUrlHydrating(false);
+    setSelectedCategory("ALL");
     setSelectedBrand("");
     setSelectedModel("");
     setSelectedEngineId("");
@@ -637,6 +702,82 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
   };
 
 
+  if (showCategoryGate) {
+    return (
+      <div className="w-full max-w-xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-5">
+        {/* Top Bar matching Görsel 2 */}
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="p-2 rounded-xl bg-slate-900/60 border border-white/10 text-slate-200 hover:border-orange-500/50 transition cursor-pointer"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Vasıta Türü Seç</h1>
+          <div className="w-9" />
+        </div>
+
+        <p className="text-xs sm:text-sm text-slate-400">
+          Sorgulamak istediğiniz vasıta türünü seçerek devam edin.
+        </p>
+
+        <div className="flex flex-col gap-3">
+          {WEB_CATEGORY_ITEMS.map(({ id, name, Icon }) => {
+            const isSelected = selectedCategory === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleSelectCategoryGate(id)}
+                className={`w-full flex items-center justify-between px-4 py-4 rounded-2xl border transition cursor-pointer text-left ${
+                  isSelected
+                    ? "bg-orange-500/10 border-orange-500 text-orange-400 shadow-lg shadow-orange-500/10"
+                    : "bg-slate-900/60 border-white/10 text-slate-100 hover:border-orange-500/50 hover:bg-slate-900"
+                }`}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div
+                    className={`w-11 h-11 rounded-full flex items-center justify-center ${
+                      isSelected ? "bg-orange-500/20 text-orange-400" : "bg-slate-800 text-slate-200"
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <span className="text-base font-extrabold">{name}</span>
+                </div>
+                {isSelected ? (
+                  <CheckCircle2 className="w-6 h-6 text-orange-500 shrink-0" />
+                ) : (
+                  <div className="w-5 h-5 rounded-full border-2 border-slate-600 shrink-0" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Info Banner */}
+        <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-orange-950/30 border border-orange-500/30 text-orange-300 text-xs font-semibold leading-relaxed">
+          <Info className="w-4 h-4 text-orange-400 shrink-0" />
+          <span>
+            Seçtiğiniz vasıta türüne göre ilgili marka, model ve teknik varyant kriterleri listelenecektir.
+          </span>
+        </div>
+
+        {/* Bottom Button: Tüm İlanları Görüntüle */}
+        <button
+          type="button"
+          onClick={() => handleSelectCategoryGate("ALL")}
+          className="w-full flex items-center justify-center gap-2.5 py-4 px-6 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-black text-sm sm:text-base shadow-lg shadow-orange-600/25 transition cursor-pointer mt-1"
+        >
+          <LayoutGrid className="w-5 h-5" />
+          <span>Tüm İlanları Görüntüle</span>
+          <ArrowRight className="w-5 h-5" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-6">
       {/* Title Header */}
@@ -682,6 +823,34 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
           </div>
 
           <div className="border-t border-white/5"></div>
+
+          {/* 0. Vasıta Türü (En Üstte) */}
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vasıta Türü</label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => {
+                const nextCat = e.target.value as WebListingCategory;
+                if (nextCat !== selectedCategory) {
+                  setSelectedBrand("");
+                  setSelectedModel("");
+                  setSelectedEngineId("");
+                  setSelectedTrimId("");
+                }
+                setSelectedCategory(nextCat);
+                setPage(1);
+              }}
+              className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-semibold text-slate-200 outline-none focus:border-orange-500 transition"
+            >
+              <option value="ALL">Tüm Vasıta Türleri (Karışık)</option>
+              <option value="AUTOMOBILE">Otomobil</option>
+              <option value="SUV_PICKUP">Arazi, SUV &amp; Pickup</option>
+              <option value="MINIVAN_PANELVAN">Minivan &amp; Panelvan</option>
+              <option value="MOTORCYCLE">Motosiklet</option>
+            </select>
+          </div>
+
+          <div className="border-t border-white/5 my-1"></div>
 
           {/* Adres */}
           <div className="flex flex-col gap-2">

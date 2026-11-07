@@ -231,6 +231,7 @@ interface ListingItem {
   district?: string;
   fuelType?: string;
   transmission?: string;
+  bodyType?: string;
   isUrgent?: boolean;
   isShowcaseFeedActive?: boolean;
   hasAiReport?: boolean;
@@ -248,11 +249,64 @@ interface ListingItem {
   photos?: { url: string }[];
   vehicleVariant?: {
     year?: number;
+    vehicleType?: string;
+    bodyType?: string;
     brand?: { id?: string; name: string };
-    model?: { id?: string; name: string };
+    model?: { id?: string; name: string; vehicleType?: string };
     trim?: { id?: string; name: string };
   };
 }
+
+type ListingVehicleCategory = 'ALL' | 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE';
+
+const LISTING_CATEGORY_ITEMS: {
+  id: Exclude<ListingVehicleCategory, 'ALL'>;
+  name: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { id: 'AUTOMOBILE', name: 'Otomobil', icon: 'car-sport-outline' },
+  { id: 'SUV_PICKUP', name: 'Arazi, SUV & Pickup', icon: 'trail-sign-outline' },
+  { id: 'MINIVAN_PANELVAN', name: 'Minivan & Panelvan', icon: 'bus-outline' },
+  { id: 'MOTORCYCLE', name: 'Motosiklet', icon: 'bicycle-outline' },
+];
+
+const getListingCategoryLabel = (cat: ListingVehicleCategory): string => {
+  switch (cat) {
+    case 'AUTOMOBILE':
+      return 'Otomobil';
+    case 'SUV_PICKUP':
+      return 'Arazi, SUV & Pickup';
+    case 'MINIVAN_PANELVAN':
+      return 'Minivan & Panelvan';
+    case 'MOTORCYCLE':
+      return 'Motosiklet';
+    case 'ALL':
+    default:
+      return 'Tüm Vasıta Türleri';
+  }
+};
+
+const matchesListingCategory = (item: ListingItem, cat: ListingVehicleCategory): boolean => {
+  if (!cat || cat === 'ALL') return true;
+  const vType = (item.vehicleVariant?.vehicleType || item.vehicleVariant?.model?.vehicleType || '').toUpperCase();
+  const bType = (item.bodyType || item.vehicleVariant?.bodyType || '').toUpperCase();
+
+  if (cat === 'MOTORCYCLE') {
+    return vType === 'MOTORCYCLE';
+  }
+  if (cat === 'MINIVAN_PANELVAN') {
+    return vType === 'MINIVAN_PANELVAN' || bType === 'MINIVAN' || bType === 'VAN';
+  }
+  if (cat === 'SUV_PICKUP') {
+    return vType === 'SUV_PICKUP' || bType === 'SUV' || bType === 'PICKUP';
+  }
+  if (cat === 'AUTOMOBILE') {
+    if (vType === 'MOTORCYCLE' || vType === 'MINIVAN_PANELVAN' || vType === 'SUV_PICKUP') return false;
+    if (bType === 'SUV' || bType === 'PICKUP' || bType === 'MINIVAN' || bType === 'VAN') return false;
+    return true;
+  }
+  return true;
+};
 
 interface Brand {
   id: string;
@@ -268,13 +322,26 @@ type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'km_asc';
 
 export default function ListingsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ urgentOnly?: string }>();
+  const params = useLocalSearchParams<{
+    urgentOnly?: string;
+    showcaseOnly?: string;
+    promptCategory?: string;
+    category?: string;
+  }>();
 
   const [listings, setListings] = useState<ListingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+
+  // Vasıta Türü Seçim Ekranı (Gate) & Seçili Vasıta Türü
+  const [selectedCategory, setSelectedCategory] = useState<ListingVehicleCategory>(
+    (params.category as ListingVehicleCategory) || 'ALL'
+  );
+  const [categoryGateVisible, setCategoryGateVisible] = useState<boolean>(
+    params.urgentOnly !== 'true' && params.showcaseOnly !== 'true' && !params.category
+  );
 
   // View Mode: 'LIST' or 'CARD'
   const [viewMode, setViewMode] = useState<'LIST' | 'CARD'>('LIST');
@@ -316,10 +383,17 @@ export default function ListingsScreen() {
   useEffect(() => {
     if (params.urgentOnly === 'true') {
       setUrgentOnly(true);
+      setCategoryGateVisible(false);
     } else if (params.urgentOnly === 'false') {
       setUrgentOnly(false);
     }
   }, [params.urgentOnly]);
+
+  useEffect(() => {
+    if (params.promptCategory) {
+      setCategoryGateVisible(true);
+    }
+  }, [params.promptCategory]);
 
   // Sorting
   const [sortOption, setSortOption] = useState<SortOption>('newest');
@@ -363,22 +437,26 @@ export default function ListingsScreen() {
   }, [availableDistricts, districtSearchQuery]);
 
   useEffect(() => {
-    fetchBrands();
+    fetchBrands(selectedCategory);
+  }, [selectedCategory]);
+
+  useEffect(() => {
     loadFavorites();
   }, []);
 
   useEffect(() => {
     if (selectedBrand) {
-      fetchModels(selectedBrand.id);
+      fetchModels(selectedBrand.id, selectedCategory);
     } else {
       setModels([]);
       setSelectedModel(null);
     }
-  }, [selectedBrand]);
+  }, [selectedBrand, selectedCategory]);
 
   useEffect(() => {
     fetchListings();
   }, [
+    selectedCategory,
     selectedBrand,
     selectedModel,
     city,
@@ -427,9 +505,10 @@ export default function ListingsScreen() {
     }
   };
 
-  const fetchBrands = async () => {
+  const fetchBrands = async (cat: ListingVehicleCategory = selectedCategory) => {
     try {
-      const res = await fetch(`${API_URL}/vehicles/brands`);
+      const query = cat && cat !== 'ALL' ? `?category=${cat}` : `?category=ALL`;
+      const res = await fetch(`${API_URL}/vehicles/brands${query}`);
       if (res.ok) {
         const data = await res.json();
         const sorted = Array.isArray(data)
@@ -442,9 +521,10 @@ export default function ListingsScreen() {
     }
   };
 
-  const fetchModels = async (brandId: string) => {
+  const fetchModels = async (brandId: string, cat: ListingVehicleCategory = selectedCategory) => {
     try {
-      const res = await fetch(`${API_URL}/vehicles/models?brandId=${brandId}`);
+      const catQuery = cat && cat !== 'ALL' ? `&category=${cat}` : `&category=ALL`;
+      const res = await fetch(`${API_URL}/vehicles/models?brandId=${brandId}${catQuery}`);
       if (res.ok) {
         const data = await res.json();
         const sorted = Array.isArray(data)
@@ -457,10 +537,22 @@ export default function ListingsScreen() {
     }
   };
 
+  const handleSelectCategory = (cat: ListingVehicleCategory) => {
+    if (cat !== selectedCategory) {
+      setSelectedBrand(null);
+      setSelectedModel(null);
+    }
+    setSelectedCategory(cat);
+    setCategoryGateVisible(false);
+  };
+
   const fetchListings = async () => {
     setLoading(true);
     try {
       let url = `${API_URL}/listings?limit=50&`;
+      if (selectedCategory && selectedCategory !== 'ALL') {
+        url += `category=${selectedCategory}&`;
+      }
       if (selectedBrand) url += `brandId=${selectedBrand.id}&`;
       if (selectedModel) url += `modelId=${selectedModel.id}&`;
       if (search.trim()) url += `keyword=${encodeURIComponent(search.trim())}&`;
@@ -526,6 +618,9 @@ export default function ListingsScreen() {
         if (selectedColors.length > 1) {
           items = items.filter((i) => i.color && selectedColors.includes(i.color));
         }
+        if (selectedCategory && selectedCategory !== 'ALL') {
+          items = items.filter((i) => matchesListingCategory(i, selectedCategory));
+        }
 
         setListings(items);
       } else {
@@ -546,6 +641,7 @@ export default function ListingsScreen() {
   };
 
   const handleClearFilters = () => {
+    setSelectedCategory('ALL');
     setSelectedBrand(null);
     setSelectedModel(null);
     setCity('');
@@ -576,6 +672,7 @@ export default function ListingsScreen() {
 
   const countActiveFilters = () => {
     let count = 0;
+    if (selectedCategory && selectedCategory !== 'ALL') count++;
     if (selectedBrand) count++;
     if (selectedModel) count++;
     if (city && city !== 'Tümü') count++;
@@ -826,13 +923,184 @@ export default function ListingsScreen() {
 
   const activeFilterCount = countActiveFilters();
 
+  if (categoryGateVisible) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: '#fafcff' }]} edges={['top']}>
+        {/* Header matching Görsel 2 */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+          }}
+        >
+          <TouchableOpacity
+            style={{ padding: 4 }}
+            onPress={() => router.push('/(tabs)/index' as any)}
+          >
+            <Ionicons name="chevron-back" size={24} color="#0f172a" />
+          </TouchableOpacity>
+          <Text style={{ fontSize: 20, fontWeight: '900', color: '#0b192c' }}>
+            Vasıta Türü Seç
+          </Text>
+          <View style={{ width: 28 }} />
+        </View>
+
+        <Text
+          style={{
+            fontSize: 13.5,
+            color: '#64748b',
+            paddingHorizontal: 20,
+            marginBottom: 14,
+          }}
+        >
+          Sorgulamak istediğiniz vasıta türünü seçerek devam edin.
+        </Text>
+
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 12 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {LISTING_CATEGORY_ITEMS.map((cat) => {
+            const isSelected = selectedCategory === cat.id;
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 16,
+                  paddingHorizontal: 16,
+                  borderRadius: 16,
+                  backgroundColor: isSelected ? '#fff7ed' : '#ffffff',
+                  borderWidth: 1.5,
+                  borderColor: isSelected ? '#ea580c' : '#e2e8f0',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 6,
+                  elevation: 2,
+                }}
+                activeOpacity={0.8}
+                onPress={() => handleSelectCategory(cat.id)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 }}>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: isSelected ? '#ffedd5' : '#f1f5f9',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Ionicons
+                      name={cat.icon}
+                      size={22}
+                      color={isSelected ? '#ea580c' : '#0f172a'}
+                    />
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: '800',
+                      color: isSelected ? '#c2410c' : '#0f172a',
+                    }}
+                  >
+                    {cat.name}
+                  </Text>
+                </View>
+
+                <View style={{ marginLeft: 8 }}>
+                  {isSelected ? (
+                    <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
+                  ) : (
+                    <View
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        borderWidth: 2,
+                        borderColor: '#cbd5e1',
+                      }}
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              backgroundColor: '#fff7ed',
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              borderRadius: 12,
+              marginTop: 4,
+              borderWidth: 1,
+              borderColor: '#ffedd5',
+            }}
+          >
+            <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 12,
+                color: '#c2410c',
+                fontWeight: '600',
+                lineHeight: 17,
+              }}
+            >
+              Seçtiğiniz vasıta türüne göre ilgili marka, model ve teknik varyant kriterleri listelenecektir.
+            </Text>
+          </View>
+
+          {/* EN ALT BUTON: TÜM İLANLARI GÖRÜNTÜLE */}
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              backgroundColor: '#ea580c',
+              paddingVertical: 16,
+              paddingHorizontal: 20,
+              borderRadius: 16,
+              marginTop: 10,
+              shadowColor: '#ea580c',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.25,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
+            activeOpacity={0.85}
+            onPress={() => handleSelectCategory('ALL')}
+          >
+            <Ionicons name="grid-outline" size={18} color="#ffffff" />
+            <Text style={{ fontSize: 16, fontWeight: '900', color: '#ffffff' }}>
+              Tüm İlanları Görüntüle
+            </Text>
+            <Ionicons name="arrow-forward" size={18} color="#ffffff" />
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* TOP APPBAR */}
       <View style={styles.topAppBar}>
         <TouchableOpacity
           style={styles.appBarIconBtn}
-          onPress={() => router.push('/(tabs)/index' as any)}
+          onPress={() => setCategoryGateVisible(true)}
         >
           <Ionicons name="chevron-back" size={24} color="#0f172a" />
         </TouchableOpacity>
@@ -840,7 +1108,9 @@ export default function ListingsScreen() {
         <View style={styles.appBarCenter}>
           <Text style={styles.appBarTitle}>Araç İlanları</Text>
           <Text style={styles.appBarSubTitle}>
-            {loading ? 'Yükleniyor...' : `${listings.length} ilan`}
+            {loading
+              ? 'Yükleniyor...'
+              : `${getListingCategoryLabel(selectedCategory)} • ${listings.length} ilan`}
           </Text>
         </View>
 
@@ -953,6 +1223,16 @@ export default function ListingsScreen() {
       {activeFilterCount > 0 && (
         <View style={styles.activeFilterNotice}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {selectedCategory && selectedCategory !== 'ALL' && (
+              <TouchableOpacity
+                style={styles.filterTagPill}
+                onPress={() => handleSelectCategory('ALL')}
+              >
+                <Ionicons name="car-sport-outline" size={13} color="#ea580c" />
+                <Text style={styles.filterTagPillText}>{getListingCategoryLabel(selectedCategory)}</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
             {selectedBrand && (
               <TouchableOpacity
                 style={styles.filterTagPill}
@@ -1110,6 +1390,73 @@ export default function ListingsScreen() {
             contentContainerStyle={styles.filterModalScrollContent}
             showsVerticalScrollIndicator={false}
           >
+            {/* 0. VASITA TÜRÜ (EN ÜSTTE) */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>🚘 VASITA TÜRÜ</Text>
+              <View style={{ gap: 8 }}>
+                {[
+                  { id: 'ALL' as ListingVehicleCategory, name: 'Tüm Vasıta Türleri (Karışık)', icon: 'grid-outline' as const },
+                  ...LISTING_CATEGORY_ITEMS,
+                ].map((cat) => {
+                  const isSelected = selectedCategory === cat.id;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingVertical: 11,
+                        paddingHorizontal: 12,
+                        borderRadius: 12,
+                        backgroundColor: isSelected ? '#fff7ed' : '#f8fafc',
+                        borderWidth: 1.5,
+                        borderColor: isSelected ? '#ea580c' : '#e2e8f0',
+                      }}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        if (cat.id !== selectedCategory) {
+                          setSelectedBrand(null);
+                          setSelectedModel(null);
+                        }
+                        setSelectedCategory(cat.id);
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Ionicons
+                          name={cat.icon}
+                          size={18}
+                          color={isSelected ? '#ea580c' : '#475569'}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: isSelected ? '800' : '600',
+                            color: isSelected ? '#c2410c' : '#0f172a',
+                          }}
+                        >
+                          {cat.name}
+                        </Text>
+                      </View>
+                      {isSelected ? (
+                        <Ionicons name="checkmark-circle" size={20} color="#ea580c" />
+                      ) : (
+                        <View
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: 9,
+                            borderWidth: 1.5,
+                            borderColor: '#cbd5e1',
+                          }}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             {/* 1. ADRES (İL / İLÇE) */}
             <View style={styles.filterCard}>
               <Text style={styles.filterCardTitle}>📍 ADRES (İL / İLÇE)</Text>

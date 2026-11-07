@@ -22,6 +22,7 @@ import { BadRequestException } from '@nestjs/common';
 
 export interface MarketplaceFilterParams {
   now?: Date;
+  category?: string;
   urgentOnly?: string;
   showcaseOnly?: string;
   sellerId?: string;
@@ -225,6 +226,49 @@ export function buildMarketplaceListingWhere(
 
   if (params.vehicleVariantId) {
     where.vehicleVariantId = params.vehicleVariantId;
+  }
+
+  if (params.category && params.category.toUpperCase() !== 'ALL') {
+    const cat = params.category.toUpperCase().trim();
+    if (cat === 'AUTOMOBILE') {
+      where.AND.push({
+        OR: [
+          {
+            vehicleVariant: {
+              vehicleType: 'AUTOMOBILE',
+              bodyType: { notIn: ['SUV', 'PICKUP', 'MINIVAN', 'VAN'] as any },
+            },
+          },
+          {
+            vehicleVariantId: null,
+            bodyType: { in: ['SEDAN', 'HATCHBACK', 'COUPE', 'CONVERTIBLE', 'WAGON'] as any },
+          },
+        ],
+      });
+    } else if (cat === 'SUV_PICKUP' || cat === 'SUV') {
+      where.AND.push({
+        OR: [
+          { vehicleVariant: { vehicleType: 'SUV_PICKUP' } },
+          { vehicleVariant: { bodyType: { in: ['SUV', 'PICKUP'] as any } } },
+          { bodyType: { in: ['SUV', 'PICKUP'] as any } },
+        ],
+      });
+    } else if (cat === 'MINIVAN_PANELVAN' || cat === 'COMMERCIAL') {
+      where.AND.push({
+        OR: [
+          { vehicleVariant: { vehicleType: 'MINIVAN_PANELVAN' } },
+          { vehicleVariant: { bodyType: { in: ['MINIVAN', 'VAN'] as any } } },
+          { bodyType: { in: ['MINIVAN', 'VAN'] as any } },
+        ],
+      });
+    } else if (cat === 'MOTORCYCLE' || cat === 'MOTOSIKLET') {
+      where.AND.push({
+        OR: [
+          { vehicleVariant: { vehicleType: 'MOTORCYCLE' } },
+          { vehicleVariant: { model: { vehicleType: 'MOTORCYCLE' } } },
+        ],
+      });
+    }
   }
 
   if (params.brandId || params.modelId || params.engineId || params.trimId || params.transmissionId) {

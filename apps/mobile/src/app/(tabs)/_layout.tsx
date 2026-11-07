@@ -177,7 +177,10 @@ export default function TabsLayout() {
     setMenuVisible(false);
     router.push({
       pathname: '/(tabs)/listings',
-      params: { urgentOnly: urgent ? 'true' : 'false' },
+      params: {
+        urgentOnly: urgent ? 'true' : 'false',
+        promptCategory: urgent ? undefined : String(Date.now()),
+      },
     } as any);
   };
 

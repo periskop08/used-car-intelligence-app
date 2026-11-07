@@ -116,10 +116,13 @@ export class ListingController {
     @Query('engineId') engineId?: string,
     @Query('trimId') trimId?: string,
     @Query('transmissionId') transmissionId?: string,
+    @Query('category') category?: string,
+    @Query('vehicleType') vehicleType?: string,
   ) {
     const now = new Date();
     const filterParams = {
       now,
+      category: category || vehicleType,
       urgentOnly,
       showcaseOnly,
       sellerId,

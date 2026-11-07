@@ -44,6 +44,12 @@ export class VehicleService {
   ) {}
 
   async getBrands(category?: string) {
+    if (category && category.toUpperCase().trim() === 'ALL') {
+      return this.prisma.brand.findMany({
+        where: { isActive: true },
+        orderBy: { name: 'asc' },
+      });
+    }
     const norm = normalizeVehicleType(category);
     if (norm === 'MOTORCYCLE') {
       return this.prisma.brand.findMany({
@@ -83,6 +89,15 @@ export class VehicleService {
   }
 
   async getModels(brandId: string, category?: string) {
+    if (category && category.toUpperCase().trim() === 'ALL') {
+      return this.prisma.model.findMany({
+        where: {
+          brandId,
+          isActive: true,
+        },
+        orderBy: { name: 'asc' },
+      });
+    }
     const norm = normalizeVehicleType(category);
     if (norm === 'MOTORCYCLE') {
       return this.prisma.model.findMany({
