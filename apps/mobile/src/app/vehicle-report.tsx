@@ -2447,7 +2447,7 @@ export default function VehicleReportScreen() {
           <IsiCepteRecommendationWidget
             vehicleBrand={report.vehicleIdentity.brand}
             title={`${report.vehicleIdentity.brand} İçin İşi Cepte Öneriyor`}
-            subtitle={`${report.vehicleIdentity.brand} ${report.vehicleIdentity.model} için onaylı yetkili/özel servisler ve ekspertiz noktaları`}
+            subtitle={`${report.vehicleIdentity.brand} ${report.vehicleIdentity.model} için yetkili/özel servisler ve ekspertiz noktaları`}
           />
 
           {/* FEEDBACK & HELPFULNESS CARD (Alt Geri Bildirim Bölümü) */}

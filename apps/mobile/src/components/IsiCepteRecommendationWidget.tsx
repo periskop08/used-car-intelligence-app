@@ -132,6 +132,10 @@ export default function IsiCepteRecommendationWidget({
   const [citySearchQuery, setCitySearchQuery] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<IsiCepteProviderItem | null>(null);
 
+  const horizontalScrollRef = useRef<any>(null);
+  const currentCardIndexRef = useRef(0);
+  const isUserInteractingRef = useRef(false);
+
   const cityModalPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const providerModalPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
@@ -301,6 +305,7 @@ export default function IsiCepteRecommendationWidget({
       if (res.ok) {
         const data = await res.json();
         const providers = Array.isArray(data.items) ? data.items : [];
+        currentCardIndexRef.current = 0;
         setItems(providers);
       }
     } catch (e) {
@@ -313,6 +318,28 @@ export default function IsiCepteRecommendationWidget({
   useEffect(() => {
     fetchRecommendations();
   }, [fetchRecommendations]);
+
+  // Auto-scroll provider cards horizontally and loop back to start when reaching the end
+  useEffect(() => {
+    if (loading || items.length <= 1 || isCityModalVisible || Boolean(selectedProvider)) {
+      return;
+    }
+    const CARD_STEP = 232; // providerCard width (220) + gap (12)
+    const interval = setInterval(() => {
+      if (isUserInteractingRef.current) return;
+      const nextIndex =
+        currentCardIndexRef.current + 1 >= items.length
+          ? 0
+          : currentCardIndexRef.current + 1;
+      currentCardIndexRef.current = nextIndex;
+      horizontalScrollRef.current?.scrollTo({
+        x: nextIndex * CARD_STEP,
+        animated: true,
+      });
+    }, 2800);
+
+    return () => clearInterval(interval);
+  }, [loading, items.length, isCityModalVisible, selectedProvider]);
 
   const handleCall = (phone?: string | null) => {
     if (!phone) return;
@@ -338,7 +365,7 @@ export default function IsiCepteRecommendationWidget({
             <Text style={styles.isiCepteBadgeText}>İŞİ CEPTE ÖNERİYOR</Text>
           </View>
           <View style={styles.guaranteeBadge}>
-            <Text style={styles.guaranteeBadgeText}>Onaylı Oto Servis & Usta</Text>
+            <Text style={styles.guaranteeBadgeText}>Oto Servis & Usta</Text>
           </View>
         </View>
 
@@ -348,7 +375,7 @@ export default function IsiCepteRecommendationWidget({
               {title || (vehicleBrand ? `${vehicleBrand} İçin Önerilen Servisler` : 'Güvenilir Servis & Ustalar')}
             </Text>
             <Text style={styles.subTitle}>
-              {subtitle || 'Bölgenizdeki uzman mekanik, kaporta, ekspertiz ve yedek parça noktaları'}
+              {(subtitle || 'Bölgenizdeki uzman mekanik, kaporta, ekspertiz ve yedek parça noktaları').replace(/\bonaylı\s+/gi, '')}
             </Text>
           </View>
 
@@ -394,9 +421,23 @@ export default function IsiCepteRecommendationWidget({
         </View>
       ) : (
         <ScrollView
+          ref={horizontalScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.horizontalScrollContent}
+          onScrollBeginDrag={() => {
+            isUserInteractingRef.current = true;
+          }}
+          onScrollEndDrag={() => {
+            setTimeout(() => {
+              isUserInteractingRef.current = false;
+            }, 1500);
+          }}
+          onMomentumScrollEnd={(e) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.x / 232);
+            currentCardIndexRef.current = Math.max(0, Math.min(items.length - 1, idx));
+            isUserInteractingRef.current = false;
+          }}
         >
           {items.map((provider) => (
             <TouchableOpacity
@@ -467,7 +508,11 @@ export default function IsiCepteRecommendationWidget({
                   onPress={() => handleOpenIsiCepte(provider)}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="open-outline" size={13} color="#0284c7" />
+                  <Image
+                    source={ISICEPTE_LOGO}
+                    style={{ width: 15, height: 15, borderRadius: 4 }}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.actionBtnIsiCepteText} numberOfLines={1}>
                     İşi Cepte'de Aç
                   </Text>
@@ -666,7 +711,7 @@ export default function IsiCepteRecommendationWidget({
                     </View>
                     <View style={styles.detailVerifiedRow}>
                       <Image source={ISICEPTE_LOGO} style={{ width: 14, height: 14, borderRadius: 3 }} resizeMode="contain" />
-                      <Text style={styles.detailVerifiedText}>İşi Cepte Onaylı Usta</Text>
+                      <Text style={styles.detailVerifiedText}>İşi Cepte Usta & Servis</Text>
                     </View>
                   </View>
                   <TouchableOpacity
@@ -753,7 +798,11 @@ export default function IsiCepteRecommendationWidget({
                     onPress={() => handleOpenIsiCepte(selectedProvider)}
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="open-outline" size={18} color="#ffffff" />
+                    <Image
+                      source={ISICEPTE_LOGO}
+                      style={{ width: 18, height: 18, borderRadius: 4 }}
+                      resizeMode="contain"
+                    />
                     <Text style={styles.detailIsiCepteBtnText}>İşi Cepte'de Aç</Text>
                   </TouchableOpacity>
                 </View>
