@@ -24,7 +24,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
-const CLUB_TAB_ICON = require('../../../assets/images/club-tab-icon.png');
 const CLUB_HEADER_LOGO = require('../../../assets/images/torkscout-club-header-logo.png');
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -488,20 +487,13 @@ export default function TorqueScoutClubScreen() {
       {/* TOP CLUB NAVBAR */}
       <View style={styles.topNavbar}>
         <View style={styles.navLeft}>
-          <View style={styles.shieldBadge}>
-            <Image
-              source={CLUB_TAB_ICON}
-              style={{ width: 22, height: 22, tintColor: '#ffffff' }}
-              resizeMode="contain"
-            />
-          </View>
-          <View>
+          <View style={{ alignItems: 'flex-start' }}>
             <Image
               source={CLUB_HEADER_LOGO}
-              style={{ width: 170, height: 22 }}
+              style={{ width: 185, height: 24, marginLeft: -2 }}
               resizeMode="contain"
             />
-            <Text style={[styles.clubSubTitle, { marginTop: 2 }]}>Otomobil Tutkunları Topluluğu</Text>
+            <Text style={[styles.clubSubTitle, { marginTop: 3 }]}>Otomobil Tutkunları Topluluğu</Text>
           </View>
         </View>
 
