@@ -13,13 +13,14 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ returnToPrevious?: string }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -41,8 +42,11 @@ export default function LoginScreen() {
       const data = await res.json();
       if (res.ok && data.accessToken) {
         await AsyncStorage.setItem('accessToken', data.accessToken);
-        Alert.alert('Başarılı', 'Giriş yapıldı.');
-        router.replace('/(tabs)/profile');
+        if (params.returnToPrevious === '1' || router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/(tabs)/profile');
+        }
       } else {
         Alert.alert('Hata', data.message || 'E-posta veya şifre hatalı.');
       }
@@ -135,7 +139,15 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.registerLink} onPress={() => router.push('/register')}>
+          <TouchableOpacity
+            style={styles.registerLink}
+            onPress={() =>
+              router.replace({
+                pathname: '/register',
+                params: params.returnToPrevious ? { returnToPrevious: params.returnToPrevious } : undefined,
+              } as any)
+            }
+          >
             <Text style={styles.registerText}>
               Hesabınız yok mu? <Text style={styles.highlight}>Kayıt Olun</Text>
             </Text>

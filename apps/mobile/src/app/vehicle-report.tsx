@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -17,7 +17,7 @@ import {
   PanResponder,
   RefreshControl,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -450,6 +450,8 @@ export default function VehicleReportScreen() {
   const [isQuotaModalVisible, setIsQuotaModalVisible] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const chatScrollRef = useRef<ScrollView>(null);
+  const pendingReopenChatAfterAuth = useRef(false);
+  const pendingQuestionAfterAuth = useRef<string | null>(null);
 
   // Swipe-Down-To-Dismiss PanResponder
   const chatPanY = useRef(new Animated.Value(0)).current;
@@ -591,7 +593,17 @@ export default function VehicleReportScreen() {
           'TorqueScout Yapay Zeka Danışmanına soru sormak ve soru haklarınızı kullanmak için lütfen giriş yapın.',
           [
             { text: 'Vazgeç', style: 'cancel' },
-            { text: 'Giriş Yap', onPress: () => router.push('/login') },
+            {
+              text: 'Giriş Yap',
+              onPress: () => {
+                pendingReopenChatAfterAuth.current = true;
+                pendingQuestionAfterAuth.current = textToSend;
+                setIsChatModalVisible(false);
+                setTimeout(() => {
+                  router.push({ pathname: '/login', params: { returnToPrevious: '1' } } as any);
+                }, 150);
+              },
+            },
           ]
         );
         return;
@@ -818,13 +830,51 @@ export default function VehicleReportScreen() {
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const token =
+          (await AsyncStorage.getItem('accessToken')) ||
+          (await AsyncStorage.getItem('token'));
+        if (token) {
+          fetchUserRights();
+          if (activeVariantId) {
+            checkIfFavorited(activeVariantId);
+          }
+          if (pendingReopenChatAfterAuth.current) {
+            pendingReopenChatAfterAuth.current = false;
+            const queuedQuestion = pendingQuestionAfterAuth.current;
+            pendingQuestionAfterAuth.current = null;
+            chatPanY.setValue(0);
+            setIsChatModalVisible(true);
+            if (queuedQuestion) {
+              setTimeout(() => {
+                handleSendChat(queuedQuestion);
+              }, 250);
+            }
+          }
+        }
+      })();
+    }, [activeVariantId])
+  );
+
   const toggleFavorite = async () => {
     if (!activeVariantId) return;
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
-        Alert.alert('Giriş Gerekli', 'Raporları favorilere eklemek için lütfen giriş yapın.');
-        router.push('/login');
+        Alert.alert(
+          'Giriş Gerekli',
+          'Raporları favorilere eklemek için lütfen giriş yapın.',
+          [
+            { text: 'Vazgeç', style: 'cancel' },
+            {
+              text: 'Giriş Yap',
+              onPress: () =>
+                router.push({ pathname: '/login', params: { returnToPrevious: '1' } } as any),
+            },
+          ]
+        );
         return;
       }
 
