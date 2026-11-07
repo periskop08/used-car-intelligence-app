@@ -29,7 +29,7 @@ import {
   IsiCepteProviderItem,
   openIsiCepteAppOrStore,
 } from '../components/IsiCepteRecommendationWidget';
-import { getBrandLogoUrl } from '../constants/brandLogos';
+import { getBrandLogoUrl, normalizeBrandKey } from '../constants/brandLogos';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const ISICEPTE_LOGO = require('../../assets/images/isicepte-logo.png');
@@ -85,9 +85,251 @@ const INITIAL_MOTORCYCLE_BRANDS: string[] = [
   'Yuki', 'Zontes',
 ];
 
-const MOTORCYCLE_BRAND_SET = new Set(
-  INITIAL_MOTORCYCLE_BRANDS.map((b) => b.toLowerCase())
-);
+// Hem otomobil hem motosiklet üreten çift kategorili markalar
+const DUAL_VEHICLE_BRAND_SLUGS = new Set(['bmw', 'honda', 'suzuki', 'peugeot']);
+
+// Sadece Otomobil / SUV / Ticari sınıfına ait tüm doğrulanmış marka anahtarları
+const ALLOWED_AUTOMOBILE_BRAND_SLUGS = new Set([
+  'abarth', 'acura', 'aion', 'alfa-romeo', 'alpine', 'anadol', 'askam', 'aston-martin',
+  'audi', 'bentley', 'bmc', 'bmw', 'bugatti', 'buick', 'byd', 'cadillac', 'cenntro',
+  'chery', 'chevrolet', 'chrysler', 'citroen', 'cupra', 'dacia', 'daewoo', 'daf',
+  'daihatsu', 'dfm', 'dfsk', 'dodge', 'dongfeng', 'ds', 'ds-automobiles', 'eagle',
+  'etox', 'faw', 'ferrari', 'fiat', 'fisker', 'ford', 'forthing', 'foton', 'gaz',
+  'geely', 'genesis', 'gmc', 'honda', 'hongqi', 'hummer', 'hyundai', 'ikco', 'infiniti',
+  'isuzu', 'iveco', 'jac', 'jaecoo', 'jaguar', 'jeep', 'joyce', 'karsan', 'kia',
+  'koenigsegg', 'lada', 'lamborghini', 'lancia', 'land-rover', 'leapmotor', 'levc',
+  'lexus', 'lincoln', 'lotus', 'lynk-and-co', 'mahindra', 'man', 'maserati', 'maxus',
+  'maybach', 'mazda', 'mclaren', 'mercedes-benz', 'mercury', 'mg', 'micro', 'mini',
+  'mitsubishi', 'morgan', 'moskwitsch', 'nissan', 'oldsmobile', 'omoda', 'opel',
+  'otokar', 'pagani', 'peugeot', 'plymouth', 'polestar', 'pontiac', 'porsche', 'proton',
+  'rainwoll', 'ram', 'reeder', 'renault', 'rolls-royce', 'rover', 'saab', 'scania',
+  'seat', 'seres', 'skoda', 'skywell', 'smart', 'ssangyong', 'subaru', 'suzuki', 'tata',
+  'temsa', 'tesla', 'the-london-taxi', 'tofas', 'togg', 'toyota', 'vanderhall',
+  'volkswagen', 'volvo', 'voyah', 'xev', 'yudo',
+]);
+
+// Sadece Motosiklet sınıfına ait bilinen tüm marka anahtarları (Otomobil listesinden kesin olarak dışlanır)
+const PURE_MOTORCYCLE_BRAND_SLUGS = new Set([
+  'abush', 'aeon', 'airforce', 'ajp', 'altai', 'apachi', 'apec', 'aprilia', 'argo',
+  'ariic', 'armode', 'arora', 'asya', 'bajaj', 'banhe', 'baotian', 'barossa', 'bashan',
+  'belderia', 'benda', 'benelli', 'beta', 'better', 'beyaz-benli', 'bianchi', 'bimota',
+  'birdhunter', 'bisan', 'boom', 'borelli-ledow', 'brixton', 'bsa', 'buell',
+  'bumotojinling', 'cagiva', 'can-am', 'caza', 'celik-motor', 'cezeta', 'cfmoto',
+  'cheeta', 'chopper', 'coral', 'cosmopolitan', 'cq', 'crn', 'csn-motor', 'daelim',
+  'dayun', 'delta-motorcycle', 'derbi', 'di-blasi', 'dofern', 'doohan', 'dorado',
+  'ducati', 'easycool', 'ecotrike', 'elitte', 'enbest', 'ersi', 'falcon', 'fantic',
+  'fcm', 'fengchi', 'fest', 'fosti', 'fym', 'gaoming', 'garelli', 'gas-gas', 'gasgas',
+  'gilera', 'gomoto', 'haojiang', 'haojin', 'haojue', 'harley-davidson', 'harput',
+  'hazey-turk', 'hercules', 'hero', 'hf-kanuni', 'hfkanuni', 'hh-moto', 'hm-moto',
+  'hsun', 'husaberg', 'husqvarna', 'hyosung', 'indian', 'isildar', 'italjet', 'izh',
+  'jawa', 'jaxin', 'jiajue', 'jiayuan', 'jinding', 'jinlun', 'jonway', 'jpn-motor',
+  'kadirga', 'kaldera', 'kamax', 'kangda', 'kanuni', 'karpaty', 'kastino', 'katren',
+  'kawasaki', 'kayo', 'kayo-moto', 'keeway', 'kentoya', 'kimmi', 'kinetic', 'kinroad',
+  'kove', 'kral', 'ktm', 'kuba', 'kymco', 'lambretta', 'lanying', 'leksas', 'lem',
+  'lifan', 'linhai', 'lintex', 'lml', 'luqi', 'lynx', 'malaguti', 'maranta', 'megelli',
+  'meiduo', 'meka-motor', 'memnun', 'minsk', 'mirage', 'mobylette', 'modenas', 'mondial',
+  'monero', 'motard', 'moto-gusto', 'moto-guzzi', 'moto-morini', 'moto-zeen', 'moto-zeta',
+  'motobecane', 'motolux', 'motoran', 'motosan', 'motozeus', 'motti', 'muravey',
+  'musatti', 'mutt', 'mv-agusta', 'mz', 'nanok', 'nibbi', 'nieve', 'nimizi-borelli',
+  'norton', 'nova', 'nsu', 'ocherk', 'ohvale', 'omi', 'orti', 'ortimobil', 'oubao',
+  'oxobike', 'pgo', 'piaggio', 'pioneer', 'planet', 'polaris', 'polini', 'presto',
+  'puch', 'qjmotor', 'qooder', 'qstrong', 'ramex', 'ramzey', 'rasler', 'regal-raptor',
+  'relive', 'renda', 'revolt', 'rewaco', 'rialli', 'rieju', 'rkn', 'rks',
+  'rmg-moto-gusto', 'romet', 'royal-alloy', 'royal-enfield', 'rutec', 'salcano',
+  'sam-motor', 'scorpa', 'seger', 'sfm', 'shenke', 'sherco', 'shinari', 'simson',
+  'ski-doo', 'skygo', 'skyjet', 'skyteam', 'spada', 'stmax', 'sukida', 'superking',
+  'swm', 'sym', 'takashi', 'taktas-motor', 'taro', 'telstar', 'tenax', 'tgb', 'titan',
+  'tm', 'tm-racing', 'togo', 'triumph', 'tt', 'tvs', 'ugursam', 'um', 'ural',
+  'velosolex', 'vespa', 'victory', 'vitello', 'voge', 'volta', 'wangye', 'wsk', 'wuxi',
+  'xgjao', 'xingyue', 'xintian', 'yamaha', 'yiben', 'yuan', 'yuki', 'zealsun',
+  'zongshen', 'zontes', 'zorro',
+]);
+
+// Kanonik marka gösterim isimleri (çift yazımları tek ve en temiz isimde birleştirir)
+const CANONICAL_BRAND_DISPLAY_LABELS: Record<string, string> = {
+  'alfa-romeo': 'Alfa Romeo',
+  'aston-martin': 'Aston Martin',
+  'bmc': 'BMC',
+  'bmw': 'BMW',
+  'byd': 'BYD',
+  'can-am': 'Can-Am',
+  'celik-motor': 'Çelik Motor',
+  'cfmoto': 'CFMoto',
+  'csn-motor': 'CSN Motor',
+  'dfm': 'DFM',
+  'dfsk': 'DFSK',
+  'di-blasi': 'Di Blasi',
+  'ds': 'DS Automobiles',
+  'ds-automobiles': 'DS Automobiles',
+  'gas-gas': 'GasGas',
+  'gasgas': 'GasGas',
+  'gmc': 'GMC',
+  'harley-davidson': 'Harley-Davidson',
+  'hazey-turk': 'Hazey Türk',
+  'hf-kanuni': 'HF Kanuni',
+  'hfkanuni': 'HF Kanuni',
+  'hh-moto': 'HH Moto',
+  'hm-moto': 'HM Moto',
+  'isildar': 'Işıldar',
+  'izh': 'IZH',
+  'jac': 'JAC',
+  'jpn-motor': 'JPN Motor',
+  'kadirga': 'Kadırga',
+  'kayo': 'Kayo Moto',
+  'kayo-moto': 'Kayo Moto',
+  'ktm': 'KTM',
+  'kuba': 'Kuba',
+  'land-rover': 'Land Rover',
+  'levc': 'LEVC',
+  'lml': 'LML',
+  'lynk-and-co': 'Lynk & Co',
+  'man': 'MAN',
+  'meka-motor': 'Meka Motor',
+  'mercedes-benz': 'Mercedes-Benz',
+  'mg': 'MG',
+  'mini': 'MINI',
+  'moto-gusto': 'RMG Moto Gusto',
+  'rmg-moto-gusto': 'RMG Moto Gusto',
+  'moto-guzzi': 'Moto Guzzi',
+  'moto-morini': 'Moto Morini',
+  'moto-zeen': 'Moto Zeen',
+  'moto-zeta': 'Moto Zeta',
+  'mv-agusta': 'MV Agusta',
+  'mz': 'MZ',
+  'nimizi-borelli': 'Borelli Ledow',
+  'borelli-ledow': 'Borelli Ledow',
+  'nsu': 'NSU',
+  'orti': 'Orti',
+  'ortimobil': 'Orti',
+  'pgo': 'PGO',
+  'qjmotor': 'QJMotor',
+  'ram': 'RAM',
+  'regal-raptor': 'Regal Raptor',
+  'rkn': 'RKN',
+  'rks': 'RKS',
+  'rolls-royce': 'Rolls-Royce',
+  'royal-alloy': 'Royal Alloy',
+  'royal-enfield': 'Royal Enfield',
+  'sam-motor': 'Sam Motor',
+  'sfm': 'SFM',
+  'ski-doo': 'Ski-Doo',
+  'ssangyong': 'SsangYong',
+  'swm': 'SWM',
+  'sym': 'SYM',
+  'taktas-motor': 'Taktaş Motor',
+  'tgb': 'TGB',
+  'the-london-taxi': 'The London Taxi',
+  'tm': 'TM Racing',
+  'tm-racing': 'TM Racing',
+  'tofas': 'Tofaş',
+  'tt': 'TT',
+  'tvs': 'TVS',
+  'ugursam': 'Uğursam',
+  'um': 'UM',
+  'wsk': 'WSK',
+  'xev': 'XEV',
+};
+
+/**
+ * Bir marka adını tüm boşluk, tire, büyük/küçük harf ve "Motor/Moto/Racing" eklerinden
+ * arındırarak tekil bir karşılaştırma anahtarına dönüştürür.
+ */
+function getBrandDedupeKey(rawName: string): string {
+  const rawTrimmed = rawName.trim().toLowerCase();
+  if (rawTrimmed === 'tofaş' || rawTrimmed === 'tofas') {
+    return 'tofas';
+  }
+  const slug = normalizeBrandKey(rawName);
+  if (!slug) return '';
+
+  // Bilinen eşanlamlı slug'ları tek anahtarda birleştir
+  const aliasMap: Record<string, string> = {
+    'gas-gas': 'gasgas',
+    'hf-kanuni': 'hfkanuni',
+    'kayo': 'kayo-moto',
+    'tm': 'tm-racing',
+    'moto-gusto': 'rmg-moto-gusto',
+    'nimizi-borelli': 'borelli-ledow',
+    'ortimobil': 'orti',
+    'ds-automobiles': 'ds',
+  };
+  const mappedSlug = aliasMap[slug] || slug;
+
+  // Sonundaki "-motor", "-motors", "-motocorp", "-motosiklet", "-motorcycle" eklerini soyup
+  // harf/rakam dışındaki tire ve boşlukları kaldırarak kesin tekillik sağla
+  const stripped = mappedSlug
+    .replace(/-(motor|motors|motocorp|motosiklet|motorcycle)$/i, '')
+    .replace(/[^a-z0-9]/g, '');
+
+  return stripped || mappedSlug.replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Marka listesini çift yazımlardan (örn. CFMoto / CFMOTO / CF Moto, SYM / Sym, Kuba / Kuba Motor vb.)
+ * arındırır ve Türkçe alfabetik sıraya göre tekil olarak döndürür.
+ */
+function deduplicateAndSortBrands(rawBrands: string[], preferredList: string[] = []): string[] {
+  const seenKeys = new Map<string, string>();
+
+  // Önce tercih edilen temiz yazımları kaydet
+  for (const pref of preferredList) {
+    if (!pref || pref === 'Tüm Markalar') continue;
+    const key = getBrandDedupeKey(pref);
+    if (!key) continue;
+    const slug = normalizeBrandKey(pref);
+    const canonicalLabel = CANONICAL_BRAND_DISPLAY_LABELS[slug] || pref.trim();
+    if (!seenKeys.has(key)) {
+      seenKeys.set(key, canonicalLabel);
+    }
+  }
+
+  // Ardından gelen tüm markaları tekilleştirerek ekle
+  for (const raw of rawBrands) {
+    if (!raw || typeof raw !== 'string') continue;
+    const clean = raw.trim();
+    if (!clean || clean === 'Tüm Markalar') continue;
+
+    const key = getBrandDedupeKey(clean);
+    if (!key || seenKeys.has(key)) continue;
+
+    const slug = normalizeBrandKey(clean);
+    const canonicalLabel = CANONICAL_BRAND_DISPLAY_LABELS[slug] || clean;
+    seenKeys.set(key, canonicalLabel);
+  }
+
+  return Array.from(seenKeys.values()).sort((a, b) => a.localeCompare(b, 'tr'));
+}
+
+/**
+ * Bir markanın Otomobil (Otomobil + SUV + Ticari) listesinde yer alıp alamayacağını denetler.
+ * Sadece motosiklet üreten markalar kesin olarak elenir.
+ */
+function isGenuineAutomobileBrand(brandName: string, dynamicMotoSlugs?: Set<string>): boolean {
+  if (!brandName || brandName === 'Tüm Markalar') return false;
+  const rawLower = brandName.trim().toLowerCase();
+  if (rawLower === 'tofaş' || rawLower === 'tofas') return true;
+
+  const slug = normalizeBrandKey(brandName);
+  const dedupeKey = getBrandDedupeKey(brandName);
+  if (!slug || !dedupeKey) return false;
+
+  // Çift kategorili 4 marka (BMW, Honda, Suzuki, Peugeot) her zaman geçerlidir
+  if (DUAL_VEHICLE_BRAND_SLUGS.has(slug) || DUAL_VEHICLE_BRAND_SLUGS.has(dedupeKey)) {
+    return true;
+  }
+
+  // Bilinen veya dinamik gelen saf motosiklet markalarını kesin olarak reddet
+  if (
+    PURE_MOTORCYCLE_BRAND_SLUGS.has(slug) ||
+    PURE_MOTORCYCLE_BRAND_SLUGS.has(dedupeKey) ||
+    (dynamicMotoSlugs && (dynamicMotoSlugs.has(slug) || dynamicMotoSlugs.has(dedupeKey)))
+  ) {
+    return false;
+  }
+
+  // Sadece doğrulanmış otomobil/SUV/ticari markalarına izin ver
+  return ALLOWED_AUTOMOBILE_BRAND_SLUGS.has(slug) || ALLOWED_AUTOMOBILE_BRAND_SLUGS.has(dedupeKey);
+}
 
 export default function IsiCepteOneriyorScreen() {
   const router = useRouter();
@@ -317,27 +559,46 @@ export default function IsiCepteOneriyorScreen() {
           fetch(`${API_URL}/vehicle-filters/brands?category=MOTORCYCLE`).catch(() => null),
         ]);
 
-        const combinedAutoNames = new Set<string>(INITIAL_AUTOMOBILE_BRANDS);
+        let dynamicMotoSlugs = new Set<string>();
+        let extractedMotoNames: string[] = [];
+
+        if (motoRes && motoRes.ok) {
+          const motoJson = await motoRes.json();
+          extractedMotoNames = extractBrandNames(motoJson);
+          for (const mName of extractedMotoNames) {
+            const mSlug = normalizeBrandKey(mName);
+            const mKey = getBrandDedupeKey(mName);
+            if (mSlug && !DUAL_VEHICLE_BRAND_SLUGS.has(mSlug)) dynamicMotoSlugs.add(mSlug);
+            if (mKey && !DUAL_VEHICLE_BRAND_SLUGS.has(mKey)) dynamicMotoSlugs.add(mKey);
+          }
+
+          // Motosiklet markalarında çift yazımları (örn. CFMoto / CFMOTO / CF Moto, SYM / Sym vb.) temizle
+          const dedupedMoto = deduplicateAndSortBrands(
+            [...INITIAL_MOTORCYCLE_BRANDS, ...extractedMotoNames],
+            INITIAL_MOTORCYCLE_BRANDS
+          );
+          setMotoBrands(['Tüm Markalar', ...dedupedMoto]);
+        } else {
+          const dedupedMoto = deduplicateAndSortBrands(INITIAL_MOTORCYCLE_BRANDS, INITIAL_MOTORCYCLE_BRANDS);
+          setMotoBrands(['Tüm Markalar', ...dedupedMoto]);
+        }
+
+        const rawAutoCandidates: string[] = [...INITIAL_AUTOMOBILE_BRANDS];
         for (const res of [autoRes, suvRes, vanRes]) {
           if (res && res.ok) {
             const json = await res.json();
             for (const name of extractBrandNames(json)) {
-              combinedAutoNames.add(name);
+              if (isGenuineAutomobileBrand(name, dynamicMotoSlugs)) {
+                rawAutoCandidates.push(name);
+              }
             }
           }
         }
-        const sortedAuto = Array.from(combinedAutoNames).sort((a, b) => a.localeCompare(b, 'tr'));
-        setAutoBrands(['Tüm Markalar', ...sortedAuto]);
-
-        if (motoRes && motoRes.ok) {
-          const motoJson = await motoRes.json();
-          const combinedMotoNames = new Set<string>([
-            ...INITIAL_MOTORCYCLE_BRANDS,
-            ...extractBrandNames(motoJson),
-          ]);
-          const sortedMoto = Array.from(combinedMotoNames).sort((a, b) => a.localeCompare(b, 'tr'));
-          setMotoBrands(['Tüm Markalar', ...sortedMoto]);
-        }
+        const cleanedAuto = deduplicateAndSortBrands(
+          rawAutoCandidates.filter((name) => isGenuineAutomobileBrand(name, dynamicMotoSlugs)),
+          INITIAL_AUTOMOBILE_BRANDS
+        );
+        setAutoBrands(['Tüm Markalar', ...cleanedAuto]);
       } catch {
         // Fallback lists already initialized
       }
@@ -409,19 +670,17 @@ export default function IsiCepteOneriyorScreen() {
           }
 
           if (Array.isArray(data.availableBrands) && data.availableBrands.length > 0) {
-            const dualBrands = new Set(['bmw', 'honda', 'suzuki', 'peugeot']);
-            const extraAutoBrands = data.availableBrands.filter((b: string) => {
-              if (!b || b === 'Tüm Markalar') return false;
-              const lower = b.toLowerCase().trim();
-              if (MOTORCYCLE_BRAND_SET.has(lower) && !dualBrands.has(lower)) return false;
-              return true;
-            });
+            const extraAutoBrands = data.availableBrands.filter((b: string) =>
+              isGenuineAutomobileBrand(b)
+            );
             if (extraAutoBrands.length > 0) {
               setAutoBrands((prev) => {
-                const merged = new Set(prev.filter((x) => x !== 'Tüm Markalar'));
-                for (const b of extraAutoBrands) merged.add(b);
-                const sorted = Array.from(merged).sort((a, b) => a.localeCompare(b, 'tr'));
-                return ['Tüm Markalar', ...sorted];
+                const existing = prev.filter((x) => x !== 'Tüm Markalar' && isGenuineAutomobileBrand(x));
+                const deduped = deduplicateAndSortBrands(
+                  [...existing, ...extraAutoBrands],
+                  INITIAL_AUTOMOBILE_BRANDS
+                );
+                return ['Tüm Markalar', ...deduped];
               });
             }
           }
@@ -627,9 +886,6 @@ export default function IsiCepteOneriyorScreen() {
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={styles.headerTitle}>İşi Cepte Öneriyor</Text>
-              <View style={styles.headerBadge}>
-                <Text style={styles.headerBadgeText}>ONAYLI</Text>
-              </View>
             </View>
             <Text style={styles.headerSubtitle} numberOfLines={1}>
               {scope === 'SHOWCASE_ONLY'
@@ -1603,8 +1859,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   vehicleTypeBtnActive: {
-    backgroundColor: '#0f172a',
-    borderColor: '#0f172a',
+    backgroundColor: '#ea580c',
+    borderColor: '#ea580c',
   },
   vehicleTypeBtnText: {
     fontSize: 12.5,
