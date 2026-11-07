@@ -15,6 +15,7 @@ import {
   Share,
   Alert,
   Switch,
+  Image,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +24,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
+const CLUB_TAB_ICON = require('../../../assets/images/club-tab-icon.png');
 const { width: windowWidth } = Dimensions.get('window');
 
 const resolvePostMediaUrl = (url?: string | null): string => {
@@ -486,7 +488,11 @@ export default function TorqueScoutClubScreen() {
       <View style={styles.topNavbar}>
         <View style={styles.navLeft}>
           <View style={styles.shieldBadge}>
-            <Ionicons name="shield-checkmark" size={18} color="#ffffff" />
+            <Image
+              source={CLUB_TAB_ICON}
+              style={{ width: 22, height: 22, tintColor: '#ffffff' }}
+              resizeMode="contain"
+            />
           </View>
           <View>
             <Text style={styles.clubMainTitle}>TorqueScout <Text style={styles.clubAccentTitle}>Club</Text></Text>
