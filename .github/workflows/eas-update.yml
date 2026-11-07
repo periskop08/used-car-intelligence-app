@@ -53,10 +53,17 @@ jobs:
           '
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git commit -am "ci: inject temporary eas projectId for cloud update" || true
+          git add -A
+          git commit -m "${{ github.event.head_commit.message }}" || true
 
       - name: 📱 Publish EAS Update
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas update --auto --non-interactive --message "${{ github.event.head_commit.message }}"
+        run: |
+          OUT=$(eas update --auto --non-interactive 2>&1) || {
+            echo "$OUT"
+            echo "::error::$(echo "$OUT" | tail -n 15 | tr '\n' ' ')"
+            exit 1
+          }
+          echo "$OUT"
