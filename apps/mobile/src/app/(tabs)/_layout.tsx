@@ -12,8 +12,11 @@ import {
   Animated,
   PanResponder,
   Dimensions,
+  Image,
 } from 'react-native';
 import HomeScreen from './index';
+
+const CLUB_TAB_ICON = require('../../../assets/images/club-tab-icon.png');
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -312,8 +315,12 @@ export default function TabsLayout() {
           options={{
             headerShown: false,
             tabBarLabel: 'Club',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'shield-checkmark' : 'shield-checkmark-outline'} size={22} color={color} />
+            tabBarIcon: ({ color }) => (
+              <Image
+                source={CLUB_TAB_ICON}
+                style={{ width: 25, height: 25, tintColor: color }}
+                resizeMode="contain"
+              />
             ),
           }}
         />
