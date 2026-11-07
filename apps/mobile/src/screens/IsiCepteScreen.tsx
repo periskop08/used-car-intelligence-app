@@ -1344,7 +1344,7 @@ export default function IsiCepteOneriyorScreen() {
                     {item.supportedBrands.slice(0, 5).map((brandName, idx) => {
                       const logoUri = getBrandLogoUrl(
                         brandName,
-                        MOTORCYCLE_BRAND_SET.has(brandName.toLowerCase())
+                        PURE_MOTORCYCLE_BRAND_SLUGS.has(normalizeBrandKey(brandName))
                           ? 'MOTORCYCLE'
                           : selectedVehicleType
                       );
@@ -1685,7 +1685,7 @@ export default function IsiCepteOneriyorScreen() {
                       {detailModalProvider.supportedBrands.map((b, idx) => {
                         const logoUri = getBrandLogoUrl(
                           b,
-                          MOTORCYCLE_BRAND_SET.has(b.toLowerCase())
+                          PURE_MOTORCYCLE_BRAND_SLUGS.has(normalizeBrandKey(b))
                             ? 'MOTORCYCLE'
                             : selectedVehicleType
                         );
