@@ -36,29 +36,27 @@ jobs:
           packager: npm
 
       - name: 📦 Install Root & Workspace Dependencies
-        run: |
-          npm install --legacy-peer-deps
-          npm --prefix apps/mobile install --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       - name: 🔨 Build Shared Package
         run: npm --prefix packages/shared run build
 
-      - name: ⚙️ Inject EAS Cloud Config for CI Update
+      - name: ⚙️ Inject EAS Project ID for CI Update
         working-directory: apps/mobile
         run: |
           node -e '
             const fs = require("fs");
             const appJson = JSON.parse(fs.readFileSync("app.json", "utf8"));
-            appJson.expo.owner = "periskop007";
-            appJson.expo.updates = { url: "https://u.expo.dev/891b84e5-c90a-448d-be5a-6e87d7784d50" };
-            appJson.expo.runtimeVersion = { policy: "appVersion" };
             appJson.expo.extra = appJson.expo.extra || {};
             appJson.expo.extra.eas = { projectId: "891b84e5-c90a-448d-be5a-6e87d7784d50" };
             fs.writeFileSync("app.json", JSON.stringify(appJson, null, 2));
           '
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git commit -am "ci: inject temporary eas projectId for cloud update" || true
 
       - name: 📱 Publish EAS Update
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas update --auto --non-interactive
+        run: eas update --auto --non-interactive --message "${{ github.event.head_commit.message }}"
