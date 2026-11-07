@@ -18,15 +18,13 @@ import {
   getCcRangeById,
   isValidHpRangeId,
   isValidCcRangeId,
+  TURKEY_81_PROVINCES,
+  getDistrictsForCity,
 } from "@used-car-intelligence/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-const TURKISH_CITIES = [
-  "İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", 
-  "Adana", "Konya", "Gaziantep", "Kayseri", "Kocaeli",
-  "Samsun", "Mersin", "Eskişehir", "Trabzon", "Diyarbakır"
-];
+const TURKISH_CITIES = TURKEY_81_PROVINCES;
 
 export type ViewMode = "list" | "gallery";
 
@@ -297,6 +295,7 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
     const showcaseVal = isShowcasePage || searchParams.get("showcaseOnly") === "true";
     const statusVal = searchParams.get("vehicleStatus");
     const cityVal = searchParams.get("city");
+    const districtVal = searchParams.get("district");
     const profileId = searchParams.get("preferenceProfileId");
     const sId = searchParams.get("sessionId");
 
@@ -343,6 +342,7 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
     if (showcaseVal) setShowcaseOnly(true);
     if (statusVal) setVehicleStatuses(statusVal.split(","));
     if (cityVal) setCity(cityVal);
+    if (districtVal) setDistrict(districtVal);
     if (profileId) setPreferenceProfileId(profileId);
     if (sId) setPrefSessionId(sId);
 
@@ -441,6 +441,8 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
     selectedEngineId,
     selectedTrimId,
     vehicleVariantId,
+    city,
+    district,
     minPrice,
     maxPrice,
     minYear,
@@ -686,21 +688,28 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Adres (İl / İlçe)</label>
             <select
               value={city}
-              onChange={(e) => setCity(e.target.value)}
+              onChange={(e) => {
+                setCity(e.target.value);
+                setDistrict("");
+              }}
               className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-orange-500 transition"
             >
-              <option value="">İl Seçin</option>
+              <option value="">İl Seçin (81 İl)</option>
               {TURKISH_CITIES.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-            <input
-              type="text"
-              placeholder="İlçe girin..."
+            <select
               value={district}
               onChange={(e) => setDistrict(e.target.value)}
-              className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-orange-500 transition"
-            />
+              disabled={!city}
+              className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50"
+            >
+              <option value="">{city ? `${city} - Tüm İlçeler` : "Önce İl Seçin"}</option>
+              {getDistrictsForCity(city).map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
           </div>
 
           <div className="border-t border-white/5 my-1"></div>

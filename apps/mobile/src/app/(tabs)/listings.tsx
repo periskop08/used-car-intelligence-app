@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TURKEY_81_PROVINCES } from '@used-car-intelligence/shared';
+import { TURKEY_81_PROVINCES, getDistrictsForCity } from '@used-car-intelligence/shared';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
@@ -269,7 +269,9 @@ export default function ListingsScreen() {
   const [brandPickerVisible, setBrandPickerVisible] = useState(false);
   const [modelPickerVisible, setModelPickerVisible] = useState(false);
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
+  const [districtPickerVisible, setDistrictPickerVisible] = useState(false);
   const [citySearchQuery, setCitySearchQuery] = useState('');
+  const [districtSearchQuery, setDistrictSearchQuery] = useState('');
 
   const filteredCities = useMemo(() => {
     const q = citySearchQuery.trim().toLocaleLowerCase('tr-TR');
@@ -278,6 +280,19 @@ export default function ListingsScreen() {
       c.toLocaleLowerCase('tr-TR').includes(q)
     );
   }, [citySearchQuery]);
+
+  const availableDistricts = useMemo(() => {
+    if (!city || city === 'Tümü') return [];
+    return ['Tümü', ...getDistrictsForCity(city)];
+  }, [city]);
+
+  const filteredDistricts = useMemo(() => {
+    const q = districtSearchQuery.trim().toLocaleLowerCase('tr-TR');
+    if (!q) return availableDistricts;
+    return availableDistricts.filter((d) =>
+      d.toLocaleLowerCase('tr-TR').includes(q)
+    );
+  }, [availableDistricts, districtSearchQuery]);
 
   useEffect(() => {
     fetchBrands();
@@ -886,8 +901,20 @@ export default function ListingsScreen() {
               </TouchableOpacity>
             )}
             {city && city !== 'Tümü' && (
-              <TouchableOpacity style={styles.filterTagPill} onPress={() => setCity('')}>
+              <TouchableOpacity
+                style={styles.filterTagPill}
+                onPress={() => {
+                  setCity('');
+                  setDistrict('');
+                }}
+              >
                 <Text style={styles.filterTagPillText} numberOfLines={1} ellipsizeMode="tail">{city}</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {district && district !== 'Tümü' && (
+              <TouchableOpacity style={styles.filterTagPill} onPress={() => setDistrict('')}>
+                <Text style={styles.filterTagPillText} numberOfLines={1} ellipsizeMode="tail">{district}</Text>
                 <Ionicons name="close" size={12} color="#ea580c" />
               </TouchableOpacity>
             )}
@@ -1016,21 +1043,38 @@ export default function ListingsScreen() {
               <Text style={styles.filterCardTitle}>📍 ADRES (İL / İLÇE)</Text>
               <TouchableOpacity
                 style={styles.dropdownSelector}
-                onPress={() => setCityPickerVisible(true)}
+                onPress={() => {
+                  setCitySearchQuery('');
+                  setCityPickerVisible(true);
+                }}
               >
-                <Text style={[styles.dropdownSelectorText, !!city && styles.dropdownSelectedText]}>
-                  {city || 'İl Seçin'}
+                <Text
+                  style={[styles.dropdownSelectorText, !!city && styles.dropdownSelectedText, { flexShrink: 1 }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {city || 'İl Seçin (81 İl)'}
                 </Text>
                 <Ionicons name="chevron-down" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
-              <TextInput
-                style={styles.filterTextInput}
-                placeholder="İlçe girin (Örn: Kadıköy)..."
-                placeholderTextColor="#94a3b8"
-                value={district}
-                onChangeText={setDistrict}
-              />
+              <TouchableOpacity
+                style={[styles.dropdownSelector, (!city || city === 'Tümü') && { opacity: 0.5 }]}
+                disabled={!city || city === 'Tümü'}
+                onPress={() => {
+                  setDistrictSearchQuery('');
+                  setDistrictPickerVisible(true);
+                }}
+              >
+                <Text
+                  style={[styles.dropdownSelectorText, !!district && styles.dropdownSelectedText, { flexShrink: 1 }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {district || (city && city !== 'Tümü' ? `${city} İlçesi Seçin` : 'Önce İl Seçin')}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+              </TouchableOpacity>
             </View>
 
             {/* 2. MARKA & MODEL */}
@@ -1528,61 +1572,31 @@ export default function ListingsScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
-      </Modal>
 
-      {/* ========================================================================= */}
-      {/* BRAND SELECTION SHEET */}
-      {/* ========================================================================= */}
-      <Modal
-        visible={brandPickerVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setBrandPickerVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.pickerSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Marka Seçin</Text>
-              <TouchableOpacity
-                style={styles.modalCloseCircle}
-                onPress={() => setBrandPickerVisible(false)}
-              >
-                <Ionicons name="close" size={18} color="#64748b" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              style={{ maxHeight: 420 }}
-              contentContainerStyle={{ padding: 14, gap: 8 }}
-            >
-              <TouchableOpacity
-                style={[styles.pickerItem, !selectedBrand && styles.pickerItemSelected]}
-                onPress={() => {
-                  setSelectedBrand(null);
-                  setSelectedModel(null);
-                  setBrandPickerVisible(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.pickerItemText,
-                    !selectedBrand && styles.pickerItemTextSelected,
-                  ]}
-                >
-                  Tüm Markalar
-                </Text>
-                {!selectedBrand && (
-                  <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
-                )}
-              </TouchableOpacity>
-              {brands.map((b) => {
-                const isSelected = selectedBrand?.id === b.id;
-                return (
+          {/* ========================================================================= */}
+          {/* IN-MODAL BRAND SELECTION OVERLAY (Avoids iOS Nested Modal Conflict) */}
+          {/* ========================================================================= */}
+          {brandPickerVisible && (
+            <View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}>
+              <View style={styles.pickerSheet}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Marka Seçin</Text>
                   <TouchableOpacity
-                    key={b.id}
-                    style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                    style={styles.modalCloseCircle}
+                    onPress={() => setBrandPickerVisible(false)}
+                  >
+                    <Ionicons name="close" size={18} color="#64748b" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView
+                  style={{ maxHeight: 420 }}
+                  contentContainerStyle={{ padding: 14, gap: 8 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <TouchableOpacity
+                    style={[styles.pickerItem, !selectedBrand && styles.pickerItemSelected]}
                     onPress={() => {
-                      setSelectedBrand(b);
+                      setSelectedBrand(null);
                       setSelectedModel(null);
                       setBrandPickerVisible(false);
                     }}
@@ -1590,200 +1604,315 @@ export default function ListingsScreen() {
                     <Text
                       style={[
                         styles.pickerItemText,
-                        isSelected && styles.pickerItemTextSelected,
+                        !selectedBrand && styles.pickerItemTextSelected,
                       ]}
                     >
-                      {b.name}
+                      Tüm Markalar
                     </Text>
-                    {isSelected && (
+                    {!selectedBrand && (
                       <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
                     )}
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ========================================================================= */}
-      {/* MODEL SELECTION SHEET */}
-      {/* ========================================================================= */}
-      <Modal
-        visible={modelPickerVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setModelPickerVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.pickerSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedBrand ? `${selectedBrand.name} Modelleri` : 'Model Seçin'}
-              </Text>
-              <TouchableOpacity
-                style={styles.modalCloseCircle}
-                onPress={() => setModelPickerVisible(false)}
-              >
-                <Ionicons name="close" size={18} color="#64748b" />
-              </TouchableOpacity>
+                  {brands.map((b) => {
+                    const isSelected = selectedBrand?.id === b.id;
+                    return (
+                      <TouchableOpacity
+                        key={b.id}
+                        style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                        onPress={() => {
+                          setSelectedBrand(b);
+                          setSelectedModel(null);
+                          setBrandPickerVisible(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.pickerItemText,
+                            isSelected && styles.pickerItemTextSelected,
+                          ]}
+                        >
+                          {b.name}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             </View>
-            <ScrollView
-              style={{ maxHeight: 420 }}
-              contentContainerStyle={{ padding: 14, gap: 8 }}
-            >
-              <TouchableOpacity
-                style={[styles.pickerItem, !selectedModel && styles.pickerItemSelected]}
-                onPress={() => {
-                  setSelectedModel(null);
-                  setModelPickerVisible(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.pickerItemText,
-                    !selectedModel && styles.pickerItemTextSelected,
-                  ]}
-                >
-                  Tüm Modeller
-                </Text>
-                {!selectedModel && (
-                  <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
-                )}
-              </TouchableOpacity>
-              {models.map((m) => {
-                const isSelected = selectedModel?.id === m.id;
-                return (
+          )}
+
+          {/* ========================================================================= */}
+          {/* IN-MODAL MODEL SELECTION OVERLAY */}
+          {/* ========================================================================= */}
+          {modelPickerVisible && (
+            <View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}>
+              <View style={styles.pickerSheet}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>
+                    {selectedBrand ? `${selectedBrand.name} Modelleri` : 'Model Seçin'}
+                  </Text>
                   <TouchableOpacity
-                    key={m.id}
-                    style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                    style={styles.modalCloseCircle}
+                    onPress={() => setModelPickerVisible(false)}
+                  >
+                    <Ionicons name="close" size={18} color="#64748b" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView
+                  style={{ maxHeight: 420 }}
+                  contentContainerStyle={{ padding: 14, gap: 8 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <TouchableOpacity
+                    style={[styles.pickerItem, !selectedModel && styles.pickerItemSelected]}
                     onPress={() => {
-                      setSelectedModel(m);
+                      setSelectedModel(null);
                       setModelPickerVisible(false);
                     }}
                   >
                     <Text
                       style={[
                         styles.pickerItemText,
-                        isSelected && styles.pickerItemTextSelected,
+                        !selectedModel && styles.pickerItemTextSelected,
                       ]}
                     >
-                      {m.name}
+                      Tüm Modeller
                     </Text>
-                    {isSelected && (
+                    {!selectedModel && (
                       <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
                     )}
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ========================================================================= */}
-      {/* CITY SELECTION SHEET */}
-      {/* ========================================================================= */}
-      <Modal
-        visible={cityPickerVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => {
-          setCityPickerVisible(false);
-          setCitySearchQuery('');
-        }}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.pickerSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>İl Seçin ({TURKEY_81_PROVINCES.length} İl)</Text>
-              <TouchableOpacity
-                style={styles.modalCloseCircle}
-                onPress={() => {
-                  setCityPickerVisible(false);
-                  setCitySearchQuery('');
-                }}
-              >
-                <Ionicons name="close" size={18} color="#64748b" />
-              </TouchableOpacity>
+                  {models.map((m) => {
+                    const isSelected = selectedModel?.id === m.id;
+                    return (
+                      <TouchableOpacity
+                        key={m.id}
+                        style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                        onPress={() => {
+                          setSelectedModel(m);
+                          setModelPickerVisible(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.pickerItemText,
+                            isSelected && styles.pickerItemTextSelected,
+                          ]}
+                        >
+                          {m.name}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             </View>
+          )}
 
-            {/* Arama Kutusu */}
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: '#f1f5f9',
-              borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              marginHorizontal: 14,
-              marginTop: 6,
-              marginBottom: 4,
-              gap: 8,
-            }}>
-              <Ionicons name="search" size={16} color="#94a3b8" />
-              <TextInput
-                style={{
-                  flex: 1,
-                  fontSize: 13,
-                  color: '#0f172a',
-                  paddingVertical: 0,
-                }}
-                placeholder="İl ara... (Örn: Adana, Bursa)"
-                placeholderTextColor="#94a3b8"
-                value={citySearchQuery}
-                onChangeText={setCitySearchQuery}
-                autoCorrect={false}
-              />
-              {citySearchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setCitySearchQuery('')}>
-                  <Ionicons name="close-circle" size={16} color="#94a3b8" />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <ScrollView
-              style={{ maxHeight: 420 }}
-              contentContainerStyle={{ padding: 14, gap: 8 }}
-              keyboardShouldPersistTaps="handled"
-            >
-              {filteredCities.map((c) => {
-                const isSelected = city === c || (!city && c === 'Tümü');
-                return (
+          {/* ========================================================================= */}
+          {/* IN-MODAL CITY SELECTION OVERLAY (81 İL + INSTANT SEARCH) */}
+          {/* ========================================================================= */}
+          {cityPickerVisible && (
+            <View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}>
+              <View style={styles.pickerSheet}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>İl Seçin ({TURKEY_81_PROVINCES.length} İl)</Text>
                   <TouchableOpacity
-                    key={c}
-                    style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                    style={styles.modalCloseCircle}
                     onPress={() => {
-                      setCity(c === 'Tümü' ? '' : c);
                       setCityPickerVisible(false);
                       setCitySearchQuery('');
                     }}
                   >
-                    <Text
-                      style={[
-                        styles.pickerItemText,
-                        isSelected && styles.pickerItemTextSelected,
-                        { flexShrink: 1 },
-                      ]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                    >
-                      {c}
-                    </Text>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
-                    )}
+                    <Ionicons name="close" size={18} color="#64748b" />
                   </TouchableOpacity>
-                );
-              })}
-              {filteredCities.length === 0 && (
-                <View style={{ paddingVertical: 28, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 13, color: '#94a3b8' }}>Eşleşen il bulunamadı.</Text>
                 </View>
-              )}
-            </ScrollView>
-          </View>
-        </View>
+
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#f1f5f9',
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  marginHorizontal: 14,
+                  marginTop: 6,
+                  marginBottom: 4,
+                  gap: 8,
+                }}>
+                  <Ionicons name="search" size={16} color="#94a3b8" />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      color: '#0f172a',
+                      paddingVertical: 0,
+                    }}
+                    placeholder="İl ara... (Örn: Adana, Bursa)"
+                    placeholderTextColor="#94a3b8"
+                    value={citySearchQuery}
+                    onChangeText={setCitySearchQuery}
+                    autoCorrect={false}
+                  />
+                  {citySearchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setCitySearchQuery('')}>
+                      <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <ScrollView
+                  style={{ maxHeight: 420 }}
+                  contentContainerStyle={{ padding: 14, gap: 8 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {filteredCities.map((c) => {
+                    const isSelected = city === c || (!city && c === 'Tümü');
+                    return (
+                      <TouchableOpacity
+                        key={c}
+                        style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                        onPress={() => {
+                          const nextCity = c === 'Tümü' ? '' : c;
+                          if (nextCity !== city) {
+                            setDistrict('');
+                          }
+                          setCity(nextCity);
+                          setCityPickerVisible(false);
+                          setCitySearchQuery('');
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.pickerItemText,
+                            isSelected && styles.pickerItemTextSelected,
+                            { flexShrink: 1 },
+                          ]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {c}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {filteredCities.length === 0 && (
+                    <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#94a3b8' }}>Eşleşen il bulunamadı.</Text>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+
+          {/* ========================================================================= */}
+          {/* IN-MODAL DISTRICT SELECTION OVERLAY (CASCADED BY CITY + INSTANT SEARCH) */}
+          {/* ========================================================================= */}
+          {districtPickerVisible && (
+            <View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}>
+              <View style={styles.pickerSheet}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>
+                    {city ? `${city} İlçeleri` : 'İlçe Seçin'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.modalCloseCircle}
+                    onPress={() => {
+                      setDistrictPickerVisible(false);
+                      setDistrictSearchQuery('');
+                    }}
+                  >
+                    <Ionicons name="close" size={18} color="#64748b" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#f1f5f9',
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  marginHorizontal: 14,
+                  marginTop: 6,
+                  marginBottom: 4,
+                  gap: 8,
+                }}>
+                  <Ionicons name="search" size={16} color="#94a3b8" />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      color: '#0f172a',
+                      paddingVertical: 0,
+                    }}
+                    placeholder="İlçe ara... (Örn: Kadıköy, Çankaya)"
+                    placeholderTextColor="#94a3b8"
+                    value={districtSearchQuery}
+                    onChangeText={setDistrictSearchQuery}
+                    autoCorrect={false}
+                  />
+                  {districtSearchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setDistrictSearchQuery('')}>
+                      <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <ScrollView
+                  style={{ maxHeight: 420 }}
+                  contentContainerStyle={{ padding: 14, gap: 8 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {filteredDistricts.map((d) => {
+                    const isSelected = district === d || (!district && d === 'Tümü');
+                    return (
+                      <TouchableOpacity
+                        key={d}
+                        style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                        onPress={() => {
+                          setDistrict(d === 'Tümü' ? '' : d);
+                          setDistrictPickerVisible(false);
+                          setDistrictSearchQuery('');
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.pickerItemText,
+                            isSelected && styles.pickerItemTextSelected,
+                            { flexShrink: 1 },
+                          ]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {d}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {filteredDistricts.length === 0 && (
+                    <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#94a3b8' }}>Eşleşen ilçe bulunamadı.</Text>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+        </SafeAreaView>
       </Modal>
 
       {/* ========================================================================= */}
