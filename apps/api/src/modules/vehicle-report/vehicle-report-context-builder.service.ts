@@ -678,9 +678,24 @@ export class VehicleReportContextBuilderService {
       (contextObj as any).transmissionScope = searchScope?.transmission || 'Manuel + Otomatik';
     }
 
+    const canonicalHashPayload = {
+      vehicleType: effectiveVehicleType,
+      variantId: variant.id,
+      selected8Filters: {
+        brand: String(contextObj.vehicleIdentity.selected8Filters.brand || '').trim().toLowerCase(),
+        model: String(contextObj.vehicleIdentity.selected8Filters.model || '').trim().toLowerCase(),
+        year: Number(contextObj.vehicleIdentity.selected8Filters.year) || 0,
+        bodyType: String(contextObj.vehicleIdentity.selected8Filters.bodyType || '').trim().toLowerCase(),
+        engine: String(contextObj.vehicleIdentity.selected8Filters.engine || '').replace(/\s+/g, ' ').trim().toLowerCase(),
+        fuelType: String(contextObj.vehicleIdentity.selected8Filters.fuelType || '').trim().toLowerCase(),
+        transmission: String(contextObj.vehicleIdentity.selected8Filters.transmission || '').replace(/\s+/g, ' ').trim().toLowerCase(),
+        trim: String(contextObj.vehicleIdentity.selected8Filters.trim || '').replace(/\s+/g, ' ').trim().toLowerCase(),
+      },
+    };
+
     const contextHash = crypto
       .createHash('sha256')
-      .update(JSON.stringify(contextObj))
+      .update(JSON.stringify(canonicalHashPayload))
       .digest('hex');
 
     return {
@@ -743,9 +758,16 @@ export class VehicleReportContextBuilderService {
       },
     };
 
+    const canonicalMotoHashPayload = {
+      vehicleType: 'MOTORCYCLE',
+      modelId,
+      brand: String(model.brand?.name || '').trim().toLowerCase(),
+      model: String(model.name || '').trim().toLowerCase(),
+    };
+
     const contextHash = crypto
       .createHash('sha256')
-      .update(JSON.stringify(contextObj))
+      .update(JSON.stringify(canonicalMotoHashPayload))
       .digest('hex');
 
     return {

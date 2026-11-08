@@ -288,6 +288,71 @@ export class VehicleReportService implements OnModuleInit {
         throw new BadRequestException('Araç raporu oluşturulabilmesi için geçerli bir variantId veya modelId gereklidir.');
       }
 
+      // 1.5. Fast Published Report Pre-Check (Avoids redundant AI spec research & prevents duplicate version generation)
+      if (!dto.forceRefresh) {
+        const fastMatchWhere: any = {
+          isCurrentPublished: true,
+          isDraft: false,
+          status: VehicleReportStatus.COMPLETED,
+          provider: { not: 'DETERMINISTIC_FALLBACK' },
+        };
+
+        if (isMotorcycle && modelId) {
+          fastMatchWhere.OR = [{ modelId }, { variantId: modelId }];
+        } else if (variantId) {
+          fastMatchWhere.variantId = variantId;
+        }
+
+        const fastPublished = await this.prisma.generatedVehicleReport.findFirst({
+          where: fastMatchWhere,
+          orderBy: { completedAt: 'desc' },
+        });
+
+        if (fastPublished) {
+          const repData = fastPublished.reportData as any;
+          const isModernReport =
+            fastPublished.schemaVersion >= 2 ||
+            Boolean(
+              repData?.expertDecisionSynthesis?.contemporaryTrimEvaluation ||
+                repData?.expertDecisionSynthesis?.trimPackageComparison ||
+                repData?.expertDecisionSynthesis?.motorcycleEraAnalysis,
+            );
+
+          // Ensure trim matches if an explicit non-default trim filter was supplied on shared-variant commercial vehicles
+          const requestedTrim = String(dto.searchScope?.trim || '').replace(/\s+/g, ' ').trim().toLowerCase();
+          const reportTrim = String(
+            repData?.vehicleIdentity?.trimName ||
+              repData?.vehicleIdentity?.trim ||
+              repData?.vehicleIdentity?.selected8Filters?.trim ||
+              '',
+          )
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+
+          const trimMatches =
+            isMotorcycle ||
+            !requestedTrim ||
+            !reportTrim ||
+            requestedTrim === reportTrim ||
+            requestedTrim.includes('standart') ||
+            requestedTrim.includes('tüm');
+
+          if (isModernReport && trimMatches) {
+            VehicleReportService.ephemeralReports.set(fastPublished.id, {
+              report: fastPublished,
+              createdAt: Date.now(),
+            });
+            return {
+              reportId: fastPublished.id,
+              mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
+              status: fastPublished.status,
+              cached: true,
+            };
+          }
+        }
+      }
+
       // 2. Build Vehicle Context
       let vehicleContext: any;
       let vehicleContextHash: string;
@@ -306,17 +371,29 @@ export class VehicleReportService implements OnModuleInit {
         vehicleContextHash = vRes.vehicleContextHash;
       }
 
-      // 3. Check existing CURRENT PUBLISHED report (Rule: 100% exact contextHash match)
+      // 3. Check existing CURRENT PUBLISHED report (Exact contextHash OR Normalized Vehicle Identity / Sibling Variant Match)
       if (!dto.forceRefresh) {
-        const existingCurrent = await this.prisma.generatedVehicleReport.findFirst({
+        let existingCurrent = await this.prisma.generatedVehicleReport.findFirst({
           where: {
             contextHash: vehicleContextHash,
             isCurrentPublished: true,
             isDraft: false,
             status: VehicleReportStatus.COMPLETED,
+            provider: { not: 'DETERMINISTIC_FALLBACK' },
           },
           orderBy: { completedAt: 'desc' },
         });
+
+        if (!existingCurrent && variantId) {
+          existingCurrent = await this.cacheService.getCachedReport(
+            userId,
+            'TORQUE_SCOUT_VEHICLE_REPORT',
+            vehicleContextHash,
+            CURRENT_REPORT_VERSION,
+            variantId,
+            listingId,
+          );
+        }
 
         const repData = existingCurrent?.reportData as any;
         const isModernReport = existingCurrent && (
@@ -325,6 +402,17 @@ export class VehicleReportService implements OnModuleInit {
         );
 
         if (existingCurrent && isModernReport) {
+          // Sync canonical contextHash if report was created before canonical hash normalization
+          if (existingCurrent.contextHash !== vehicleContextHash) {
+            await this.prisma.generatedVehicleReport.update({
+              where: { id: existingCurrent.id },
+              data: {
+                contextHash: vehicleContextHash,
+                vehicleContextHash,
+              },
+            }).catch(() => {});
+          }
+
           VehicleReportService.ephemeralReports.set(existingCurrent.id, {
             report: existingCurrent,
             createdAt: Date.now(),
