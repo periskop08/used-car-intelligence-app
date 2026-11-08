@@ -18,13 +18,32 @@ import HomeScreen from './index';
 
 const CLUB_TAB_ICON = require('../../../assets/images/club-tab-icon.png');
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function TabsLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const [menuVisible, setMenuVisible] = useState(false);
+  const centerBadgeRef = useRef<any>(null);
+  const [closeBtnBottom, setCloseBtnBottom] = useState<number>(
+    Platform.OS === 'ios' ? 51 : 38
+  );
   const swipeTranslateX = useRef(new Animated.Value(0)).current;
+
+  const openMenu = () => {
+    if (centerBadgeRef.current && typeof centerBadgeRef.current.measureInWindow === 'function') {
+      centerBadgeRef.current.measureInWindow((_x: number, y: number, _w: number, h: number) => {
+        if (typeof y === 'number' && typeof h === 'number' && y > 0) {
+          const winH = Dimensions.get('window').height || SCREEN_HEIGHT;
+          const exactBottom = Math.max(20, Math.round(winH - (y + h)));
+          setCloseBtnBottom(exactBottom);
+        }
+        setMenuVisible(true);
+      });
+    } else {
+      setMenuVisible(true);
+    }
+  };
 
   const isHomeTab = pathname === '/' || pathname === '/index' || pathname === '/(tabs)' || pathname === '/(tabs)/index';
 
@@ -282,14 +301,18 @@ export default function TabsLayout() {
             tabPress: (e) => {
               // Open 3 floating bubbles above tab button
               e.preventDefault();
-              setMenuVisible(true);
+              openMenu();
             },
           }}
           options={{
             headerShown: false,
             tabBarLabel: 'İlanlar',
             tabBarIcon: ({ color, focused }) => (
-              <View style={styles.centerTabBadge}>
+              <View
+                ref={centerBadgeRef}
+                collapsable={false}
+                style={[styles.centerTabBadge, menuVisible && { opacity: 0 }]}
+              >
                 <Ionicons name="car-sport" size={24} color="#ffffff" />
               </View>
             ),
@@ -367,7 +390,7 @@ export default function TabsLayout() {
           <Animated.View style={[styles.backdropBg, { opacity: fadeAnim }]} />
 
           {/* Centered Floating Bubbles Cluster */}
-          <View style={styles.bubblesContainer}>
+          <View style={[styles.bubblesContainer, { bottom: closeBtnBottom }]}>
             {/* Bubble 1 (Top): İLAN VER */}
             <Animated.View
               style={{
@@ -482,7 +505,7 @@ const styles = StyleSheet.create({
   },
   bubblesContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 36 : 24,
+    bottom: Platform.OS === 'ios' ? 51 : 38,
     alignItems: 'center',
     gap: 12,
   },
@@ -564,9 +587,9 @@ const styles = StyleSheet.create({
   },
   /* CLOSE BUTTON */
   bubbleCloseBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: '#0f172a',
     justifyContent: 'center',
     alignItems: 'center',
