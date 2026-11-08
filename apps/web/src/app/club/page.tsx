@@ -854,8 +854,14 @@ function ClubPageContent() {
 
       {/* User Popover Action Modal */}
       {selectedUser && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full space-y-5 shadow-2xl animate-scaleUp">
+        <div
+          onClick={() => setSelectedUser(null)}
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-sm w-full space-y-5 shadow-2xl animate-scaleUp"
+          >
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-sm font-bold text-white">Kullanıcı Bilgileri</h3>
               <button
@@ -904,8 +910,14 @@ function ClubPageContent() {
 
       {/* Admin DM Modal */}
       {dmModalOpen && selectedUser && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-orange-500/30 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+        <div
+          onClick={() => setDmModalOpen(false)}
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-900 border border-orange-500/30 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl"
+          >
             <h3 className="text-sm font-bold text-white">
               {selectedUser.displayName} Adlı Kullanıcıya Özel Mesaj
             </h3>

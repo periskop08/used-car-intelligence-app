@@ -12,6 +12,8 @@ import {
   Platform,
   KeyboardAvoidingView,
   Switch,
+  Pressable,
+  Keyboard,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -576,11 +578,23 @@ export default function EditListingScreen() {
         animationType="slide"
         transparent={true}
         onRequestClose={() => {
+          Keyboard.dismiss();
           setActivePicker(null);
           setPickerSearch('');
         }}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalBackdrop}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              Keyboard.dismiss();
+              setActivePicker(null);
+              setPickerSearch('');
+            }}
+          />
           <View style={styles.pickerSheet}>
             {/* Header */}
             <View style={styles.modalHeader}>
@@ -588,6 +602,7 @@ export default function EditListingScreen() {
               <TouchableOpacity
                 style={styles.modalCloseCircle}
                 onPress={() => {
+                  Keyboard.dismiss();
                   setActivePicker(null);
                   setPickerSearch('');
                 }}
@@ -616,7 +631,7 @@ export default function EditListingScreen() {
 
             {/* Option List */}
             <ScrollView
-              style={{ maxHeight: 420 }}
+              style={{ flex: 1 }}
               contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 8 }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
@@ -657,7 +672,7 @@ export default function EditListingScreen() {
               )}
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -932,7 +947,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 16,
-    maxHeight: '80%',
+    height: '72%',
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',

@@ -229,8 +229,14 @@ export default function BuyerPackagesSection() {
 
       {/* One-Time Payment Modal */}
       {selectedPkg && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#0b0f19] border border-white/10 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl flex flex-col gap-5 relative">
+        <div
+          onClick={() => setSelectedPkg(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0b0f19] border border-white/10 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl flex flex-col gap-5 relative"
+          >
             <button
               onClick={() => setSelectedPkg(null)}
               className="absolute top-4 right-4 text-slate-400 hover:text-white text-lg font-bold"

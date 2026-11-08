@@ -12,9 +12,11 @@ import {
   Image,
   Platform,
   KeyboardAvoidingView,
+  Pressable,
+  Keyboard,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -100,12 +102,12 @@ type VehicleCategory = 'AUTOMOBILE' | 'SUV_PICKUP' | 'MOTORCYCLE' | 'MINIVAN_PAN
 const VEHICLE_CATEGORIES: {
   key: VehicleCategory;
   label: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
 }[] = [
-  { key: 'AUTOMOBILE', label: 'Otomobil', icon: 'car-sport-outline' },
-  { key: 'SUV_PICKUP', label: 'SUV & Pickup', icon: 'trail-sign-outline' },
-  { key: 'MOTORCYCLE', label: 'Motosiklet', icon: 'bicycle-outline' },
-  { key: 'MINIVAN_PANELVAN', label: 'Minivan & Panelvan', icon: 'bus-outline' },
+  { key: 'AUTOMOBILE', label: 'Otomobil', icon: 'car-sports' },
+  { key: 'SUV_PICKUP', label: 'SUV & Pickup', icon: 'car-lifted-pickup' },
+  { key: 'MOTORCYCLE', label: 'Motosiklet', icon: 'motorbike' },
+  { key: 'MINIVAN_PANELVAN', label: 'Minivan & Panelvan', icon: 'van-utility' },
 ];
 
 const WIZARD_STEPS = [
@@ -1466,9 +1468,9 @@ export default function CreateListingScreen() {
                           handleCategorySwitch(cat.key);
                         }}
                       >
-                        <Ionicons
+                        <MaterialCommunityIcons
                           name={cat.icon}
-                          size={16}
+                          size={19}
                           color={isActive ? '#ffffff' : '#64748b'}
                         />
                         <Text
@@ -2876,11 +2878,23 @@ export default function CreateListingScreen() {
           animationType="slide"
           transparent={true}
           onRequestClose={() => {
+            Keyboard.dismiss();
             setActivePicker(null);
             setPickerSearch('');
           }}
         >
-          <View style={styles.modalBackdrop}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalBackdrop}
+          >
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => {
+                Keyboard.dismiss();
+                setActivePicker(null);
+                setPickerSearch('');
+              }}
+            />
             <View style={styles.modalSheet}>
               {/* Header */}
               <View style={styles.modalHeader}>
@@ -2902,6 +2916,7 @@ export default function CreateListingScreen() {
                 <TouchableOpacity
                   style={styles.modalCloseBtn}
                   onPress={() => {
+                    Keyboard.dismiss();
                     setActivePicker(null);
                     setPickerSearch('');
                   }}
@@ -2930,7 +2945,7 @@ export default function CreateListingScreen() {
 
               {/* Option List */}
               <ScrollView
-                style={{ maxHeight: 440 }}
+                style={{ flex: 1 }}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 8 }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
@@ -2988,7 +3003,7 @@ export default function CreateListingScreen() {
                 )}
               </ScrollView>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -3843,6 +3858,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    height: '72%',
     maxHeight: '86%',
   },
   modalHeader: {

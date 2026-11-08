@@ -13,6 +13,7 @@ import {
   SafeAreaView,
   StatusBar,
   Modal,
+  Pressable,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -813,6 +814,10 @@ export default function ListingFeedScreen() {
           onRequestClose={() => setSelectedExpertiseItem(null)}
         >
           <View style={styles.modalOverlay}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setSelectedExpertiseItem(null)}
+            />
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

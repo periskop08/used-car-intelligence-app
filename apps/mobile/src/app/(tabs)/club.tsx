@@ -16,6 +16,7 @@ import {
   Alert,
   Switch,
   Image,
+  Pressable,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -792,6 +793,10 @@ export default function TorqueScoutClubScreen() {
           style={styles.modalBackdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setCreatePostModalVisible(false)}
+          />
           <View style={styles.createPostModalSheet}>
             {/* Modal Header */}
             <View style={styles.modalHeaderBar}>
@@ -960,6 +965,10 @@ export default function TorqueScoutClubScreen() {
           style={styles.modalBackdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setActivePostForComments(null)}
+          />
           <View style={styles.commentModalSheet}>
             {/* Modal Header */}
             <View style={styles.modalHeaderBar}>

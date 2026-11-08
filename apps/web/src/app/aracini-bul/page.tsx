@@ -1208,8 +1208,14 @@ export default function FindMyCarPage() {
 
         {/* CONFIGURE FILTERS SCREEN MODAL OVERLAY */}
         {showFilterPanel && (
-          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-white/5 p-6 rounded-[28px] max-w-md w-full shadow-2xl flex flex-col gap-5 animate-scale-up">
+          <div
+            onClick={() => setShowFilterPanel(false)}
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-900 border border-white/5 p-6 rounded-[28px] max-w-md w-full shadow-2xl flex flex-col gap-5 animate-scale-up"
+            >
               <div className="flex items-center justify-between border-b border-white/5 pb-3">
                 <h3 className="font-extrabold text-slate-200">Keşif Kriterlerini Yapılandır</h3>
                 <button

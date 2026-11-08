@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Modal, FlatList, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Modal, FlatList, ActivityIndicator, Alert, TextInput, Pressable, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -457,7 +457,17 @@ export default function VehicleQueryScreen() {
 
       {/* Selector Modal Bottom Sheet styled */}
       <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              Keyboard.dismiss();
+              setModalVisible(false);
+            }}
+          />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Seçim Yapın</Text>
@@ -483,6 +493,8 @@ export default function VehicleQueryScreen() {
             <FlatList
               data={getOptionsList()}
               keyExtractor={(item) => item.id}
+              style={{ flex: 1 }}
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ paddingBottom: 24 }}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.optionRow} onPress={() => selectOption(item)}>
@@ -491,7 +503,7 @@ export default function VehicleQueryScreen() {
               )}
             />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -592,7 +604,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e293b',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '75%',
+    height: '72%',
+    maxHeight: '82%',
     padding: 20,
     gap: 16,
   },

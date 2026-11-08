@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Alert,
   Modal,
+  Pressable,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -584,6 +585,14 @@ export default function MyListingsScreen() {
         }}
       >
         <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              if (!submittingPromotion) {
+                setPromotionListing(null);
+              }
+            }}
+          />
           <View style={styles.promoSheet}>
             {/* Header */}
             <View style={styles.promoHeader}>

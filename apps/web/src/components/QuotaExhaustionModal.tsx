@@ -18,8 +18,14 @@ export default function QuotaExhaustionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-[#0b0f19]/95 border border-orange-500/30 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl shadow-orange-500/10 flex flex-col gap-5 relative max-h-[92vh] overflow-y-auto custom-scrollbar">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[#0b0f19]/95 border border-orange-500/30 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl shadow-orange-500/10 flex flex-col gap-5 relative max-h-[92vh] overflow-y-auto custom-scrollbar"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}

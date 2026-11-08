@@ -11,6 +11,9 @@ import {
   ScrollView,
   TextInput,
   Modal,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -1280,8 +1283,20 @@ export default function AraciniBulScreen() {
       )}
 
       {/* 8. FILTER MODAL */}
-      <Modal visible={showFilterModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+      <Modal
+        visible={showFilterModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setShowFilterModal(false)}
+          />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Keşif Kriterleri</Text>
@@ -1368,7 +1383,7 @@ export default function AraciniBulScreen() {
               <Text style={styles.applyBtnText}>Filtreleri Uygula</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

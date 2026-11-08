@@ -916,8 +916,14 @@ export default function ListingDetail() {
 
       {/* Send Message Modal Popup */}
       {showMessageModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-[#090d1a] border border-white/10 p-6 rounded-[28px] max-w-lg w-full shadow-2xl flex flex-col gap-5 relative">
+        <div
+          onClick={() => setShowMessageModal(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#090d1a] border border-white/10 p-6 rounded-[28px] max-w-lg w-full shadow-2xl flex flex-col gap-5 relative"
+          >
             {/* Close Button */}
             <button
               onClick={() => setShowMessageModal(false)}

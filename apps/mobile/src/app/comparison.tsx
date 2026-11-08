@@ -11,8 +11,12 @@ import {
   Alert,
   Image,
   TextInput,
+  Pressable,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
@@ -106,11 +110,11 @@ interface VehicleSlot {
 
 type VehicleCategory = 'AUTOMOBILE' | 'SUV_PICKUP' | 'COMMERCIAL' | 'MOTORCYCLE';
 
-const VEHICLE_CATEGORIES: { key: VehicleCategory; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'AUTOMOBILE', label: 'Otomobil', icon: 'car-sport-outline' },
-  { key: 'SUV_PICKUP', label: 'Arazi, SUV & Pickup', icon: 'trail-sign-outline' },
-  { key: 'COMMERCIAL', label: 'Minivan & Panelvan', icon: 'bus-outline' },
-  { key: 'MOTORCYCLE', label: 'Motosiklet', icon: 'bicycle-outline' },
+const VEHICLE_CATEGORIES: { key: VehicleCategory; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
+  { key: 'AUTOMOBILE', label: 'Otomobil', icon: 'car-sports' },
+  { key: 'SUV_PICKUP', label: 'Arazi, SUV & Pickup', icon: 'car-lifted-pickup' },
+  { key: 'COMMERCIAL', label: 'Minivan & Panelvan', icon: 'van-utility' },
+  { key: 'MOTORCYCLE', label: 'Motosiklet', icon: 'motorbike' },
 ];
 
 const CRITERIA_METADATA: Record<string, { title: string; weightStr: string; icon: string }> = {
@@ -992,9 +996,9 @@ export default function ComparisonScreen() {
                   onPress={() => handleSearchModeChange(cat.key)}
                   activeOpacity={0.8}
                 >
-                  <Ionicons
+                  <MaterialCommunityIcons
                     name={cat.icon}
-                    size={14}
+                    size={16}
                     color={isActive ? '#ffffff' : '#64748b'}
                     style={{ marginRight: 5 }}
                   />
@@ -1562,6 +1566,10 @@ export default function ComparisonScreen() {
         onRequestClose={() => setDetailModalVisible(false)}
       >
         <View style={styles.detailModalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setDetailModalVisible(false)}
+          />
           <View style={styles.detailModalContent}>
             {selectedDetail && (
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14 }}>
@@ -1645,9 +1653,22 @@ export default function ComparisonScreen() {
         animationType="slide"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setModalVisible(false);
+        }}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              Keyboard.dismiss();
+              setModalVisible(false);
+            }}
+          />
           <View style={styles.modalContent}>
             {/* Modal Header with Back Arrow, Title and Close */}
             <View style={styles.modalHeader}>
@@ -1823,8 +1844,10 @@ export default function ComparisonScreen() {
                 <FlatList
                   data={filteredOptions}
                   keyExtractor={(item, index) => `${item}_${index}`}
+                  style={{ flex: 1 }}
                   contentContainerStyle={{ paddingBottom: 24 }}
                   showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
                   ListHeaderComponent={
                     step === 1 && searchQuery.trim().length === 0 && recentVehicles.length > 0 ? (() => {
                       const sortedRecentVehicles = [...recentVehicles].sort((a, b) => {
@@ -1989,7 +2012,7 @@ export default function ComparisonScreen() {
               );
             })()}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Centered Quota Exhaustion Modal (Alıcı Mini Banner) */}
@@ -2879,7 +2902,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '80%',
+    height: '75%',
+    maxHeight: '85%',
     padding: 20,
     gap: 14,
   },

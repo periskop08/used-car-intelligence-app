@@ -16,6 +16,7 @@ import {
   Animated,
   PanResponder,
   RefreshControl,
+  Pressable,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -2555,6 +2556,10 @@ export default function VehicleReportScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.chatModalOverlay}
         >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setIsChatModalVisible(false)}
+          />
           <Animated.View
             style={[
               styles.chatModalContainer,

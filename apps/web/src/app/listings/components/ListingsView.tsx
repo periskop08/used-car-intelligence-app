@@ -29,13 +29,32 @@ const TURKISH_CITIES = TURKEY_81_PROVINCES;
 export type ViewMode = "list" | "gallery";
 export type WebListingCategory = "ALL" | "AUTOMOBILE" | "SUV_PICKUP" | "MINIVAN_PANELVAN" | "MOTORCYCLE";
 
+const SuvPickupIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M3 14h18v3a1 1 0 0 1-1 1h-1.5" />
+    <path d="M3 14v-3l2.5-4.5A2 2 0 0 1 7.25 5.5h6.5a2 2 0 0 1 1.85 1.25L17 10.5h3a1 1 0 0 1 1 1V14" />
+    <path d="M5.5 18h-1A1.5 1.5 0 0 1 3 16.5V14" />
+    <circle cx="7.5" cy="18" r="2.5" />
+    <circle cx="16.5" cy="18" r="2.5" />
+    <path d="M10 18h4" />
+  </svg>
+);
+
 const WEB_CATEGORY_ITEMS: {
   id: Exclude<WebListingCategory, "ALL">;
   name: string;
   Icon: any;
 }[] = [
   { id: "AUTOMOBILE", name: "Otomobil", Icon: Car },
-  { id: "SUV_PICKUP", name: "Arazi, SUV & Pickup", Icon: Compass },
+  { id: "SUV_PICKUP", name: "Arazi, SUV & Pickup", Icon: SuvPickupIcon },
   { id: "MINIVAN_PANELVAN", name: "Minivan & Panelvan", Icon: Truck },
   { id: "MOTORCYCLE", name: "Motosiklet", Icon: Bike },
 ];
@@ -709,7 +728,13 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
         <div className="flex items-center justify-between">
           <button
             type="button"
-            onClick={() => router.push("/")}
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push("/");
+              }
+            }}
             className="p-2 rounded-xl bg-slate-900/60 border border-white/10 text-slate-200 hover:border-orange-500/50 transition cursor-pointer"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -808,9 +833,21 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
           </div>
         </div>
       ) : (
-        <div>
-          <h1 className="text-3xl font-black text-slate-200 canvas-title tracking-tight">Araç İlanları</h1>
-          <p className="text-sm text-slate-400 canvas-subtitle mt-1">TorqueScout AI onaylı varyantlar ve kapsamlı kullanıcı analizleri ile ikinci el ilanları.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowCategoryGate(true)}
+              className="p-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-slate-200 hover:border-orange-500/50 transition cursor-pointer"
+              title="Vasıta Türü Seçimine Dön"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-black text-slate-200 canvas-title tracking-tight">Araç İlanları</h1>
+              <p className="text-sm text-slate-400 canvas-subtitle mt-1">TorqueScout AI onaylı varyantlar ve kapsamlı kullanıcı analizleri ile ikinci el ilanları.</p>
+            </div>
+          </div>
         </div>
       )}
 

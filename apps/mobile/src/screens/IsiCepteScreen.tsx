@@ -19,6 +19,7 @@ import {
   Pressable,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
 } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -1429,7 +1430,10 @@ export default function IsiCepteOneriyorScreen() {
         transparent={true}
         onRequestClose={() => setActiveFilterModal(null)}
       >
-        <View style={styles.cityModalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.cityModalOverlay}
+        >
           {/* Tap outside backdrop to close */}
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -1504,6 +1508,7 @@ export default function IsiCepteOneriyorScreen() {
             <FlatList
               data={modalOptions}
               keyExtractor={(item) => item}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => {
                 const isSelected =
                   (activeFilterModal === 'city' && selectedCity === item) ||
@@ -1548,7 +1553,7 @@ export default function IsiCepteOneriyorScreen() {
               }}
             />
           </Animated.View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ========================================================================= */}

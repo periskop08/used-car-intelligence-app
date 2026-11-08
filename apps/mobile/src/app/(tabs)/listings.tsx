@@ -13,9 +13,13 @@ import {
   Alert,
   Share,
   Image,
+  Pressable,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -262,12 +266,12 @@ type ListingVehicleCategory = 'ALL' | 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PAN
 const LISTING_CATEGORY_ITEMS: {
   id: Exclude<ListingVehicleCategory, 'ALL'>;
   name: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
 }[] = [
-  { id: 'AUTOMOBILE', name: 'Otomobil', icon: 'car-sport-outline' },
-  { id: 'SUV_PICKUP', name: 'Arazi, SUV & Pickup', icon: 'trail-sign-outline' },
-  { id: 'MINIVAN_PANELVAN', name: 'Minivan & Panelvan', icon: 'bus-outline' },
-  { id: 'MOTORCYCLE', name: 'Motosiklet', icon: 'bicycle-outline' },
+  { id: 'AUTOMOBILE', name: 'Otomobil', icon: 'car-sports' },
+  { id: 'SUV_PICKUP', name: 'Arazi, SUV & Pickup', icon: 'car-lifted-pickup' },
+  { id: 'MINIVAN_PANELVAN', name: 'Minivan & Panelvan', icon: 'van-utility' },
+  { id: 'MOTORCYCLE', name: 'Motosiklet', icon: 'motorbike' },
 ];
 
 const getListingCategoryLabel = (cat: ListingVehicleCategory): string => {
@@ -938,7 +942,13 @@ export default function ListingsScreen() {
         >
           <TouchableOpacity
             style={{ padding: 4 }}
-            onPress={() => router.push('/(tabs)/index' as any)}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)' as any);
+              }
+            }}
           >
             <Ionicons name="chevron-back" size={24} color="#0f172a" />
           </TouchableOpacity>
@@ -998,9 +1008,9 @@ export default function ListingsScreen() {
                       alignItems: 'center',
                     }}
                   >
-                    <Ionicons
+                    <MaterialCommunityIcons
                       name={cat.icon}
-                      size={22}
+                      size={24}
                       color={isSelected ? '#ea580c' : '#0f172a'}
                     />
                   </View>
@@ -1100,7 +1110,17 @@ export default function ListingsScreen() {
       <View style={styles.topAppBar}>
         <TouchableOpacity
           style={styles.appBarIconBtn}
-          onPress={() => setCategoryGateVisible(true)}
+          onPress={() => {
+            if (params.urgentOnly === 'true' || params.showcaseOnly === 'true') {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)' as any);
+              }
+            } else {
+              setCategoryGateVisible(true);
+            }
+          }}
         >
           <Ionicons name="chevron-back" size={24} color="#0f172a" />
         </TouchableOpacity>
@@ -1395,7 +1415,7 @@ export default function ListingsScreen() {
               <Text style={styles.filterCardTitle}>🚘 VASITA TÜRÜ</Text>
               <View style={{ gap: 8 }}>
                 {[
-                  { id: 'ALL' as ListingVehicleCategory, name: 'Tüm Vasıta Türleri (Karışık)', icon: 'grid-outline' as const },
+                  { id: 'ALL' as ListingVehicleCategory, name: 'Tüm Vasıta Türleri (Karışık)', icon: 'view-grid-outline' as keyof typeof MaterialCommunityIcons.glyphMap },
                   ...LISTING_CATEGORY_ITEMS,
                 ].map((cat) => {
                   const isSelected = selectedCategory === cat.id;
@@ -1423,9 +1443,9 @@ export default function ListingsScreen() {
                       }}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <Ionicons
+                        <MaterialCommunityIcons
                           name={cat.icon}
-                          size={18}
+                          size={20}
                           color={isSelected ? '#ea580c' : '#475569'}
                         />
                         <Text
@@ -2004,13 +2024,25 @@ export default function ListingsScreen() {
           {/* IN-MODAL BRAND SELECTION OVERLAY (Avoids iOS Nested Modal Conflict) */}
           {/* ========================================================================= */}
           {brandPickerVisible && (
-            <View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}>
-              <View style={styles.pickerSheet}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}
+            >
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setBrandPickerVisible(false);
+                  setBrandSearchQuery('');
+                }}
+              />
+              <View style={[styles.pickerSheet, { height: '72%', maxHeight: '85%' }]}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>Marka Seçin</Text>
                   <TouchableOpacity
                     style={styles.modalCloseCircle}
                     onPress={() => {
+                      Keyboard.dismiss();
                       setBrandPickerVisible(false);
                       setBrandSearchQuery('');
                     }}
@@ -2055,7 +2087,7 @@ export default function ListingsScreen() {
                 </View>
 
                 <ScrollView
-                  style={{ maxHeight: 420 }}
+                  style={{ flex: 1 }}
                   contentContainerStyle={{ padding: 14, gap: 8 }}
                   keyboardShouldPersistTaps="handled"
                 >
@@ -2115,9 +2147,14 @@ export default function ListingsScreen() {
                       </TouchableOpacity>
                     );
                   })}
+                  {filteredBrands.length === 0 && (
+                    <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#94a3b8' }}>Eşleşen marka bulunamadı.</Text>
+                    </View>
+                  )}
                 </ScrollView>
               </View>
-            </View>
+            </KeyboardAvoidingView>
           )}
 
           {/* ========================================================================= */}
@@ -2125,7 +2162,11 @@ export default function ListingsScreen() {
           {/* ========================================================================= */}
           {modelPickerVisible && (
             <View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}>
-              <View style={styles.pickerSheet}>
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={() => setModelPickerVisible(false)}
+              />
+              <View style={[styles.pickerSheet, { height: '72%', maxHeight: '85%' }]}>
                 <View style={styles.modalHeader}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                     {selectedBrand && <BrandLogo brandName={selectedBrand.name} size={28} />}
@@ -2141,7 +2182,7 @@ export default function ListingsScreen() {
                   </TouchableOpacity>
                 </View>
                 <ScrollView
-                  style={{ maxHeight: 420 }}
+                  style={{ flex: 1 }}
                   contentContainerStyle={{ padding: 14, gap: 8 }}
                   keyboardShouldPersistTaps="handled"
                 >
@@ -2198,13 +2239,25 @@ export default function ListingsScreen() {
           {/* IN-MODAL CITY SELECTION OVERLAY (81 İL + INSTANT SEARCH) */}
           {/* ========================================================================= */}
           {cityPickerVisible && (
-            <View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}>
-              <View style={styles.pickerSheet}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}
+            >
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setCityPickerVisible(false);
+                  setCitySearchQuery('');
+                }}
+              />
+              <View style={[styles.pickerSheet, { height: '72%', maxHeight: '85%' }]}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>İl Seçin ({TURKEY_81_PROVINCES.length} İl)</Text>
                   <TouchableOpacity
                     style={styles.modalCloseCircle}
                     onPress={() => {
+                      Keyboard.dismiss();
                       setCityPickerVisible(false);
                       setCitySearchQuery('');
                     }}
@@ -2247,7 +2300,7 @@ export default function ListingsScreen() {
                 </View>
 
                 <ScrollView
-                  style={{ maxHeight: 420 }}
+                  style={{ flex: 1 }}
                   contentContainerStyle={{ padding: 14, gap: 8 }}
                   keyboardShouldPersistTaps="handled"
                 >
@@ -2291,15 +2344,26 @@ export default function ListingsScreen() {
                   )}
                 </ScrollView>
               </View>
-            </View>
+            </KeyboardAvoidingView>
           )}
 
           {/* ========================================================================= */}
           {/* IN-MODAL DISTRICT SELECTION OVERLAY (CASCADED BY CITY + INSTANT SEARCH) */}
           {/* ========================================================================= */}
           {districtPickerVisible && (
-            <View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}>
-              <View style={styles.pickerSheet}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}
+            >
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setDistrictPickerVisible(false);
+                  setDistrictSearchQuery('');
+                }}
+              />
+              <View style={[styles.pickerSheet, { height: '72%', maxHeight: '85%' }]}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>
                     {city ? `${city} İlçeleri` : 'İlçe Seçin'}
@@ -2307,6 +2371,7 @@ export default function ListingsScreen() {
                   <TouchableOpacity
                     style={styles.modalCloseCircle}
                     onPress={() => {
+                      Keyboard.dismiss();
                       setDistrictPickerVisible(false);
                       setDistrictSearchQuery('');
                     }}
@@ -2349,7 +2414,7 @@ export default function ListingsScreen() {
                 </View>
 
                 <ScrollView
-                  style={{ maxHeight: 420 }}
+                  style={{ flex: 1 }}
                   contentContainerStyle={{ padding: 14, gap: 8 }}
                   keyboardShouldPersistTaps="handled"
                 >
@@ -2389,7 +2454,7 @@ export default function ListingsScreen() {
                   )}
                 </ScrollView>
               </View>
-            </View>
+            </KeyboardAvoidingView>
           )}
         </SafeAreaView>
       </Modal>
@@ -2404,6 +2469,10 @@ export default function ListingsScreen() {
         onRequestClose={() => setSortModalVisible(false)}
       >
         <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setSortModalVisible(false)}
+          />
           <View style={styles.pickerSheet}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>İlanları Sırala</Text>

@@ -16,6 +16,7 @@ import {
   Pressable,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
 } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -562,7 +563,10 @@ export default function IsiCepteRecommendationWidget({
         transparent={true}
         onRequestClose={() => setIsCityModalVisible(false)}
       >
-        <View style={styles.cityModalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.cityModalOverlay}
+        >
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setIsCityModalVisible(false)}
@@ -635,6 +639,7 @@ export default function IsiCepteRecommendationWidget({
             <FlatList
               data={filteredCities}
               keyExtractor={(item) => item}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => {
                 const isSelected = selectedCity === item;
                 return (
@@ -655,7 +660,7 @@ export default function IsiCepteRecommendationWidget({
               }}
             />
           </Animated.View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ========================================================================= */}

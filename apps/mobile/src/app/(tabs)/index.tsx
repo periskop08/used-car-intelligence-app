@@ -15,7 +15,7 @@ import {
   StatusBar,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle, Line, G } from 'react-native-svg';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image as ExpoImage } from 'expo-image';
@@ -453,31 +453,31 @@ export const CATEGORY_ITEMS: {
   id: 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE';
   name: string;
   desc: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
 }[] = [
   {
     id: 'AUTOMOBILE',
     name: 'Otomobil',
     desc: 'Sedan, Hatchback, Station Wagon ve binek araçlar',
-    icon: 'car-sport-outline',
+    icon: 'car-sports',
   },
   {
     id: 'SUV_PICKUP',
     name: 'Arazi, SUV & Pickup',
     desc: 'SUV, Crossover, Pickup ve 4x4 arazi araçları',
-    icon: 'trail-sign-outline',
+    icon: 'car-lifted-pickup',
   },
   {
     id: 'MINIVAN_PANELVAN',
     name: 'Minivan & Panelvan',
     desc: 'Hafif ticari, kamyonet, minibüs ve panelvan araçlar',
-    icon: 'bus-outline',
+    icon: 'van-utility',
   },
   {
     id: 'MOTORCYCLE',
     name: 'Motosiklet',
     desc: 'Scooter, touring, supersport ve tüm motosikletler',
-    icon: 'bicycle-outline',
+    icon: 'motorbike',
   },
 ];
 
@@ -2456,7 +2456,11 @@ export default function MobileDashboard() {
 
           {/* Scrollable Content Container */}
           <View style={styles.stepBodyWithJumper}>
-            <ScrollView contentContainerStyle={styles.stepScrollInner} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              contentContainerStyle={styles.stepScrollInner}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               {activeStep === 'brand' && !searchText && (
                 <>
                   {/* Popüler Markalar Horizontal Row */}
@@ -2537,9 +2541,9 @@ export default function MobileDashboard() {
                       >
                         <View style={styles.categoryStepCardLeft}>
                           <View style={[styles.categoryStepIconCircle, isSelected && styles.categoryStepIconCircleSelected]}>
-                            <Ionicons
+                            <MaterialCommunityIcons
                               name={cat.icon}
-                              size={22}
+                              size={24}
                               color={isSelected ? '#ea580c' : '#0f172a'}
                             />
                           </View>
