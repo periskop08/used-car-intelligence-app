@@ -8,14 +8,41 @@ import {
   Modal,
   Pressable,
   Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function BottomTabBarFooter() {
   const router = useRouter();
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 20 : 12);
+  const tabBarHeight = 60 + bottomInset;
+  const defaultCloseBottom = bottomInset + 27;
+
   const [menuVisible, setMenuVisible] = useState(false);
+  const centerBadgeRef = useRef<any>(null);
+  const [closeBtnBottom, setCloseBtnBottom] = useState<number>(defaultCloseBottom);
+
+  const openMenu = () => {
+    if (centerBadgeRef.current && typeof centerBadgeRef.current.measureInWindow === 'function') {
+      centerBadgeRef.current.measureInWindow((_x: number, y: number, _w: number, h: number) => {
+        if (typeof y === 'number' && typeof h === 'number' && y > 0) {
+          const winH = Dimensions.get('window').height;
+          const exactBottom = Math.max(20, Math.round(winH - (y + h)));
+          setCloseBtnBottom(exactBottom);
+        } else {
+          setCloseBtnBottom(defaultCloseBottom);
+        }
+        setMenuVisible(true);
+      });
+    } else {
+      setCloseBtnBottom(defaultCloseBottom);
+      setMenuVisible(true);
+    }
+  };
 
   const scaleAnim1 = useRef(new Animated.Value(0)).current;
   const scaleAnim2 = useRef(new Animated.Value(0)).current;
@@ -80,7 +107,7 @@ export function BottomTabBarFooter() {
 
   return (
     <>
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { paddingBottom: bottomInset, height: tabBarHeight }]}>
         {/* 1. Ana Sayfa */}
         <TouchableOpacity
           style={styles.tabItem}
@@ -109,9 +136,13 @@ export function BottomTabBarFooter() {
         <TouchableOpacity
           style={styles.tabItem}
           activeOpacity={0.85}
-          onPress={() => setMenuVisible(true)}
+          onPress={openMenu}
         >
-          <View style={styles.centerTabBadge}>
+          <View
+            ref={centerBadgeRef}
+            collapsable={false}
+            style={[styles.centerTabBadge, menuVisible && { opacity: 0 }]}
+          >
             <Ionicons name="car-sport" size={24} color="#ffffff" />
           </View>
           <Text style={styles.tabLabel}>İlanlar</Text>
@@ -146,7 +177,7 @@ export function BottomTabBarFooter() {
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
           <Animated.View style={[styles.backdropBg, { opacity: fadeAnim }]} />
-          <View style={styles.bubblesContainer}>
+          <View style={[styles.bubblesContainer, { bottom: closeBtnBottom }]}>
             <Animated.View style={{ transform: [{ scale: scaleAnim1 }], opacity: scaleAnim1 }}>
               <TouchableOpacity
                 style={[styles.bubblePill, styles.bubblePillCreate]}

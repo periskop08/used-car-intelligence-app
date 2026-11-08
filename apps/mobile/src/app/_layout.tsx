@@ -1,12 +1,14 @@
 import React from 'react';
 import { Stack } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 export default function RootLayout() {
   return (
-    <ErrorBoundary>
-      <View style={styles.container}>
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <View style={styles.container}>
         <Stack
         screenOptions={{
           gestureEnabled: true,
@@ -53,6 +55,7 @@ export default function RootLayout() {
       </Stack>
     </View>
   </ErrorBoundary>
+  </SafeAreaProvider>
 );
 }
 

@@ -11,9 +11,9 @@ import {
   FlatList,
   TextInput,
   Dimensions,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle, Line, G } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -1486,7 +1486,7 @@ export default function MobileDashboard() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       {/* TOP HEADER - White Clean Navbar */}
@@ -1938,7 +1938,7 @@ export default function MobileDashboard() {
       setQueryModalVisible(false);
     }}
   >
-    <SafeAreaView style={styles.fullModalContainer}>
+    <SafeAreaView style={styles.fullModalContainer} edges={['top', 'bottom']}>
       {modalView === 'form' ? (
         /* FORM VIEW MATCHING REFERENCE IMAGE 2 */
         <ScrollView contentContainerStyle={styles.refFormPadding} showsVerticalScrollIndicator={false}>

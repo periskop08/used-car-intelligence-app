@@ -19,6 +19,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -1057,7 +1058,7 @@ export default function VehicleReportScreen() {
     ];
 
     return (
-      <View style={styles.loadingContainerLight}>
+      <SafeAreaView style={styles.loadingContainerLight} edges={['top']}>
         <ScrollView contentContainerStyle={styles.loadingContentScroll} showsVerticalScrollIndicator={false}>
           <View style={styles.loadingHeaderBox}>
             {countdown !== null ? (
@@ -1127,7 +1128,7 @@ export default function VehicleReportScreen() {
             </View>
           </Animated.View>
         </ScrollView>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -1450,7 +1451,7 @@ export default function VehicleReportScreen() {
   const sellerQuestions = report?.sellerQuestions || (report?.expertDecisionSynthesis as any)?.sellerQuestions || [];
 
   return (
-    <View style={styles.containerLight}>
+    <SafeAreaView style={styles.containerLight} edges={['top']}>
       {/* Top Detail Modal Popup */}
       <ItemDetailModal data={activeModalData} onClose={() => setActiveModalData(null)} />
 
@@ -2778,7 +2779,7 @@ export default function VehicleReportScreen() {
         visible={isQuotaModalVisible}
         onClose={() => setIsQuotaModalVisible(false)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -2792,7 +2793,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 50,
+    paddingTop: 10,
     paddingBottom: 12,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,

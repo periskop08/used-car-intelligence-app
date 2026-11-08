@@ -17,6 +17,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
@@ -955,7 +956,7 @@ export default function ComparisonScreen() {
   }, [activeResultTab, vehiclesList.length, isSpecsAutoScrollPaused]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top Header Navigation */}
       <View style={styles.navHeader}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
@@ -2020,7 +2021,7 @@ export default function ComparisonScreen() {
         visible={isQuotaModalVisible}
         onClose={() => setIsQuotaModalVisible(false)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -2036,7 +2037,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 52,
+    paddingTop: 10,
     paddingBottom: 12,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,

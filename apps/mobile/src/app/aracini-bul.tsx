@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AraciniBulScreen from '../screens/AraciniBulScreen';
@@ -8,7 +9,7 @@ import { BottomTabBarFooter } from '../components/BottomTabBarFooter';
 export default function AraciniBulStackScreen() {
   const router = useRouter();
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff' }} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.75}>
           <Ionicons name="chevron-back" size={22} color="#0f172a" />

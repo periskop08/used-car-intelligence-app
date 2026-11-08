@@ -10,11 +10,11 @@ import {
   Share,
   Linking,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   Modal,
   Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';

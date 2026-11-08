@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -66,7 +67,7 @@ export default function AdminScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#f97316" />
@@ -107,7 +108,7 @@ export default function AdminScreen() {
           <Text style={styles.emptyText}>Onay bekleyen araç varyant önerisi bulunmamaktadır.</Text>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

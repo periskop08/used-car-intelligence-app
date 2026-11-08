@@ -14,6 +14,7 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HomeScreen from './index';
 
 const CLUB_TAB_ICON = require('../../../assets/images/club-tab-icon.png');
@@ -23,11 +24,14 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 export default function TabsLayout() {
   const router = useRouter();
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 20 : 12);
+  const tabBarHeight = 60 + bottomInset;
+  const defaultCloseBottom = bottomInset + 27;
+
   const [menuVisible, setMenuVisible] = useState(false);
   const centerBadgeRef = useRef<any>(null);
-  const [closeBtnBottom, setCloseBtnBottom] = useState<number>(
-    Platform.OS === 'ios' ? 51 : 38
-  );
+  const [closeBtnBottom, setCloseBtnBottom] = useState<number>(defaultCloseBottom);
   const swipeTranslateX = useRef(new Animated.Value(0)).current;
 
   const openMenu = () => {
@@ -37,10 +41,13 @@ export default function TabsLayout() {
           const winH = Dimensions.get('window').height || SCREEN_HEIGHT;
           const exactBottom = Math.max(20, Math.round(winH - (y + h)));
           setCloseBtnBottom(exactBottom);
+        } else {
+          setCloseBtnBottom(defaultCloseBottom);
         }
         setMenuVisible(true);
       });
     } else {
+      setCloseBtnBottom(defaultCloseBottom);
       setMenuVisible(true);
     }
   };
@@ -246,8 +253,8 @@ export default function TabsLayout() {
             borderTopWidth: 1,
             borderTopColor: '#e2e8f0',
             paddingTop: 8,
-            paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-            height: Platform.OS === 'ios' ? 88 : 72,
+            paddingBottom: bottomInset,
+            height: tabBarHeight,
             elevation: 12,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -3 },

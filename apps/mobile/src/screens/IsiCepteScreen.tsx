@@ -11,7 +11,6 @@ import {
   Modal,
   Linking,
   Platform,
-  SafeAreaView,
   StatusBar,
   RefreshControl,
   Image,
@@ -21,6 +20,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { Ionicons } from '@expo/vector-icons';
@@ -869,7 +869,7 @@ export default function IsiCepteOneriyorScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
       {/* TOP HEADER BAR */}
