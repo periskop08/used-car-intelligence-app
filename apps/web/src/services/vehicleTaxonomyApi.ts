@@ -62,10 +62,11 @@ export const vehicleTaxonomyApi = {
     return json.success && Array.isArray(json.data) ? json.data : [];
   },
 
-  async getYears(brand: string, model: string, category?: string): Promise<TaxonomyOption[]> {
+  async getYears(brand: string, model: string, category?: string, forListing?: boolean): Promise<TaxonomyOption[]> {
     if (!brand || !model) return [];
     const query = new URLSearchParams({ brand, modelFamily: model });
     if (category) query.set('category', category);
+    if (forListing) query.set('forListing', 'true');
     const res = await fetch(`${API_URL}/vehicle-filters/years?${query.toString()}`);
     const json = await res.json();
     return json.success && Array.isArray(json.data) ? json.data : [];

@@ -399,15 +399,30 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'modelFamily', required: false })
   @ApiQuery({ name: 'model', required: false })
   @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({ name: 'forListing', required: false })
   async getYears(
     @Query('brand') brand: string,
     @Query('modelFamily') modelFamily?: string,
     @Query('model') model?: string,
     @Query('category') category?: string,
+    @Query('forListing') forListing?: string,
   ) {
     const targetModel = model || modelFamily;
     if (!brand || !targetModel) {
       throw new BadRequestException('brand ve modelFamily query parametreleri gereklidir.');
+    }
+
+    if (forListing === 'true') {
+      const maxYear = Math.max(new Date().getFullYear(), 2026);
+      const minYear = 1970;
+      const listingYears = Array.from({ length: maxYear - minYear + 1 }, (_, i) => {
+        const yr = String(maxYear - i);
+        return { label: yr, value: yr };
+      });
+      return {
+        success: true,
+        data: listingYears,
+      };
     }
 
     const norm = normalizeVehicleType(category);
@@ -471,7 +486,7 @@ export class VehicleFiltersController {
         return { success: true, data: [] };
       }
       const categoryWhere = getCategoryVariantWhere(category);
-      const variants = await this.prisma.vehicleVariant.findMany({
+      let variants = await this.prisma.vehicleVariant.findMany({
         where: {
           status: 'APPROVED',
           brand: { name: { equals: brand, mode: 'insensitive' } },
@@ -481,7 +496,29 @@ export class VehicleFiltersController {
         },
         select: { bodyType: true },
       });
+
+      // Pre-2000 / classic year fallback: use model's catalog body types across all years
+      if (variants.length === 0) {
+        variants = await this.prisma.vehicleVariant.findMany({
+          where: {
+            status: 'APPROVED',
+            brand: { name: { equals: brand, mode: 'insensitive' } },
+            model: { name: { equals: targetModel, mode: 'insensitive' } },
+            ...categoryWhere,
+          },
+          select: { bodyType: true },
+        });
+      }
+
       const typesSet = new Set(variants.map(v => getBodyTypeTr(v.bodyType?.toString() || '')));
+      if (typesSet.size === 0) {
+        if (norm === 'SUV_PICKUP') {
+          typesSet.add('SUV');
+        } else {
+          typesSet.add('Sedan');
+          typesSet.add('Hatchback');
+        }
+      }
       const sortedTypes = Array.from(typesSet).filter(Boolean).sort();
       return {
         success: true,
@@ -533,7 +570,7 @@ export class VehicleFiltersController {
     const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
     const categoryWhere = getCategoryVariantWhere(category);
 
-    const variants = await this.prisma.vehicleVariant.findMany({
+    let variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
@@ -545,6 +582,32 @@ export class VehicleFiltersController {
       },
       select: { id: true, engine: { select: { code: true } } },
     });
+
+    if (variants.length === 0) {
+      variants = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          ...(norm !== 'MINIVAN_PANELVAN' && targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+          ...(fuelEnums && fuelEnums.length > 0 ? { fuelType: { in: fuelEnums as any } } : {}),
+          ...categoryWhere,
+        },
+        select: { id: true, engine: { select: { code: true } } },
+      });
+    }
+
+    if (variants.length === 0) {
+      variants = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          ...categoryWhere,
+        },
+        select: { id: true, engine: { select: { code: true } } },
+      });
+    }
 
     const NON_ENGINE_TOKENS = new Set([
       'TOURING', 'GRAN TURISMO', 'COMPACT', 'GRAN COUPE', '5.0 JAHRE EDITION',
@@ -573,6 +636,12 @@ export class VehicleFiltersController {
     );
 
     const sortedEngines = Array.from(enginesSet).sort((a, b) => a.localeCompare(b, 'tr'));
+    if (sortedEngines.length === 0) {
+      return {
+        success: true,
+        data: [{ label: 'Standart Motor', value: 'Standart Motor' }],
+      };
+    }
     return {
       success: true,
       data: sortedEngines.map(code => ({ label: code, value: code })),
@@ -619,11 +688,11 @@ export class VehicleFiltersController {
 
     const categoryWhere = getCategoryVariantWhere(category);
     let engineFilterClause: any = {};
-    if (targetEngine) {
+    if (targetEngine && targetEngine !== 'Standart Motor') {
       if (norm === 'MINIVAN_PANELVAN') {
         engineFilterClause = { engine: { code: { equals: targetEngine, mode: 'insensitive' } } };
       } else {
-        const candidates = await this.prisma.vehicleVariant.findMany({
+        let candidates = await this.prisma.vehicleVariant.findMany({
           where: {
             status: 'APPROVED',
             brand: { name: { equals: brand, mode: 'insensitive' } },
@@ -634,12 +703,26 @@ export class VehicleFiltersController {
           },
           select: { id: true, engine: { select: { code: true } } },
         });
+        if (candidates.length === 0) {
+          candidates = await this.prisma.vehicleVariant.findMany({
+            where: {
+              status: 'APPROVED',
+              brand: { name: { equals: brand, mode: 'insensitive' } },
+              model: { name: { equals: targetModel, mode: 'insensitive' } },
+              ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+              ...categoryWhere,
+            },
+            select: { id: true, engine: { select: { code: true } } },
+          });
+        }
         const rawCodes = this.canonicalDisplayService.getRawEngineCodesForTarget(targetEngine, candidates);
-        engineFilterClause = { engine: { code: { in: rawCodes } } };
+        if (rawCodes.length > 0) {
+          engineFilterClause = { engine: { code: { in: rawCodes } } };
+        }
       }
     }
 
-    const variants = await this.prisma.vehicleVariant.findMany({
+    let variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
@@ -651,9 +734,25 @@ export class VehicleFiltersController {
       },
       select: { fuelType: true },
     });
+    if (variants.length === 0) {
+      variants = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          ...(norm !== 'MINIVAN_PANELVAN' && targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+          ...engineFilterClause,
+          ...categoryWhere,
+        },
+        select: { fuelType: true },
+      });
+    }
     const order = ['Benzin', 'Dizel', 'Hibrit', 'Elektrik', 'LPG & Benzin'];
     const fuelsSet = new Set(variants.map(v => getFuelTypeTr(v.fuelType?.toString() || '')));
     let sortedFuels = Array.from(fuelsSet).filter(Boolean).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    if (sortedFuels.length === 0) {
+      sortedFuels = ['Benzin', 'Dizel', 'LPG & Benzin'];
+    }
 
     // Strict Powertrain Fuel Integrity Gatekeeper:
     // Known diesel engines (Multijet, TDI, dCi, HDi, BlueHDi, EcoBlue, CDI, CRDi, CDTI, JTD) can NEVER be Petrol or LPG.
@@ -727,8 +826,8 @@ export class VehicleFiltersController {
     const categoryWhere = getCategoryVariantWhere(category);
 
     let engineFilterClause: any = {};
-    if (targetEngine) {
-      const candidates = await this.prisma.vehicleVariant.findMany({
+    if (targetEngine && targetEngine !== 'Standart Motor') {
+      let candidates = await this.prisma.vehicleVariant.findMany({
         where: {
           status: 'APPROVED',
           brand: { name: { equals: brand, mode: 'insensitive' } },
@@ -739,11 +838,25 @@ export class VehicleFiltersController {
         },
         select: { id: true, engine: { select: { code: true } } },
       });
+      if (candidates.length === 0) {
+        candidates = await this.prisma.vehicleVariant.findMany({
+          where: {
+            status: 'APPROVED',
+            brand: { name: { equals: brand, mode: 'insensitive' } },
+            model: { name: { equals: targetModel, mode: 'insensitive' } },
+            ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+            ...categoryWhere,
+          },
+          select: { id: true, engine: { select: { code: true } } },
+        });
+      }
       const rawCodes = this.canonicalDisplayService.getRawEngineCodesForTarget(targetEngine, candidates);
-      engineFilterClause = { engine: { code: { in: rawCodes } } };
+      if (rawCodes.length > 0) {
+        engineFilterClause = { engine: { code: { in: rawCodes } } };
+      }
     }
 
-    const variants = await this.prisma.vehicleVariant.findMany({
+    let variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
@@ -756,9 +869,26 @@ export class VehicleFiltersController {
       },
       select: { transmission: { select: { name: true } } },
     });
+    if (variants.length === 0) {
+      variants = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+          ...engineFilterClause,
+          ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
+          ...categoryWhere,
+        },
+        select: { transmission: { select: { name: true } } },
+      });
+    }
     const order = ['Manuel', 'Otomatik', 'Yarı Otomatik'];
     const transSet = new Set(variants.map(v => getTransmissionTr(v.transmission?.name || '')));
-    const sortedTrans = Array.from(transSet).filter(Boolean).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    let sortedTrans = Array.from(transSet).filter(Boolean).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    if (sortedTrans.length === 0) {
+      sortedTrans = ['Manuel', 'Otomatik'];
+    }
     return {
       success: true,
       data: sortedTrans.map(name => ({ label: name, value: name })),
@@ -817,7 +947,7 @@ export class VehicleFiltersController {
 
     if (norm === 'MINIVAN_PANELVAN' || norm === 'SUV_PICKUP') {
       const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
-      const variants = await this.prisma.vehicleVariant.findMany({
+      let variants = await this.prisma.vehicleVariant.findMany({
         where: {
           status: 'APPROVED',
           vehicleType: norm,
@@ -833,10 +963,27 @@ export class VehicleFiltersController {
           trim: { select: { name: true } },
         },
       });
+      if (variants.length === 0) {
+        variants = await this.prisma.vehicleVariant.findMany({
+          where: {
+            status: 'APPROVED',
+            vehicleType: norm,
+            brand: { name: { equals: brand, mode: 'insensitive' } },
+            model: { name: { equals: targetModel, mode: 'insensitive' } },
+            ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+            ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
+          },
+          select: {
+            id: true,
+            engine: { select: { code: true } },
+            trim: { select: { name: true } },
+          },
+        });
+      }
 
       // Filter variants matching the target clean engine
       const matchingVariants = variants.filter(v => {
-        if (!targetEngine) return true;
+        if (!targetEngine || targetEngine === 'Standart Motor') return true;
         const rawCode = v.engine?.code || '';
         const { cleanEngine } = cleanEngineCodeAndExtractTrim(rawCode);
         return (
@@ -868,7 +1015,7 @@ export class VehicleFiltersController {
       return {
         success: true,
         data: sortedTrims.map(name => ({ label: name, value: name })),
-        autoVariantId: matchingVariants[0]?.id || null,
+        autoVariantId: matchingVariants[0]?.id || variants[0]?.id || null,
       };
     }
 
@@ -877,8 +1024,8 @@ export class VehicleFiltersController {
     const categoryWhere = getCategoryVariantWhere(category);
 
     let engineFilterClause: any = {};
-    if (targetEngine) {
-      const candidates = await this.prisma.vehicleVariant.findMany({
+    if (targetEngine && targetEngine !== 'Standart Motor') {
+      let candidates = await this.prisma.vehicleVariant.findMany({
         where: {
           status: 'APPROVED',
           brand: { name: { equals: brand, mode: 'insensitive' } },
@@ -889,13 +1036,27 @@ export class VehicleFiltersController {
         },
         select: { id: true, engine: { select: { code: true } } },
       });
+      if (candidates.length === 0) {
+        candidates = await this.prisma.vehicleVariant.findMany({
+          where: {
+            status: 'APPROVED',
+            brand: { name: { equals: brand, mode: 'insensitive' } },
+            model: { name: { equals: targetModel, mode: 'insensitive' } },
+            ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+            ...categoryWhere,
+          },
+          select: { id: true, engine: { select: { code: true } } },
+        });
+      }
       const rawCodes = this.canonicalDisplayService.getRawEngineCodesForTarget(targetEngine, candidates);
-      engineFilterClause = { engine: { code: { in: rawCodes } } };
+      if (rawCodes.length > 0) {
+        engineFilterClause = { engine: { code: { in: rawCodes } } };
+      }
     }
 
     const transFilterClause = getTransmissionWhereClause(targetTrans);
 
-    const variants = await this.prisma.vehicleVariant.findMany({
+    let variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
@@ -914,6 +1075,26 @@ export class VehicleFiltersController {
       },
       take: 50,
     });
+    if (variants.length === 0) {
+      variants = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+          ...engineFilterClause,
+          ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
+          ...transFilterClause,
+          ...categoryWhere,
+        },
+        select: {
+          id: true,
+          trim: { select: { name: true } },
+          transmission: { select: { name: true } },
+        },
+        take: 50,
+      });
+    }
 
     const filtered = targetTrans
       ? variants.filter(v => getTransmissionTr(v.transmission?.name || '').toLowerCase() === targetTrans.toLowerCase() || (v.transmission?.name || '').toLowerCase().includes(targetTrans.toLowerCase()))
@@ -996,20 +1177,45 @@ export class VehicleFiltersController {
 
     if (norm === 'MINIVAN_PANELVAN') {
       const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
-      const variants = await this.prisma.vehicleVariant.findMany({
+      let variants = await this.prisma.vehicleVariant.findMany({
         where: {
           status: 'APPROVED',
           vehicleType: 'MINIVAN_PANELVAN',
           brand: { name: { equals: brand, mode: 'insensitive' } },
           model: { name: { equals: targetModel, mode: 'insensitive' } },
           ...(year ? { year: Number(year) } : {}),
-          ...(targetEngine ? { engine: { code: { equals: targetEngine, mode: 'insensitive' } } } : {}),
+          ...(targetEngine && targetEngine !== 'Standart Motor' ? { engine: { code: { equals: targetEngine, mode: 'insensitive' } } } : {}),
           ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
           ...(targetTrim && !['standart', 'standart / baz'].includes(targetTrim.toLowerCase()) ? { trim: { name: { equals: targetTrim, mode: 'insensitive' } } } : {}),
         },
         select: { id: true },
         take: 1,
       });
+      if (variants.length === 0) {
+        variants = await this.prisma.vehicleVariant.findMany({
+          where: {
+            status: 'APPROVED',
+            vehicleType: 'MINIVAN_PANELVAN',
+            brand: { name: { equals: brand, mode: 'insensitive' } },
+            model: { name: { equals: targetModel, mode: 'insensitive' } },
+            ...(targetEngine && targetEngine !== 'Standart Motor' ? { engine: { code: { equals: targetEngine, mode: 'insensitive' } } } : {}),
+            ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
+          },
+          select: { id: true },
+          take: 1,
+        });
+      }
+      if (variants.length === 0) {
+        variants = await this.prisma.vehicleVariant.findMany({
+          where: {
+            status: 'APPROVED',
+            brand: { name: { equals: brand, mode: 'insensitive' } },
+            model: { name: { equals: targetModel, mode: 'insensitive' } },
+          },
+          select: { id: true },
+          take: 1,
+        });
+      }
       return {
         success: true,
         variantId: variants[0]?.id || null,
@@ -1023,8 +1229,8 @@ export class VehicleFiltersController {
 
     // 1. Try strict matching first
     let engineFilterClause: any = {};
-    if (targetEngine) {
-      const candidates = await this.prisma.vehicleVariant.findMany({
+    if (targetEngine && targetEngine !== 'Standart Motor') {
+      let candidates = await this.prisma.vehicleVariant.findMany({
         where: {
           status: 'APPROVED',
           brand: { name: { equals: brand, mode: 'insensitive' } },
@@ -1035,6 +1241,18 @@ export class VehicleFiltersController {
         },
         select: { id: true, engine: { select: { code: true } } },
       });
+      if (candidates.length === 0) {
+        candidates = await this.prisma.vehicleVariant.findMany({
+          where: {
+            status: 'APPROVED',
+            brand: { name: { equals: brand, mode: 'insensitive' } },
+            model: { name: { equals: targetModel, mode: 'insensitive' } },
+            ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+            ...categoryWhere,
+          },
+          select: { id: true, engine: { select: { code: true } } },
+        });
+      }
       const rawCodes = this.canonicalDisplayService.getRawEngineCodesForTarget(targetEngine, candidates);
       if (rawCodes.length > 0) {
         engineFilterClause = { engine: { code: { in: rawCodes } } };
@@ -1102,8 +1320,8 @@ export class VehicleFiltersController {
       };
     }
 
-    // 2. Intelligent Ranked Fallback: Score all candidates for this brand + model + year
-    const allYearVariants = await this.prisma.vehicleVariant.findMany({
+    // 2. Intelligent Ranked Fallback: Score all candidates for this brand + model + year (or across years if pre-2000 / missing year)
+    let allYearVariants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
@@ -1114,6 +1332,33 @@ export class VehicleFiltersController {
       include: { transmission: true, trim: true, engine: true },
       take: 50,
     });
+
+    if (allYearVariants.length === 0) {
+      allYearVariants = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          ...transFilterClause,
+        },
+        include: { transmission: true, trim: true, engine: true },
+        orderBy: { year: 'asc' },
+        take: 50,
+      });
+    }
+
+    if (allYearVariants.length === 0) {
+      allYearVariants = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+        },
+        include: { transmission: true, trim: true, engine: true },
+        orderBy: { year: 'asc' },
+        take: 50,
+      });
+    }
 
     if (allYearVariants.length === 0) {
       return { success: true, variantId: null };

@@ -522,24 +522,42 @@ export default function CreateListingScreen() {
 
     if (!model || !currentBrand) return;
     setLoadingYears(true);
+    const currentYearNum = new Date().getFullYear();
+    const buildListingYearRange = (maxYr: number) =>
+      Array.from({ length: maxYr - 1970 + 1 }, (_, i) => {
+        const yr = String(maxYr - i);
+        return { label: yr, value: yr };
+      });
     try {
-      const res = await fetch(
-        `${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(currentBrand)}&modelFamily=${encodeURIComponent(model)}&category=${searchMode}`
-      );
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        const list = json.data.map((item: any) =>
-          typeof item === 'string'
-            ? { label: item, value: item }
-            : { label: String(item.label || item.value), value: String(item.value) }
+      if (searchMode === 'MOTORCYCLE') {
+        setYears(buildListingYearRange(currentYearNum));
+      } else {
+        const res = await fetch(
+          `${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(currentBrand)}&modelFamily=${encodeURIComponent(model)}&category=${searchMode}&forListing=true`
         );
-        setYears(list);
-        if (list.length === 1) {
-          handleYearChange(list[0].value, model, currentBrand);
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const list = json.data.map((item: any) =>
+            typeof item === 'string'
+              ? { label: item, value: item }
+              : { label: String(item.label || item.value), value: String(item.value) }
+          );
+          if (list.some((d: any) => Number(d.value) <= 1970)) {
+            setYears(list);
+          } else {
+            const maxDbYear = list.reduce((acc: number, d: any) => {
+              const n = Number(d.value);
+              return !isNaN(n) && n > acc ? n : acc;
+            }, currentYearNum);
+            setYears(buildListingYearRange(Math.max(currentYearNum, maxDbYear)));
+          }
+        } else {
+          setYears(buildListingYearRange(currentYearNum));
         }
       }
     } catch (e) {
       console.error('Error fetching years:', e);
+      setYears(buildListingYearRange(currentYearNum));
     } finally {
       setLoadingYears(false);
     }

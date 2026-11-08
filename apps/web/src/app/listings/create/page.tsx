@@ -466,18 +466,25 @@ export default function CreateListing() {
     if (!model || !selectedBrand) return;
     setLoadingYears(true);
     try {
-      if (searchMode === 'MOTORCYCLE') {
-        const currentYearNum = new Date().getFullYear();
-        const motoYears = Array.from({ length: 37 }, (_, i) => {
-          const yr = String(currentYearNum + 1 - i);
+      const currentYearNum = new Date().getFullYear();
+      const buildListingYearRange = (maxYr: number) =>
+        Array.from({ length: maxYr - 1970 + 1 }, (_, i) => {
+          const yr = String(maxYr - i);
           return { label: yr, value: yr };
         });
-        setYears(motoYears);
+
+      if (searchMode === 'MOTORCYCLE') {
+        setYears(buildListingYearRange(currentYearNum));
       } else {
-        const data = await vehicleTaxonomyApi.getYears(selectedBrand, model, searchMode);
-        setYears(data);
-        if (data.length === 1) {
-          handleYearChange(data[0].value, model, true);
+        const data = await vehicleTaxonomyApi.getYears(selectedBrand, model, searchMode, true);
+        if (data.length > 0 && data.some(d => Number(d.value) <= 1970)) {
+          setYears(data);
+        } else {
+          const maxDbYear = data.reduce((acc, d) => {
+            const n = Number(d.value);
+            return !isNaN(n) && n > acc ? n : acc;
+          }, currentYearNum);
+          setYears(buildListingYearRange(Math.max(currentYearNum, maxDbYear)));
         }
       }
     } finally {
