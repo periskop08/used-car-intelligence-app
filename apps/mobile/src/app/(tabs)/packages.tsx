@@ -55,9 +55,9 @@ const MONTHLY_PLANS: MonthlyPlan[] = [
     listingCount: 1,
     durationDays: 30,
     features: [
+      'Aynı anda 1 Aktif İlan Yayını',
       'Ayda 3 AI Araç Raporu',
       'Ayda 3 Chatbot Mesajı',
-      'Aynı anda 1 Aktif İlan Yayını',
       'İlan Başına 30 Gün Yayın Süresi',
       'TorqueScout Club Topluluk Erişimi',
     ],
@@ -73,9 +73,9 @@ const MONTHLY_PLANS: MonthlyPlan[] = [
     listingCount: 10,
     durationDays: 30,
     features: [
+      'Aynı anda 10 Aktif İlan Yayını',
       'Ayda 10 AI Araç Raporu',
       'Ayda 30 Chatbot Mesajı',
-      'Aynı anda 10 Aktif İlan Yayını',
       'İlan Başına 30 Gün Yayın Süresi',
       'Kronik Problem ve Piyasa Fiyat Analizleri',
       'Öncelikli Satıcı Desteği',
@@ -93,9 +93,9 @@ const MONTHLY_PLANS: MonthlyPlan[] = [
     durationDays: 45,
     popularTag: 'EN ÇOK TERCİH EDİLEN',
     features: [
+      'Aynı anda 50 Aktif İlan Yayını',
       'Ayda 50 AI Araç Raporu',
       'Ayda 150 Chatbot Mesajı',
-      'Aynı anda 50 Aktif İlan Yayını',
       'İlan Başına 45 Gün Yayın Süresi',
       'Vitrin İlan ve Acil Satış Rozetleri',
       'TorqueScout Profesyonel Üyelik Rozeti',

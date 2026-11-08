@@ -1164,9 +1164,9 @@ export default function Home() {
               <div className="border-t border-white/10 my-1" />
 
               <ul className="text-xs text-slate-300 flex flex-col gap-2.5">
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 1 aktif ilan</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 3 AI araç raporu</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 3 chatbot mesajı</li>
-                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 1 aktif ilan</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 30 gün ilan yayın süresi</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 3 karşılaştırma</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Karşılaştırma başına 2 araç</li>
@@ -1199,11 +1199,11 @@ export default function Home() {
               <span className="text-[11px] font-bold text-orange-400">Tanışma paketindeki tüm özellikler, ayrıca:</span>
 
               <ul className="text-xs text-slate-200 flex flex-col gap-2.5">
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 10 aktif ilan</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 10 AI araç raporu</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 30 chatbot mesajı</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Her raporda satıcıya sorulacak sorular</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Her raporda ekspertiz kontrol listesi</li>
-                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 10 aktif ilan</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 30 gün ilan yayın süresi</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 10 karşılaştırma</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Karşılaştırma başına 5 araç</li>
@@ -1234,11 +1234,11 @@ export default function Home() {
               <span className="text-[11px] font-bold text-amber-400">Yetkin paketindeki tüm özellikler, ayrıca:</span>
 
               <ul className="text-xs text-slate-300 flex flex-col gap-2.5">
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 50 aktif ilan</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 50 AI araç raporu</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 150 chatbot mesajı</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Her raporda satıcıya sorulacak sorular</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Her raporda ekspertiz kontrol listesi</li>
-                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 50 aktif ilan</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 45 gün ilan yayın süresi</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 30 karşılaştırma</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Karşılaştırma başına 10 araç</li>

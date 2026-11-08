@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { formatImageUrl } from "../utils/media";
-import GlobalCitySelector from "./common/GlobalCitySelector";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "https://used-car-api-hzmu.onrender.com";
@@ -278,7 +277,6 @@ export default function Header() {
                       }`}>
                         {user.subscriptionTier === 'TANISMA' ? 'TANIŞMA' : user.subscriptionTier === 'YETKIN' ? 'YETKİN' : user.subscriptionTier === 'PROFESYONEL' ? 'PROFESYONEL' : user.subscriptionTier}
                       </span>
-                      <GlobalCitySelector compact />
                     </div>
                   </div>
 
@@ -380,7 +378,6 @@ export default function Header() {
           </div>
         ) : (
           <div className="hidden md:flex items-center gap-2.5">
-            <GlobalCitySelector compact />
             <a
               href="/register?redirect=/listings/create"
               className="text-xs font-bold px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/20 transition flex items-center gap-1 cursor-pointer"
@@ -426,12 +423,6 @@ export default function Header() {
           />
           <div className="fixed top-[77px] right-0 bottom-0 w-80 bg-[#070b14]/95 backdrop-blur-xl border-l border-white/5 shadow-2xl p-6 flex flex-col gap-6 overflow-y-auto z-40 md:hidden animate-in slide-in-from-right duration-300">
             
-            {/* Mobile City Selector */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
-              <span className="text-xs font-semibold text-slate-300">Aktif Şehir</span>
-              <GlobalCitySelector />
-            </div>
-
             {/* Mobile Accordion Menu */}
             <div className="flex flex-col gap-4">
               

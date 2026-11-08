@@ -165,6 +165,9 @@ export default function PricingPage() {
 
                 <div className="border-t border-white/10 pt-6 space-y-3 text-xs">
                   <div className="flex items-center gap-2 text-slate-200">
+                    <span className="text-emerald-400 font-bold">✓</span> {tanismaLimits.activeListings ?? 1} Aktif İlan Yayınlama Hakkı ({tanismaLimits.listingDurationDays ?? 30} Gün)
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-200">
                     <span className="text-emerald-400 font-bold">✓</span> {tanismaLimits.comparisons ?? 3} Araç Karşılaştırma Hakkı
                   </div>
                   <div className="flex items-center gap-2 text-slate-200">
@@ -172,9 +175,6 @@ export default function PricingPage() {
                   </div>
                   <div className="flex items-center gap-2 text-slate-200">
                     <span className="text-emerald-400 font-bold">✓</span> {tanismaLimits.aiReports ?? 1} Detaylı AI Araç Analiz Raporu
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-200">
-                    <span className="text-emerald-400 font-bold">✓</span> {tanismaLimits.activeListings ?? 1} Aktif İlan Yayınlama Hakkı ({tanismaLimits.listingDurationDays ?? 30} Gün)
                   </div>
                   <div className="flex items-center gap-2 text-slate-500 line-through">
                     <span>✕</span> Vitrin İlanı (Pakette Yok)
@@ -221,6 +221,9 @@ export default function PricingPage() {
 
                 <div className="border-t border-white/10 pt-6 space-y-3 text-xs">
                   <div className="flex items-center gap-2 text-slate-100 font-semibold">
+                    <span className="text-orange-400 font-bold">✓</span> {yetkinLimits.activeListings ?? 5} Aktif İlan Yayınlama Hakkı ({yetkinLimits.listingDurationDays ?? 30} Gün)
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-100 font-semibold">
                     <span className="text-orange-400 font-bold">✓</span> {yetkinLimits.comparisons ?? 20} Araç Karşılaştırma Hakkı
                   </div>
                   <div className="flex items-center gap-2 text-slate-100 font-semibold">
@@ -228,9 +231,6 @@ export default function PricingPage() {
                   </div>
                   <div className="flex items-center gap-2 text-slate-100 font-semibold">
                     <span className="text-orange-400 font-bold">✓</span> {yetkinLimits.aiReports ?? 5} Detaylı AI Araç Analiz Raporu
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-100 font-semibold">
-                    <span className="text-orange-400 font-bold">✓</span> {yetkinLimits.activeListings ?? 5} Aktif İlan Yayınlama Hakkı ({yetkinLimits.listingDurationDays ?? 30} Gün)
                   </div>
                   <div className="flex items-center gap-2 text-slate-100 font-semibold">
                     <span className="text-orange-400 font-bold">✓</span> {yetkinLimits.vitrinListings ?? 1} Vitrin İlanı (14 Gün Ön Çıkarma)
@@ -289,6 +289,9 @@ export default function PricingPage() {
 
                 <div className="border-t border-white/10 pt-6 space-y-3 text-xs">
                   <div className="flex items-center gap-2 text-slate-200">
+                    <span className="text-amber-400 font-bold">✓</span> {proLimits.activeListings ?? 15} Aktif İlan Yayınlama Hakkı ({proLimits.listingDurationDays ?? 45} Gün)
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-200">
                     <span className="text-amber-400 font-bold">✓</span> {proLimits.comparisons ?? 50} Araç Karşılaştırma Hakkı
                   </div>
                   <div className="flex items-center gap-2 text-slate-200">
@@ -296,9 +299,6 @@ export default function PricingPage() {
                   </div>
                   <div className="flex items-center gap-2 text-slate-200">
                     <span className="text-amber-400 font-bold">✓</span> {proLimits.aiReports ?? 20} Detaylı AI Araç Analiz Raporu
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-200">
-                    <span className="text-amber-400 font-bold">✓</span> {proLimits.activeListings ?? 15} Aktif İlan Yayınlama Hakkı ({proLimits.listingDurationDays ?? 45} Gün)
                   </div>
                   <div className="flex items-center gap-2 text-slate-200">
                     <span className="text-amber-400 font-bold">✓</span> {proLimits.vitrinListings ?? 3} Vitrin İlanı (14 Gün Ön Çıkarma)
