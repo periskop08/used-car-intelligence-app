@@ -47,8 +47,8 @@ export default function KesfetHub() {
       color: '#131b2e',
     },
     {
-      title: 'İşi Cepte • İşletmeni Ekle',
-      description: 'Oto servisinizi veya ustalığınızı İşi Cepte uygulamasına kaydederek TorqueScout vitrininde yerinizi alın.',
+      title: "İşi Cepte' yi Keşfet",
+      description: 'Aktif Üyeler Arasından Öne Çıkan Ustaları Ve Servisleri Keşfedin.',
       icon: 'add-circle',
       customLogo: ISICEPTE_LOGO,
       showPlusBadge: true,

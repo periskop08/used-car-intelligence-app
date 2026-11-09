@@ -893,13 +893,11 @@ export default function IsiCepteOneriyorScreen() {
                 activeOpacity={0.85}
               >
                 <Ionicons name="add" size={14} color="#ffffff" />
-                <Text style={styles.addBusinessHeaderBtnText}>İşletmeni Ekle</Text>
+                <Text style={styles.addBusinessHeaderBtnText}>İşi Cepte&apos; yi Keşfet</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {scope === 'SHOWCASE_ONLY'
-                ? 'Öne çıkan vitrin otomotiv ustaları ve servisleri'
-                : 'TorqueScout onaylı tüm aktif İşi Cepte servisleri'}
+            <Text style={styles.headerSubtitle} numberOfLines={2}>
+              Aktif Üyeler Arasından Öne Çıkan Ustaları Ve Servisleri Keşfedin.
             </Text>
           </View>
         </View>

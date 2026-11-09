@@ -371,16 +371,16 @@ function IsiCepteOneriyorContent() {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-white/10">
         {/* Title */}
         <div className="space-y-2 max-w-2xl">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight whitespace-nowrap">
               İşi Cepte Öneriyor
             </h1>
             <a
               href="https://isicepte.com"
               target="_blank"
               rel="noopener noreferrer"
-              title="İşi Cepte'de İşletmeni Ekle"
-              aria-label="İşi Cepte'de İşletmeni Ekle"
+              title="İşi Cepte' yi Keşfet"
+              aria-label="İşi Cepte' yi Keşfet"
               onClick={() => {
                 fetch(`${API_BASE_URL}/isicepte/events`, {
                   method: "POST",
@@ -391,16 +391,14 @@ function IsiCepteOneriyorContent() {
                   }),
                 }).catch(() => {});
               }}
-              className="h-9 md:h-10 px-3.5 md:px-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs md:text-sm font-bold flex items-center gap-1.5 transition shadow-lg shadow-orange-600/30 hover:scale-[1.03] shrink-0 cursor-pointer"
+              className="h-9 md:h-10 px-3.5 md:px-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs md:text-sm font-bold flex items-center gap-1.5 transition shadow-lg shadow-orange-600/30 hover:scale-[1.03] shrink-0 whitespace-nowrap cursor-pointer"
             >
               <Plus className="w-4 h-4 md:w-4.5 md:h-4.5 stroke-[2.75]" />
-              <span>İşletmeni Ekle</span>
+              <span>İşi Cepte&apos; yi Keşfet</span>
             </a>
           </div>
           <p className="text-sm text-slate-400 leading-relaxed">
-            {scope === "SHOWCASE_ONLY"
-              ? "Aktif vitrin üyeleri arasından öne çıkan otomotiv ustalarını ve servisleri keşfedin."
-              : "TorqueScout onaylı tüm aktif İşi Cepte otomotiv servislerini ve vitrin üyelerini keşfedin."}
+            Aktif Üyeler Arasından Öne Çıkan Ustaları Ve Servisleri Keşfedin.
           </p>
         </div>
 
