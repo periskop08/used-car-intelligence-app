@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ShieldCheck,
@@ -19,18 +19,32 @@ import {
 import { API_BASE_URL } from "@/utils/apiConfig";
 import { useGlobalCity } from "@/context/GlobalCityContext";
 
-// Canonical locked 11 automotive categories
-const CANONICAL_ISICEPTE_OTO_CATEGORIES = [
+export type IsiCepteVehicleType = "AUTOMOBILE" | "MOTORCYCLE";
+
+// Otomobil Servis Kategorileri (Mobile ile birebir aynı)
+const AUTOMOBILE_CATEGORIES = [
   "Motor/Mekanik",
   "Kaporta/Boya",
-  "Oto Çekici/Kurtarıcı",
+  "Oto Ekspertiz",
   "Oto Elektrik/Elektronik",
-  "Motosiklet Servisi",
+  "Oto Çekici/Kurtarıcı",
+  "Lastik/Jant",
   "Cam Filmi/Kaplama",
   "Oto Yıkama & Detay",
-  "Lastik/Jant",
   "Oto Aksesuar",
   "Oto Yedek Parça",
+] as const;
+
+// Motosiklet Servis Kategorileri (Mobile ile birebir aynı)
+const MOTORCYCLE_CATEGORIES = [
+  "Motosiklet Servisi",
+  "Motor/Mekanik",
+  "Lastik/Jant",
+  "Oto Elektrik/Elektronik",
+  "Kaporta/Boya",
+  "Cam Filmi/Kaplama",
+  "Oto Çekici/Kurtarıcı",
+  "Oto Yıkama & Detay",
   "Oto Ekspertiz",
 ] as const;
 
@@ -45,12 +59,263 @@ const TURKEY_81_PROVINCES: string[] = [
   'Şırnak', 'Sivas', 'Tekirdağ', 'Tokat', 'Trabzon', 'Tunceli', 'Uşak', 'Van', 'Yalova', 'Yozgat', 'Zonguldak'
 ];
 
-const INITIAL_CANONICAL_BRANDS: string[] = [
-  'Alfa Romeo', 'Audi', 'BMW', 'Chery', 'Chevrolet', 'Citroen', 'Cupra', 'Dacia', 'DS Automobiles', 'Fiat',
-  'Ford', 'Honda', 'Hyundai', 'Jeep', 'Kia', 'Land Rover', 'Mazda', 'Mercedes-Benz', 'MINI', 'Mitsubishi',
-  'Nissan', 'Opel', 'Peugeot', 'Porsche', 'Renault', 'Seat', 'Skoda', 'Subaru', 'Suzuki', 'Tesla',
-  'Togg', 'Toyota', 'Volkswagen', 'Volvo'
+// Kapsam: Otomobil + Arazi, SUV & Pickup + Minivan & Panelvan markaları
+const INITIAL_AUTOMOBILE_BRANDS: string[] = [
+  'Alfa Romeo', 'Aston Martin', 'Audi', 'Bentley', 'BMC', 'BMW', 'BYD', 'Cadillac',
+  'Chery', 'Chevrolet', 'Chrysler', 'Citroen', 'Cupra', 'Dacia', 'Daewoo', 'Daihatsu',
+  'DFM', 'DFSK', 'Dodge', 'DS Automobiles', 'Ferrari', 'Fiat', 'Ford', 'Gaz', 'Geely',
+  'GMC', 'Honda', 'Hummer', 'Hyundai', 'Infiniti', 'Isuzu', 'Iveco', 'Jaguar', 'Jeep',
+  'Karsan', 'Kia', 'Lada', 'Lamborghini', 'Lancia', 'Land Rover', 'Lexus', 'Lincoln',
+  'Lotus', 'MAN', 'Maserati', 'Maxus', 'Mazda', 'McLaren', 'Mercedes-Benz', 'MG', 'MINI',
+  'Mitsubishi', 'Nissan', 'Opel', 'Otokar', 'Peugeot', 'Porsche', 'Proton', 'RAM',
+  'Renault', 'Rolls-Royce', 'Rover', 'Saab', 'Seat', 'Skoda', 'Skywell', 'Smart',
+  'SsangYong', 'Subaru', 'Suzuki', 'Tata', 'Tesla', 'Tofaş', 'Togg', 'Toyota',
+  'Volkswagen', 'Volvo',
 ];
+
+const INITIAL_MOTORCYCLE_BRANDS: string[] = [
+  'Aprilia', 'Arora', 'Bajaj', 'Benelli', 'BMW', 'CFMoto', 'Ducati', 'Harley-Davidson',
+  'Hero', 'Honda', 'Husqvarna', 'Indian', 'Kanuni', 'Kawasaki', 'KTM', 'Kuba', 'Kymco',
+  'Mondial', 'Moto Guzzi', 'MV Agusta', 'Piaggio', 'QJMotor', 'RKS', 'Royal Alloy',
+  'Royal Enfield', 'Suzuki', 'SYM', 'Triumph', 'TVS', 'Vespa', 'Voge', 'Yamaha',
+  'Yuki', 'Zontes',
+];
+
+const DUAL_VEHICLE_BRAND_SLUGS = new Set(['bmw', 'honda', 'suzuki', 'peugeot']);
+
+const ALLOWED_AUTOMOBILE_BRAND_SLUGS = new Set([
+  'abarth', 'acura', 'aion', 'alfa-romeo', 'alpine', 'anadol', 'askam', 'aston-martin',
+  'audi', 'bentley', 'bmc', 'bmw', 'bugatti', 'buick', 'byd', 'cadillac', 'cenntro',
+  'chery', 'chevrolet', 'chrysler', 'citroen', 'cupra', 'dacia', 'daewoo', 'daf',
+  'daihatsu', 'dfm', 'dfsk', 'dodge', 'dongfeng', 'ds', 'ds-automobiles', 'eagle',
+  'etox', 'faw', 'ferrari', 'fiat', 'fisker', 'ford', 'forthing', 'foton', 'gaz',
+  'geely', 'genesis', 'gmc', 'honda', 'hongqi', 'hummer', 'hyundai', 'ikco', 'infiniti',
+  'isuzu', 'iveco', 'jac', 'jaecoo', 'jaguar', 'jeep', 'joyce', 'karsan', 'kia',
+  'koenigsegg', 'lada', 'lamborghini', 'lancia', 'land-rover', 'leapmotor', 'levc',
+  'lexus', 'lincoln', 'lotus', 'lynk-and-co', 'mahindra', 'man', 'maserati', 'maxus',
+  'maybach', 'mazda', 'mclaren', 'mercedes-benz', 'mercury', 'mg', 'micro', 'mini',
+  'mitsubishi', 'morgan', 'moskwitsch', 'nissan', 'oldsmobile', 'omoda', 'opel',
+  'otokar', 'pagani', 'peugeot', 'plymouth', 'polestar', 'pontiac', 'porsche', 'proton',
+  'rainwoll', 'ram', 'reeder', 'renault', 'rolls-royce', 'rover', 'saab', 'scania',
+  'seat', 'seres', 'skoda', 'skywell', 'smart', 'ssangyong', 'subaru', 'suzuki', 'tata',
+  'temsa', 'tesla', 'the-london-taxi', 'tofas', 'togg', 'toyota', 'vanderhall',
+  'volkswagen', 'volvo', 'voyah', 'xev', 'yudo',
+]);
+
+const PURE_MOTORCYCLE_BRAND_SLUGS = new Set([
+  'abush', 'aeon', 'airforce', 'ajp', 'altai', 'apachi', 'apec', 'aprilia', 'argo',
+  'ariic', 'armode', 'arora', 'asya', 'bajaj', 'banhe', 'baotian', 'barossa', 'bashan',
+  'belderia', 'benda', 'benelli', 'beta', 'better', 'beyaz-benli', 'bianchi', 'bimota',
+  'birdhunter', 'bisan', 'boom', 'borelli-ledow', 'brixton', 'bsa', 'buell',
+  'bumotojinling', 'cagiva', 'can-am', 'caza', 'celik-motor', 'cezeta', 'cfmoto',
+  'cheeta', 'chopper', 'coral', 'cosmopolitan', 'cq', 'crn', 'csn-motor', 'daelim',
+  'dayun', 'delta-motorcycle', 'derbi', 'di-blasi', 'dofern', 'doohan', 'dorado',
+  'ducati', 'easycool', 'ecotrike', 'elitte', 'enbest', 'ersi', 'falcon', 'fantic',
+  'fcm', 'fengchi', 'fest', 'fosti', 'fym', 'gaoming', 'garelli', 'gas-gas', 'gasgas',
+  'gilera', 'gomoto', 'haojiang', 'haojin', 'haojue', 'harley-davidson', 'harput',
+  'hazey-turk', 'hercules', 'hero', 'hf-kanuni', 'hfkanuni', 'hh-moto', 'hm-moto',
+  'hsun', 'husaberg', 'husqvarna', 'hyosung', 'indian', 'isildar', 'italjet', 'izh',
+  'jawa', 'jaxin', 'jiajue', 'jiayuan', 'jinding', 'jinlun', 'jonway', 'jpn-motor',
+  'kadirga', 'kaldera', 'kamax', 'kangda', 'kanuni', 'karpaty', 'kastino', 'katren',
+  'kawasaki', 'kayo', 'kayo-moto', 'keeway', 'kentoya', 'kimmi', 'kinetic', 'kinroad',
+  'kove', 'kral', 'ktm', 'kuba', 'kymco', 'lambretta', 'lanying', 'leksas', 'lem',
+  'lifan', 'linhai', 'lintex', 'lml', 'luqi', 'lynx', 'malaguti', 'maranta', 'megelli',
+  'meiduo', 'meka-motor', 'memnun', 'minsk', 'mirage', 'mobylette', 'modenas', 'mondial',
+  'monero', 'motard', 'moto-gusto', 'moto-guzzi', 'moto-morini', 'moto-zeen', 'moto-zeta',
+  'motobecane', 'motolux', 'motoran', 'motosan', 'motozeus', 'motti', 'muravey',
+  'musatti', 'mutt', 'mv-agusta', 'mz', 'nanok', 'nibbi', 'nieve', 'nimizi-borelli',
+  'norton', 'nova', 'nsu', 'ocherk', 'ohvale', 'omi', 'orti', 'ortimobil', 'oubao',
+  'oxobike', 'pgo', 'piaggio', 'pioneer', 'planet', 'polaris', 'polini', 'presto',
+  'puch', 'qjmotor', 'qooder', 'qstrong', 'ramex', 'ramzey', 'rasler', 'regal-raptor',
+  'relive', 'renda', 'revolt', 'rewaco', 'rialli', 'rieju', 'rkn', 'rks',
+  'rmg-moto-gusto', 'romet', 'royal-alloy', 'royal-enfield', 'rutec', 'salcano',
+  'sam-motor', 'scorpa', 'seger', 'sfm', 'shenke', 'sherco', 'shinari', 'simson',
+  'ski-doo', 'skygo', 'skyjet', 'skyteam', 'spada', 'stmax', 'sukida', 'superking',
+  'swm', 'sym', 'takashi', 'taktas-motor', 'taro', 'telstar', 'tenax', 'tgb', 'titan',
+  'tm', 'tm-racing', 'togo', 'triumph', 'tt', 'tvs', 'ugursam', 'um', 'ural',
+  'velosolex', 'vespa', 'victory', 'vitello', 'voge', 'volta', 'wangye', 'wsk', 'wuxi',
+  'xgjao', 'xingyue', 'xintian', 'yamaha', 'yiben', 'yuan', 'yuki', 'zealsun',
+  'zongshen', 'zontes', 'zorro',
+]);
+
+const CANONICAL_BRAND_DISPLAY_LABELS: Record<string, string> = {
+  'alfa-romeo': 'Alfa Romeo',
+  'aston-martin': 'Aston Martin',
+  'bmc': 'BMC',
+  'bmw': 'BMW',
+  'byd': 'BYD',
+  'can-am': 'Can-Am',
+  'celik-motor': 'Çelik Motor',
+  'cfmoto': 'CFMoto',
+  'csn-motor': 'CSN Motor',
+  'dfm': 'DFM',
+  'dfsk': 'DFSK',
+  'di-blasi': 'Di Blasi',
+  'ds': 'DS Automobiles',
+  'ds-automobiles': 'DS Automobiles',
+  'gas-gas': 'GasGas',
+  'gasgas': 'GasGas',
+  'gmc': 'GMC',
+  'harley-davidson': 'Harley-Davidson',
+  'hazey-turk': 'Hazey Türk',
+  'hf-kanuni': 'HF Kanuni',
+  'hfkanuni': 'HF Kanuni',
+  'hh-moto': 'HH Moto',
+  'hm-moto': 'HM Moto',
+  'isildar': 'Işıldar',
+  'izh': 'IZH',
+  'jac': 'JAC',
+  'jpn-motor': 'JPN Motor',
+  'kadirga': 'Kadırga',
+  'kayo': 'Kayo Moto',
+  'kayo-moto': 'Kayo Moto',
+  'ktm': 'KTM',
+  'kuba': 'Kuba',
+  'land-rover': 'Land Rover',
+  'levc': 'LEVC',
+  'lml': 'LML',
+  'lynk-and-co': 'Lynk & Co',
+  'man': 'MAN',
+  'meka-motor': 'Meka Motor',
+  'mercedes-benz': 'Mercedes-Benz',
+  'mg': 'MG',
+  'mini': 'MINI',
+  'moto-gusto': 'RMG Moto Gusto',
+  'rmg-moto-gusto': 'RMG Moto Gusto',
+  'moto-guzzi': 'Moto Guzzi',
+  'moto-morini': 'Moto Morini',
+  'moto-zeen': 'Moto Zeen',
+  'moto-zeta': 'Moto Zeta',
+  'mv-agusta': 'MV Agusta',
+  'mz': 'MZ',
+  'nimizi-borelli': 'Borelli Ledow',
+  'borelli-ledow': 'Borelli Ledow',
+  'nsu': 'NSU',
+  'orti': 'Orti',
+  'ortimobil': 'Orti',
+  'pgo': 'PGO',
+  'qjmotor': 'QJMotor',
+  'ram': 'RAM',
+  'regal-raptor': 'Regal Raptor',
+  'rkn': 'RKN',
+  'rks': 'RKS',
+  'rolls-royce': 'Rolls-Royce',
+  'royal-alloy': 'Royal Alloy',
+  'royal-enfield': 'Royal Enfield',
+  'sam-motor': 'Sam Motor',
+  'sfm': 'SFM',
+  'ski-doo': 'Ski-Doo',
+  'ssangyong': 'SsangYong',
+  'swm': 'SWM',
+  'sym': 'SYM',
+  'taktas-motor': 'Taktaş Motor',
+  'tgb': 'TGB',
+  'the-london-taxi': 'The London Taxi',
+  'tm': 'TM Racing',
+  'tm-racing': 'TM Racing',
+  'tofas': 'Tofaş',
+  'tt': 'TT',
+  'tvs': 'TVS',
+  'ugursam': 'Uğursam',
+  'um': 'UM',
+  'wsk': 'WSK',
+  'xev': 'XEV',
+};
+
+function normalizeBrandKey(raw: string): string {
+  return (raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/ş/g, 's')
+    .replace(/ı/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function getBrandDedupeKey(rawName: string): string {
+  const rawTrimmed = rawName.trim().toLowerCase();
+  if (rawTrimmed === 'tofaş' || rawTrimmed === 'tofas') {
+    return 'tofas';
+  }
+  const slug = normalizeBrandKey(rawName);
+  if (!slug) return '';
+
+  const aliasMap: Record<string, string> = {
+    'gas-gas': 'gasgas',
+    'hf-kanuni': 'hfkanuni',
+    'kayo': 'kayo-moto',
+    'tm': 'tm-racing',
+    'moto-gusto': 'rmg-moto-gusto',
+    'nimizi-borelli': 'borelli-ledow',
+    'ortimobil': 'orti',
+    'ds-automobiles': 'ds',
+  };
+  const mappedSlug = aliasMap[slug] || slug;
+
+  const stripped = mappedSlug
+    .replace(/-(motor|motors|motocorp|motosiklet|motorcycle)$/i, '')
+    .replace(/[^a-z0-9]/g, '');
+
+  return stripped || mappedSlug.replace(/[^a-z0-9]/g, '');
+}
+
+function deduplicateAndSortBrands(rawBrands: string[], preferredList: string[] = []): string[] {
+  const seenKeys = new Map<string, string>();
+
+  for (const pref of preferredList) {
+    if (!pref || pref === 'Tüm Markalar') continue;
+    const key = getBrandDedupeKey(pref);
+    if (!key) continue;
+    const slug = normalizeBrandKey(pref);
+    const canonicalLabel = CANONICAL_BRAND_DISPLAY_LABELS[slug] || pref.trim();
+    if (!seenKeys.has(key)) {
+      seenKeys.set(key, canonicalLabel);
+    }
+  }
+
+  for (const raw of rawBrands) {
+    if (!raw || typeof raw !== 'string') continue;
+    const clean = raw.trim();
+    if (!clean || clean === 'Tüm Markalar') continue;
+
+    const key = getBrandDedupeKey(clean);
+    if (!key || seenKeys.has(key)) continue;
+
+    const slug = normalizeBrandKey(clean);
+    const canonicalLabel = CANONICAL_BRAND_DISPLAY_LABELS[slug] || clean;
+    seenKeys.set(key, canonicalLabel);
+  }
+
+  return Array.from(seenKeys.values()).sort((a, b) => a.localeCompare(b, 'tr'));
+}
+
+function isGenuineAutomobileBrand(brandName: string, dynamicMotoSlugs?: Set<string>): boolean {
+  if (!brandName || brandName === 'Tüm Markalar') return false;
+  const rawLower = brandName.trim().toLowerCase();
+  if (rawLower === 'tofaş' || rawLower === 'tofas') return true;
+
+  const slug = normalizeBrandKey(brandName);
+  const dedupeKey = getBrandDedupeKey(brandName);
+  if (!slug || !dedupeKey) return false;
+
+  if (DUAL_VEHICLE_BRAND_SLUGS.has(slug) || DUAL_VEHICLE_BRAND_SLUGS.has(dedupeKey)) {
+    return true;
+  }
+
+  if (
+    PURE_MOTORCYCLE_BRAND_SLUGS.has(slug) ||
+    PURE_MOTORCYCLE_BRAND_SLUGS.has(dedupeKey) ||
+    (dynamicMotoSlugs && (dynamicMotoSlugs.has(slug) || dynamicMotoSlugs.has(dedupeKey)))
+  ) {
+    return false;
+  }
+
+  return ALLOWED_AUTOMOBILE_BRAND_SLUGS.has(slug) || ALLOWED_AUTOMOBILE_BRAND_SLUGS.has(dedupeKey);
+}
 
 interface IsiCepteShowcaseItem {
   id: string;
@@ -79,6 +344,10 @@ function IsiCepteOneriyorContent() {
   const initialBrand = searchParams.get("brand") || "Tüm Markalar";
   const initialCategory = searchParams.get("category") || "Tüm Kategoriler";
   const initialScope = (searchParams.get("scope") as 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE') || "SHOWCASE_ONLY";
+  const initialVehicleType: IsiCepteVehicleType =
+    searchParams.get("vehicleType") === "MOTORCYCLE" || initialCategory === "Motosiklet Servisi"
+      ? "MOTORCYCLE"
+      : "AUTOMOBILE";
 
   const [items, setItems] = useState<IsiCepteShowcaseItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -89,14 +358,15 @@ function IsiCepteOneriyorContent() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Available filter options from canonical sources and active pool
+  // Available filter options from canonical sources and active pool (scoped by Otomobil vs Motosiklet)
   const [availableCities, setAvailableCities] = useState<string[]>(["Tüm Şehirler", ...TURKEY_81_PROVINCES]);
-  const [availableBrands, setAvailableBrands] = useState<string[]>(["Tüm Markalar", ...INITIAL_CANONICAL_BRANDS]);
-  const availableCategories = ["Tüm Kategoriler", ...CANONICAL_ISICEPTE_OTO_CATEGORIES];
+  const [autoBrands, setAutoBrands] = useState<string[]>(["Tüm Markalar", ...INITIAL_AUTOMOBILE_BRANDS]);
+  const [motoBrands, setMotoBrands] = useState<string[]>(["Tüm Markalar", ...INITIAL_MOTORCYCLE_BRANDS]);
 
   const { activeCityId, activeCityName, setActiveCity } = useGlobalCity();
 
   // Filter form state (dropdown selections before submit)
+  const [selectedVehicleType, setSelectedVehicleType] = useState<IsiCepteVehicleType>(initialVehicleType);
   const [selectedCity, setSelectedCity] = useState<string>(() => {
     if (initialCity !== "Tüm Şehirler") return initialCity;
     if (activeCityName && activeCityName !== "Tüm Türkiye") return activeCityName;
@@ -106,6 +376,7 @@ function IsiCepteOneriyorContent() {
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
 
   // Applied filter state (triggers API fetch)
+  const [appliedVehicleType, setAppliedVehicleType] = useState<IsiCepteVehicleType>(initialVehicleType);
   const [appliedCity, setAppliedCity] = useState<string>(() => {
     if (initialCity !== "Tüm Şehirler") return initialCity;
     if (activeCityName && activeCityName !== "Tüm Türkiye") return activeCityName;
@@ -114,11 +385,84 @@ function IsiCepteOneriyorContent() {
   const [appliedBrand, setAppliedBrand] = useState<string>(initialBrand);
   const [appliedCategory, setAppliedCategory] = useState<string>(initialCategory);
 
+  const availableBrands = selectedVehicleType === "MOTORCYCLE" ? motoBrands : autoBrands;
+  const availableCategories = useMemo(
+    () =>
+      selectedVehicleType === "MOTORCYCLE"
+        ? ["Tüm Kategoriler", ...MOTORCYCLE_CATEGORIES]
+        : ["Tüm Kategoriler", ...AUTOMOBILE_CATEGORIES],
+    [selectedVehicleType]
+  );
+
   // Selected Provider Detail Modal
   const [detailModalProvider, setDetailModalProvider] = useState<IsiCepteShowcaseItem | null>(null);
 
   // Session seed for stable randomization per page view
   const [sessionSeed] = useState(() => Math.random().toString(36).substring(2, 9));
+
+  // Load canonical Otomobil & Motosiklet brand lists from backend (same as Mobile app)
+  useEffect(() => {
+    const extractBrandNames = (json: any): string[] => {
+      if (!json || !json.success || !Array.isArray(json.data)) return [];
+      return json.data
+        .map((b: any) => (typeof b === "string" ? b : b.label || b.name || b.value))
+        .filter(Boolean);
+    };
+
+    const loadBrandsByType = async () => {
+      try {
+        const [autoRes, suvRes, vanRes, motoRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/vehicle-filters/brands?category=AUTOMOBILE`).catch(() => null),
+          fetch(`${API_BASE_URL}/vehicle-filters/brands?category=SUV_PICKUP`).catch(() => null),
+          fetch(`${API_BASE_URL}/vehicle-filters/brands?category=MINIVAN_PANELVAN`).catch(() => null),
+          fetch(`${API_BASE_URL}/vehicle-filters/brands?category=MOTORCYCLE`).catch(() => null),
+        ]);
+
+        const dynamicMotoSlugs = new Set<string>();
+        let extractedMotoNames: string[] = [];
+
+        if (motoRes && motoRes.ok) {
+          const motoJson = await motoRes.json();
+          extractedMotoNames = extractBrandNames(motoJson);
+          for (const mName of extractedMotoNames) {
+            const mSlug = normalizeBrandKey(mName);
+            const mKey = getBrandDedupeKey(mName);
+            if (mSlug && !DUAL_VEHICLE_BRAND_SLUGS.has(mSlug)) dynamicMotoSlugs.add(mSlug);
+            if (mKey && !DUAL_VEHICLE_BRAND_SLUGS.has(mKey)) dynamicMotoSlugs.add(mKey);
+          }
+
+          const dedupedMoto = deduplicateAndSortBrands(
+            [...INITIAL_MOTORCYCLE_BRANDS, ...extractedMotoNames],
+            INITIAL_MOTORCYCLE_BRANDS
+          );
+          setMotoBrands(["Tüm Markalar", ...dedupedMoto]);
+        } else {
+          const dedupedMoto = deduplicateAndSortBrands(INITIAL_MOTORCYCLE_BRANDS, INITIAL_MOTORCYCLE_BRANDS);
+          setMotoBrands(["Tüm Markalar", ...dedupedMoto]);
+        }
+
+        const rawAutoCandidates: string[] = [...INITIAL_AUTOMOBILE_BRANDS];
+        for (const res of [autoRes, suvRes, vanRes]) {
+          if (res && res.ok) {
+            const json = await res.json();
+            for (const name of extractBrandNames(json)) {
+              if (isGenuineAutomobileBrand(name, dynamicMotoSlugs)) {
+                rawAutoCandidates.push(name);
+              }
+            }
+          }
+        }
+        const cleanedAuto = deduplicateAndSortBrands(
+          rawAutoCandidates.filter((name) => isGenuineAutomobileBrand(name, dynamicMotoSlugs)),
+          INITIAL_AUTOMOBILE_BRANDS
+        );
+        setAutoBrands(["Tüm Markalar", ...cleanedAuto]);
+      } catch {
+        // Fallback lists already initialized
+      }
+    };
+    loadBrandsByType();
+  }, []);
 
   // Sync state when global city changes (if URL city param is not explicitly set)
   useEffect(() => {
@@ -132,8 +476,17 @@ function IsiCepteOneriyorContent() {
 
   // Update URL query parameters cleanly
   const syncUrlParams = useCallback(
-    (cityVal: string, brandVal: string, catVal: string, scopeVal: 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE') => {
+    (
+      vType: IsiCepteVehicleType,
+      cityVal: string,
+      brandVal: string,
+      catVal: string,
+      scopeVal: 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE'
+    ) => {
       const params = new URLSearchParams();
+      if (vType === "MOTORCYCLE") {
+        params.set("vehicleType", "MOTORCYCLE");
+      }
       if (cityVal && cityVal !== "Tüm Şehirler") {
         params.set("city", cityVal);
       }
@@ -159,19 +512,39 @@ function IsiCepteOneriyorContent() {
     const qBrand = searchParams.get("brand") || "Tüm Markalar";
     const qCategory = searchParams.get("category") || "Tüm Kategoriler";
     const qScope = (searchParams.get("scope") as 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE') || "SHOWCASE_ONLY";
+    const qVehicleType: IsiCepteVehicleType =
+      searchParams.get("vehicleType") === "MOTORCYCLE" || qCategory === "Motosiklet Servisi"
+        ? "MOTORCYCLE"
+        : "AUTOMOBILE";
 
+    setSelectedVehicleType(qVehicleType);
     setSelectedCity(qCity);
     setSelectedBrand(qBrand);
     setSelectedCategory(qCategory);
+    setAppliedVehicleType(qVehicleType);
     setAppliedCity(qCity);
     setAppliedBrand(qBrand);
     setAppliedCategory(qCategory);
     setScope(qScope);
   }, [searchParams]);
 
+  // Handle Vasıta Türü dropdown change (Otomobil <-> Motosiklet)
+  const handleVehicleTypeDropdownChange = (nextType: IsiCepteVehicleType) => {
+    if (nextType === selectedVehicleType) return;
+    setSelectedVehicleType(nextType);
+    setSelectedBrand("Tüm Markalar");
+    setSelectedCategory("Tüm Kategoriler");
+    setAppliedVehicleType(nextType);
+    setAppliedBrand("Tüm Markalar");
+    setAppliedCategory("Tüm Kategoriler");
+    setPage(1);
+    syncUrlParams(nextType, appliedCity, "Tüm Markalar", "Tüm Kategoriler", scope);
+  };
+
   // Fetch recommendations from API
   const fetchRecommendations = useCallback(
     async (
+      vType: IsiCepteVehicleType,
       cityVal: string,
       brandVal: string,
       catVal: string,
@@ -189,6 +562,8 @@ function IsiCepteOneriyorContent() {
         }
         if (catVal && catVal !== "Tüm Kategoriler") {
           query.append("category", catVal);
+        } else if (vType === "MOTORCYCLE" && brandVal === "Tüm Markalar") {
+          query.append("category", "Motosiklet Servisi");
         }
         query.append("scope", scopeVal);
         query.append("page", pageNum.toString());
@@ -205,10 +580,26 @@ function IsiCepteOneriyorContent() {
           setTotalPages(data.totalPages || 1);
 
           if (Array.isArray(data.availableCities) && data.availableCities.length > 0) {
-            setAvailableCities(data.availableCities);
+            setAvailableCities(
+              data.availableCities.includes("Tüm Şehirler")
+                ? data.availableCities
+                : ["Tüm Şehirler", ...data.availableCities]
+            );
           }
           if (Array.isArray(data.availableBrands) && data.availableBrands.length > 0) {
-            setAvailableBrands(data.availableBrands);
+            const extraAutoBrands = data.availableBrands.filter((b: string) =>
+              isGenuineAutomobileBrand(b)
+            );
+            if (extraAutoBrands.length > 0) {
+              setAutoBrands((prev) => {
+                const existing = prev.filter((x) => x !== "Tüm Markalar" && isGenuineAutomobileBrand(x));
+                const deduped = deduplicateAndSortBrands(
+                  [...existing, ...extraAutoBrands],
+                  INITIAL_AUTOMOBILE_BRANDS
+                );
+                return ["Tüm Markalar", ...deduped];
+              });
+            }
           }
 
           // Record impression event for Vitrin analytics if items exist
@@ -221,6 +612,7 @@ function IsiCepteOneriyorContent() {
                 city: cityVal !== "Tüm Şehirler" ? cityVal : undefined,
                 brand: brandVal !== "Tüm Markalar" ? brandVal : undefined,
                 metadata: {
+                  vehicleType: vType,
                   category: catVal !== "Tüm Kategoriler" ? catVal : undefined,
                   scope: scopeVal,
                 },
@@ -247,16 +639,17 @@ function IsiCepteOneriyorContent() {
   );
 
   useEffect(() => {
-    fetchRecommendations(appliedCity, appliedBrand, appliedCategory, scope, page);
-  }, [appliedCity, appliedBrand, appliedCategory, scope, page, fetchRecommendations]);
+    fetchRecommendations(appliedVehicleType, appliedCity, appliedBrand, appliedCategory, scope, page);
+  }, [appliedVehicleType, appliedCity, appliedBrand, appliedCategory, scope, page, fetchRecommendations]);
 
   const handleApplyFilters = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setPage(1);
+    setAppliedVehicleType(selectedVehicleType);
     setAppliedCity(selectedCity);
     setAppliedBrand(selectedBrand);
     setAppliedCategory(selectedCategory);
-    syncUrlParams(selectedCity, selectedBrand, selectedCategory, scope);
+    syncUrlParams(selectedVehicleType, selectedCity, selectedBrand, selectedCategory, scope);
     if (selectedCity && selectedCity !== "Tüm Şehirler") {
       setActiveCity(selectedCity);
     } else {
@@ -268,7 +661,7 @@ function IsiCepteOneriyorContent() {
     setSelectedCity("Tüm Şehirler");
     setAppliedCity("Tüm Şehirler");
     setPage(1);
-    syncUrlParams("Tüm Şehirler", appliedBrand, appliedCategory, scope);
+    syncUrlParams(appliedVehicleType, "Tüm Şehirler", appliedBrand, appliedCategory, scope);
     setActiveCity(null);
   };
 
@@ -276,14 +669,14 @@ function IsiCepteOneriyorContent() {
     setSelectedBrand("Tüm Markalar");
     setAppliedBrand("Tüm Markalar");
     setPage(1);
-    syncUrlParams(appliedCity, "Tüm Markalar", appliedCategory, scope);
+    syncUrlParams(appliedVehicleType, appliedCity, "Tüm Markalar", appliedCategory, scope);
   };
 
   const handleClearCategoryFilter = () => {
     setSelectedCategory("Tüm Kategoriler");
     setAppliedCategory("Tüm Kategoriler");
     setPage(1);
-    syncUrlParams(appliedCity, appliedBrand, "Tüm Kategoriler", scope);
+    syncUrlParams(appliedVehicleType, appliedCity, appliedBrand, "Tüm Kategoriler", scope);
   };
 
   const handleClearAllFilters = () => {
@@ -294,14 +687,14 @@ function IsiCepteOneriyorContent() {
     setAppliedBrand("Tüm Markalar");
     setAppliedCategory("Tüm Kategoriler");
     setPage(1);
-    syncUrlParams("Tüm Şehirler", "Tüm Markalar", "Tüm Kategoriler", scope);
+    syncUrlParams(appliedVehicleType, "Tüm Şehirler", "Tüm Markalar", "Tüm Kategoriler", scope);
     setActiveCity(null);
   };
 
   const handleToggleScope = (newScope: 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE') => {
     setScope(newScope);
     setPage(1);
-    syncUrlParams(appliedCity, appliedBrand, appliedCategory, newScope);
+    syncUrlParams(appliedVehicleType, appliedCity, appliedBrand, appliedCategory, newScope);
   };
 
   const handleOpenDetailModal = (provider: IsiCepteShowcaseItem) => {
@@ -330,6 +723,23 @@ function IsiCepteOneriyorContent() {
     window.open(provider.isicepteProfileUrl, "_blank", "noopener,noreferrer");
   };
 
+  const displayedItems = useMemo(() => {
+    if (
+      appliedVehicleType === "AUTOMOBILE" &&
+      appliedCategory === "Tüm Kategoriler" &&
+      appliedBrand === "Tüm Markalar"
+    ) {
+      return items.filter((item) => {
+        const cats = item.serviceCategories || [];
+        if (cats.length === 1 && cats[0] === "Motosiklet Servisi") {
+          return false;
+        }
+        return true;
+      });
+    }
+    return items;
+  }, [items, appliedVehicleType, appliedCategory, appliedBrand]);
+
   const isFiltered =
     appliedCity !== "Tüm Şehirler" ||
     appliedBrand !== "Tüm Markalar" ||
@@ -337,6 +747,7 @@ function IsiCepteOneriyorContent() {
 
   // Build contextual results summary
   const getContextualSummaryTitle = () => {
+    const vehicleLabel = appliedVehicleType === "MOTORCYCLE" ? "Motosiklet" : "Otomobil";
     const hasCity = appliedCity !== "Tüm Şehirler";
     const hasBrand = appliedBrand !== "Tüm Markalar";
     const hasCat = appliedCategory !== "Tüm Kategoriler";
@@ -351,11 +762,13 @@ function IsiCepteOneriyorContent() {
     } else if (hasBrand && hasCat) {
       descriptor = `${appliedBrand} için ${appliedCategory} hizmeti veren`;
     } else if (hasCity) {
-      descriptor = `${appliedCity} şehrindeki`;
+      descriptor = `${appliedCity} şehrindeki (${vehicleLabel})`;
     } else if (hasBrand) {
       descriptor = `${appliedBrand} uzmanı`;
     } else if (hasCat) {
       descriptor = `${appliedCategory} hizmeti veren`;
+    } else {
+      descriptor = vehicleLabel;
     }
 
     if (scope === "SHOWCASE_ONLY") {
@@ -368,58 +781,84 @@ function IsiCepteOneriyorContent() {
   return (
     <div className="w-full flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-8">
       {/* Top Header & Filter Controls Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-white/10">
-        {/* Title */}
-        <div className="space-y-2 max-w-2xl">
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
-            <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight whitespace-nowrap">
-              İşi Cepte Öneriyor
-            </h1>
-            <a
-              href="https://isicepte.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="İşi Cepte' yi Keşfet"
-              aria-label="İşi Cepte' yi Keşfet"
-              onClick={() => {
-                fetch(`${API_BASE_URL}/isicepte/events`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    eventType: "ISICEPTE_OUTBOUND_CLICK",
-                    city: appliedCity !== "Tüm Şehirler" ? appliedCity : undefined,
-                  }),
-                }).catch(() => {});
-              }}
-              className="h-9 md:h-10 px-3.5 md:px-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs md:text-sm font-bold flex items-center gap-1.5 transition shadow-lg shadow-orange-600/30 hover:scale-[1.03] shrink-0 whitespace-nowrap cursor-pointer"
-            >
-              <Plus className="w-4 h-4 md:w-4.5 md:h-4.5 stroke-[2.75]" />
-              <span>İşi Cepte&apos; yi Keşfet</span>
-            </a>
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 pb-6 border-b border-white/10">
+        {/* Title with İşi Cepte App Logo on the Left */}
+        <div className="flex items-start gap-4 max-w-2xl">
+          <img
+            src="/assets/images/isicepte-logo.png"
+            alt="İşi Cepte Logo"
+            className="w-16 h-16 md:w-20 md:h-20 rounded-2xl object-contain shrink-0 shadow-lg mt-0.5"
+          />
+          <div className="space-y-2">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
+              <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight whitespace-nowrap">
+                İşi Cepte Öneriyor
+              </h1>
+              <a
+                href="https://isicepte.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="İşi Cepte' yi Keşfet"
+                aria-label="İşi Cepte' yi Keşfet"
+                onClick={() => {
+                  fetch(`${API_BASE_URL}/isicepte/events`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      eventType: "ISICEPTE_OUTBOUND_CLICK",
+                      city: appliedCity !== "Tüm Şehirler" ? appliedCity : undefined,
+                    }),
+                  }).catch(() => {});
+                }}
+                className="h-9 md:h-10 px-3.5 md:px-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs md:text-sm font-bold flex items-center gap-1.5 transition shadow-lg shadow-orange-600/30 hover:scale-[1.03] shrink-0 whitespace-nowrap cursor-pointer"
+              >
+                <Plus className="w-4 h-4 md:w-4.5 md:h-4.5 stroke-[2.75]" />
+                <span>İşi Cepte&apos; yi Keşfet</span>
+              </a>
+            </div>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Öne çıkan usta ve servisleri keşfedin.
+              <br />
+              Usta veya servis misiniz?
+              <br />
+              Siz de İşi Cepte’de yerinizi alın.
+            </p>
           </div>
-          <p className="text-sm text-slate-400 leading-relaxed">
-            Öne çıkan usta ve servisleri keşfedin.
-            <br />
-            Usta veya servis misiniz?
-            <br />
-            Siz de İşi Cepte’de yerinizi alın.
-          </p>
         </div>
 
-        {/* 3-Filter Form: ŞEHİR | MARKA | KATEGORİ | [FİLTRELE] */}
+        {/* 4-Filter Form: VASITA TÜRÜ | ŞEHİR | MARKA | KATEGORİ | [FİLTRELE] */}
         <form
           onSubmit={handleApplyFilters}
-          className="flex flex-wrap lg:flex-nowrap items-end gap-3 w-full lg:w-auto"
+          className="flex flex-wrap sm:flex-nowrap items-end gap-2.5 w-full xl:w-auto"
         >
-          {/* 1. City Dropdown */}
-          <div className="w-full sm:w-[150px] lg:w-[160px] space-y-1">
+          {/* 1. Vasıta Türü Dropdown */}
+          <div className="w-full sm:w-[112px] space-y-1">
+            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+              Vasıta Türü
+            </label>
+            <select
+              value={selectedVehicleType}
+              onChange={(e) => handleVehicleTypeDropdownChange(e.target.value as IsiCepteVehicleType)}
+              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
+            >
+              <option value="AUTOMOBILE" className="bg-slate-900 text-white">
+                Otomobil
+              </option>
+              <option value="MOTORCYCLE" className="bg-slate-900 text-white">
+                Motosiklet
+              </option>
+            </select>
+          </div>
+
+          {/* 2. City Dropdown */}
+          <div className="w-full sm:w-[122px] space-y-1">
             <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
               Şehir
             </label>
             <select
               value={selectedCity}
               onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-3 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition"
+              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
             >
               {availableCities.map((c) => (
                 <option key={c} value={c} className="bg-slate-900 text-white">
@@ -429,15 +868,15 @@ function IsiCepteOneriyorContent() {
             </select>
           </div>
 
-          {/* 2. Brand Dropdown */}
-          <div className="w-full sm:w-[150px] lg:w-[160px] space-y-1">
+          {/* 3. Brand Dropdown */}
+          <div className="w-full sm:w-[126px] space-y-1">
             <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
               Marka
             </label>
             <select
               value={selectedBrand}
               onChange={(e) => setSelectedBrand(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-3 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition"
+              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
             >
               {availableBrands.map((b) => (
                 <option key={b} value={b} className="bg-slate-900 text-white">
@@ -447,15 +886,15 @@ function IsiCepteOneriyorContent() {
             </select>
           </div>
 
-          {/* 3. Category Dropdown */}
-          <div className="w-full sm:w-[180px] lg:w-[200px] space-y-1">
+          {/* 4. Category Dropdown */}
+          <div className="w-full sm:w-[136px] space-y-1">
             <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
               Kategori
             </label>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-3 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
+              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
             >
               {availableCategories.map((cat) => (
                 <option key={cat} value={cat} className="bg-slate-900 text-white">
@@ -465,10 +904,10 @@ function IsiCepteOneriyorContent() {
             </select>
           </div>
 
-          {/* 4. Filter Button */}
+          {/* 5. Filter Button */}
           <button
             type="submit"
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-orange-600/25 shrink-0 h-[38px]"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-orange-600/25 shrink-0 h-[38px]"
           >
             <Filter className="w-3.5 h-3.5" />
             <span>Filtrele</span>
@@ -560,7 +999,7 @@ function IsiCepteOneriyorContent() {
       )}
 
       {/* Empty State — 100% Real, Zero Mock Filler */}
-      {!loading && items.length === 0 && (
+      {!loading && displayedItems.length === 0 && (
         <div className="py-20 px-6 rounded-3xl bg-slate-900/40 border border-white/10 text-center flex flex-col items-center justify-center max-w-xl mx-auto space-y-4">
           <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400">
             <Search className="w-7 h-7" />
@@ -568,7 +1007,7 @@ function IsiCepteOneriyorContent() {
           <div className="space-y-1">
             <h3 className="text-base font-bold text-white">
               {scope === "SHOWCASE_ONLY"
-                ? "Bu filtrelere uygun aktif Vitrin üyesi bulunmuyor."
+                ? `Seçili kriterlere uygun aktif ${appliedVehicleType === "MOTORCYCLE" ? "Motosiklet" : "Otomobil"} Vitrin üyesi bulunmuyor.`
                 : isFiltered
                 ? "Seçtiğiniz şehir, marka ve kategoriye uygun işletme bulunamadı."
                 : "Şu anda İşiCepte Öneriyor bölümünde aktif işletme bulunmuyor."}
@@ -606,10 +1045,10 @@ function IsiCepteOneriyorContent() {
       )}
 
       {/* Provider Cards Grid (3 Columns Desktop, 2 Tablet, 1 Mobile) */}
-      {!loading && items.length > 0 && (
+      {!loading && displayedItems.length > 0 && (
         <div className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-            {items.map((provider) => (
+            {displayedItems.map((provider) => (
               <div
                 key={provider.id}
                 className="rounded-3xl bg-[#0b101e]/90 border border-white/10 hover:border-white/20 transition-all duration-300 shadow-xl overflow-hidden flex flex-col justify-between group"
