@@ -370,8 +370,8 @@ function IsiCepteOneriyorContent() {
       {/* Top Header & Filter Controls Bar */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-white/10">
         {/* Title */}
-        <div className="space-y-2 max-w-xl">
-          <div className="flex items-center gap-3">
+        <div className="space-y-2 max-w-2xl">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
               İşi Cepte Öneriyor
             </h1>
@@ -379,8 +379,8 @@ function IsiCepteOneriyorContent() {
               href="https://isicepte.com"
               target="_blank"
               rel="noopener noreferrer"
-              title="İşi Cepte Web Sitesine Git"
-              aria-label="İşi Cepte Web Sitesine Git"
+              title="İşi Cepte'de İşletmeni Ekle"
+              aria-label="İşi Cepte'de İşletmeni Ekle"
               onClick={() => {
                 fetch(`${API_BASE_URL}/isicepte/events`, {
                   method: "POST",
@@ -391,9 +391,10 @@ function IsiCepteOneriyorContent() {
                   }),
                 }).catch(() => {});
               }}
-              className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-orange-600 hover:bg-orange-500 text-white flex items-center justify-center transition shadow-lg shadow-orange-600/30 hover:scale-105 shrink-0 cursor-pointer"
+              className="h-9 md:h-10 px-3.5 md:px-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs md:text-sm font-bold flex items-center gap-1.5 transition shadow-lg shadow-orange-600/30 hover:scale-[1.03] shrink-0 cursor-pointer"
             >
-              <Plus className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />
+              <Plus className="w-4 h-4 md:w-4.5 md:h-4.5 stroke-[2.75]" />
+              <span>İşletmeni Ekle</span>
             </a>
           </div>
           <p className="text-sm text-slate-400 leading-relaxed">
