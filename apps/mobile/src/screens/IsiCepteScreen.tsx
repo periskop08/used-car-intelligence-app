@@ -885,8 +885,16 @@ export default function IsiCepteOneriyorScreen() {
         <View style={styles.headerLeft}>
           <Image source={ISICEPTE_LOGO} style={styles.headerLogoImg} resizeMode="contain" />
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <Text style={styles.headerTitle}>İşi Cepte Öneriyor</Text>
+              <TouchableOpacity
+                style={styles.addBusinessHeaderBtn}
+                onPress={() => openIsiCepteAppOrStore()}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="add" size={14} color="#ffffff" />
+                <Text style={styles.addBusinessHeaderBtnText}>İşletmeni Ekle</Text>
+              </TouchableOpacity>
             </View>
             <Text style={styles.headerSubtitle} numberOfLines={1}>
               {scope === 'SHOWCASE_ONLY'
@@ -1819,6 +1827,25 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0f172a',
     letterSpacing: -0.3,
+  },
+  addBusinessHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ea580c',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  addBusinessHeaderBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
   },
   headerBadge: {
     backgroundColor: '#fff7ed',

@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { openIsiCepteAppOrStore } from '../../components/IsiCepteRecommendationWidget';
 
 const ARAC_REHBERI_ICON = require('../../../assets/images/arac-rehberi-icon.png');
 const ARACINI_BUL_ICON = require('../../../assets/images/aracini-bul-icon.png');
@@ -45,6 +46,15 @@ export default function KesfetHub() {
       route: '/isicepte',
       color: '#131b2e',
     },
+    {
+      title: 'İşi Cepte • İşletmeni Ekle',
+      description: 'Oto servisinizi veya ustalığınızı İşi Cepte uygulamasına kaydederek TorqueScout vitrininde yerinizi alın.',
+      icon: 'add-circle',
+      customLogo: ISICEPTE_LOGO,
+      showPlusBadge: true,
+      isExternalAction: true,
+      color: '#ea580c',
+    },
   ];
 
   return (
@@ -61,7 +71,13 @@ export default function KesfetHub() {
               key={index}
               style={[styles.card, { borderColor: opt.color + '22' }]}
               activeOpacity={0.8}
-              onPress={() => router.push(opt.route as any)}
+              onPress={() => {
+                if (opt.isExternalAction) {
+                  openIsiCepteAppOrStore();
+                } else if (opt.route) {
+                  router.push(opt.route as any);
+                }
+              }}
             >
               <View
                 style={[
@@ -70,7 +86,14 @@ export default function KesfetHub() {
                 ]}
               >
                 {opt.customLogo ? (
-                  <Image source={opt.customLogo} style={styles.customLogoImg} resizeMode="contain" />
+                  <View style={styles.logoBadgeWrapper}>
+                    <Image source={opt.customLogo} style={styles.customLogoImg} resizeMode="contain" />
+                    {opt.showPlusBadge && (
+                      <View style={styles.plusBadge}>
+                        <Ionicons name="add" size={14} color="#ffffff" />
+                      </View>
+                    )}
+                  </View>
                 ) : (
                   <Ionicons name={opt.icon as any} size={28} color={opt.color} />
                 )}
@@ -79,7 +102,12 @@ export default function KesfetHub() {
                 <Text style={[styles.cardTitle, { color: opt.color }]}>{opt.title}</Text>
                 <Text style={styles.cardDesc}>{opt.description}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#94a3b8" style={styles.arrow} />
+              <Ionicons
+                name={opt.isExternalAction ? 'open-outline' : 'chevron-forward'}
+                size={20}
+                color={opt.isExternalAction ? '#ea580c' : '#94a3b8'}
+                style={styles.arrow}
+              />
             </TouchableOpacity>
           ))}
         </View>
@@ -100,6 +128,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingTop: 12,
+    paddingBottom: 110,
   },
   header: {
     marginBottom: 24,
@@ -141,12 +170,30 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     backgroundColor: 'transparent',
-    overflow: 'hidden',
+    overflow: 'visible',
+  },
+  logoBadgeWrapper: {
+    width: 52,
+    height: 52,
+    position: 'relative',
   },
   customLogoImg: {
     width: 52,
     height: 52,
     borderRadius: 14,
+  },
+  plusBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#ea580c',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cardText: {
     flex: 1,
