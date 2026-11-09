@@ -398,7 +398,9 @@ function IsiCepteOneriyorContent() {
             </a>
           </div>
           <p className="text-sm text-slate-400 leading-relaxed">
-            Aktif Üyeler Arasından Öne Çıkan Ustaları Ve Servisleri Keşfedin.
+            Öne çıkan usta ve servisleri keşfedin.
+            <br />
+            Usta veya servis misiniz? Siz de İşi Cepte’de yerinizi alın.
           </p>
         </div>
 

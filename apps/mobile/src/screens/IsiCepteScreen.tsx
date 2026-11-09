@@ -896,8 +896,8 @@ export default function IsiCepteOneriyorScreen() {
                 <Text style={styles.addBusinessHeaderBtnText}>İşi Cepte&apos; yi Keşfet</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.headerSubtitle} numberOfLines={2}>
-              Aktif Üyeler Arasından Öne Çıkan Ustaları Ve Servisleri Keşfedin.
+            <Text style={styles.headerSubtitle}>
+              {'Öne çıkan usta ve servisleri keşfedin.\nUsta veya servis misiniz? Siz de İşi Cepte’de yerinizi alın.'}
             </Text>
           </View>
         </View>
