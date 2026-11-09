@@ -384,6 +384,7 @@ function IsiCepteOneriyorContent() {
   });
   const [appliedBrand, setAppliedBrand] = useState<string>(initialBrand);
   const [appliedCategory, setAppliedCategory] = useState<string>(initialCategory);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const availableBrands = selectedVehicleType === "MOTORCYCLE" ? motoBrands : autoBrands;
   const availableCategories = useMemo(
@@ -686,6 +687,7 @@ function IsiCepteOneriyorContent() {
     setAppliedCity("Tüm Şehirler");
     setAppliedBrand("Tüm Markalar");
     setAppliedCategory("Tüm Kategoriler");
+    setSearchQuery("");
     setPage(1);
     syncUrlParams(appliedVehicleType, "Tüm Şehirler", "Tüm Markalar", "Tüm Kategoriler", scope);
     setActiveCity(null);
@@ -724,12 +726,13 @@ function IsiCepteOneriyorContent() {
   };
 
   const displayedItems = useMemo(() => {
+    let baseList = items;
     if (
       appliedVehicleType === "AUTOMOBILE" &&
       appliedCategory === "Tüm Kategoriler" &&
       appliedBrand === "Tüm Markalar"
     ) {
-      return items.filter((item) => {
+      baseList = items.filter((item) => {
         const cats = item.serviceCategories || [];
         if (cats.length === 1 && cats[0] === "Motosiklet Servisi") {
           return false;
@@ -737,13 +740,25 @@ function IsiCepteOneriyorContent() {
         return true;
       });
     }
-    return items;
-  }, [items, appliedVehicleType, appliedCategory, appliedBrand]);
+
+    const q = searchQuery.trim().toLocaleLowerCase("tr-TR");
+    if (!q) return baseList;
+
+    return baseList.filter((item) => {
+      const nameMatch = (item.businessName || "").toLocaleLowerCase("tr-TR").includes(q);
+      const cityMatch = (item.city || "").toLocaleLowerCase("tr-TR").includes(q);
+      const distMatch = (item.district || "").toLocaleLowerCase("tr-TR").includes(q);
+      const catMatch = (item.serviceCategories || []).some((c) => c.toLocaleLowerCase("tr-TR").includes(q));
+      const brandMatch = (item.supportedBrands || []).some((b) => b.toLocaleLowerCase("tr-TR").includes(q));
+      return nameMatch || cityMatch || distMatch || catMatch || brandMatch;
+    });
+  }, [items, appliedVehicleType, appliedCategory, appliedBrand, searchQuery]);
 
   const isFiltered =
     appliedCity !== "Tüm Şehirler" ||
     appliedBrand !== "Tüm Markalar" ||
-    appliedCategory !== "Tüm Kategoriler";
+    appliedCategory !== "Tüm Kategoriler" ||
+    searchQuery.trim().length > 0;
 
   // Build contextual results summary
   const getContextualSummaryTitle = () => {
@@ -826,93 +841,117 @@ function IsiCepteOneriyorContent() {
           </div>
         </div>
 
-        {/* 4-Filter Form: VASITA TÜRÜ | ŞEHİR | MARKA | KATEGORİ | [FİLTRELE] */}
-        <form
-          onSubmit={handleApplyFilters}
-          className="flex flex-wrap sm:flex-nowrap items-end gap-2.5 w-full xl:w-auto"
-        >
-          {/* 1. Vasıta Türü Dropdown */}
-          <div className="w-full sm:w-[112px] space-y-1">
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              Vasıta Türü
-            </label>
-            <select
-              value={selectedVehicleType}
-              onChange={(e) => handleVehicleTypeDropdownChange(e.target.value as IsiCepteVehicleType)}
-              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
-            >
-              <option value="AUTOMOBILE" className="bg-slate-900 text-white">
-                Otomobil
-              </option>
-              <option value="MOTORCYCLE" className="bg-slate-900 text-white">
-                Motosiklet
-              </option>
-            </select>
-          </div>
-
-          {/* 2. City Dropdown */}
-          <div className="w-full sm:w-[122px] space-y-1">
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              Şehir
-            </label>
-            <select
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
-            >
-              {availableCities.map((c) => (
-                <option key={c} value={c} className="bg-slate-900 text-white">
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 3. Brand Dropdown */}
-          <div className="w-full sm:w-[126px] space-y-1">
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              Marka
-            </label>
-            <select
-              value={selectedBrand}
-              onChange={(e) => setSelectedBrand(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
-            >
-              {availableBrands.map((b) => (
-                <option key={b} value={b} className="bg-slate-900 text-white">
-                  {b}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 4. Category Dropdown */}
-          <div className="w-full sm:w-[136px] space-y-1">
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-              Kategori
-            </label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
-            >
-              {availableCategories.map((cat) => (
-                <option key={cat} value={cat} className="bg-slate-900 text-white">
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 5. Filter Button */}
-          <button
-            type="submit"
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-orange-600/25 shrink-0 h-[38px]"
+        {/* Right Column: 4-Filter Form + Manual Search Bar Underneath */}
+        <div className="flex flex-col gap-2.5 w-full xl:w-auto">
+          <form
+            onSubmit={handleApplyFilters}
+            className="flex flex-wrap sm:flex-nowrap items-end gap-2.5 w-full xl:w-auto"
           >
-            <Filter className="w-3.5 h-3.5" />
-            <span>Filtrele</span>
-          </button>
-        </form>
+            {/* 1. Vasıta Türü Dropdown */}
+            <div className="w-full sm:w-[112px] space-y-1">
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Vasıta Türü
+              </label>
+              <select
+                value={selectedVehicleType}
+                onChange={(e) => handleVehicleTypeDropdownChange(e.target.value as IsiCepteVehicleType)}
+                className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
+              >
+                <option value="AUTOMOBILE" className="bg-slate-900 text-white">
+                  Otomobil
+                </option>
+                <option value="MOTORCYCLE" className="bg-slate-900 text-white">
+                  Motosiklet
+                </option>
+              </select>
+            </div>
+
+            {/* 2. City Dropdown */}
+            <div className="w-full sm:w-[122px] space-y-1">
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Şehir
+              </label>
+              <select
+                value={selectedCity}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
+              >
+                {availableCities.map((c) => (
+                  <option key={c} value={c} className="bg-slate-900 text-white">
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Brand Dropdown */}
+            <div className="w-full sm:w-[126px] space-y-1">
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Marka
+              </label>
+              <select
+                value={selectedBrand}
+                onChange={(e) => setSelectedBrand(e.target.value)}
+                className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
+              >
+                {availableBrands.map((b) => (
+                  <option key={b} value={b} className="bg-slate-900 text-white">
+                    {b}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 4. Category Dropdown */}
+            <div className="w-full sm:w-[136px] space-y-1">
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Kategori
+              </label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
+              >
+                {availableCategories.map((cat) => (
+                  <option key={cat} value={cat} className="bg-slate-900 text-white">
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 5. Filter Button */}
+            <button
+              type="submit"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-orange-600/25 shrink-0 h-[38px]"
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>Filtrele</span>
+            </button>
+          </form>
+
+          {/* Manual Search Box underneath the filter dropdowns (matching Mobile App) */}
+          <div className="relative w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="İşletme adı, ilçe veya uzmanlık ara..."
+              className="w-full bg-[#0b0f19] border border-white/15 text-white placeholder:text-slate-500 rounded-xl pl-10 pr-9 py-2.5 text-xs font-medium focus:border-orange-500 focus:outline-none transition"
+            />
+            {searchQuery.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                aria-label="Aramayı Temizle"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Filtered Mode Context Bar & Chips */}
@@ -971,6 +1010,18 @@ function IsiCepteOneriyorContent() {
                 className="px-3 py-1 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 border border-orange-500/30 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
               >
                 <span>{appliedCategory}</span>
+                <X className="w-3 h-3" />
+              </button>
+            )}
+
+            {/* Search Query Chip */}
+            {searchQuery.trim().length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>&ldquo;{searchQuery.trim()}&rdquo;</span>
                 <X className="w-3 h-3" />
               </button>
             )}
