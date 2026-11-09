@@ -400,7 +400,9 @@ function IsiCepteOneriyorContent() {
           <p className="text-sm text-slate-400 leading-relaxed">
             Öne çıkan usta ve servisleri keşfedin.
             <br />
-            Usta veya servis misiniz? Siz de İşi Cepte’de yerinizi alın.
+            Usta veya servis misiniz?
+            <br />
+            Siz de İşi Cepte’de yerinizi alın.
           </p>
         </div>
 

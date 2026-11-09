@@ -897,7 +897,7 @@ export default function IsiCepteOneriyorScreen() {
               </TouchableOpacity>
             </View>
             <Text style={styles.headerSubtitle}>
-              {'Öne çıkan usta ve servisleri keşfedin.\nUsta veya servis misiniz? Siz de İşi Cepte’de yerinizi alın.'}
+              {'Öne çıkan usta ve servisleri keşfedin.\nUsta veya servis misiniz?\nSiz de İşi Cepte’de yerinizi alın.'}
             </Text>
           </View>
         </View>

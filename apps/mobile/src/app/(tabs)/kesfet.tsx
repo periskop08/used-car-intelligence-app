@@ -48,7 +48,7 @@ export default function KesfetHub() {
     },
     {
       title: "İşi Cepte' yi Keşfet",
-      description: 'Öne çıkan usta ve servisleri keşfedin.\nUsta veya servis misiniz? Siz de İşi Cepte’de yerinizi alın.',
+      description: 'Öne çıkan usta ve servisleri keşfedin.\nUsta veya servis misiniz?\nSiz de İşi Cepte’de yerinizi alın.',
       icon: 'add-circle',
       customLogo: ISICEPTE_LOGO,
       showPlusBadge: true,
