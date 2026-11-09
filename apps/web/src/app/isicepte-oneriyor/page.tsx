@@ -14,6 +14,7 @@ import {
   X,
   RefreshCw,
   Search,
+  Plus,
 } from "lucide-react";
 import { API_BASE_URL } from "@/utils/apiConfig";
 import { useGlobalCity } from "@/context/GlobalCityContext";
@@ -370,9 +371,31 @@ function IsiCepteOneriyorContent() {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-white/10">
         {/* Title */}
         <div className="space-y-2 max-w-xl">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
-            İşi Cepte Öneriyor
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
+              İşi Cepte Öneriyor
+            </h1>
+            <a
+              href="https://isicepte.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="İşi Cepte Web Sitesine Git"
+              aria-label="İşi Cepte Web Sitesine Git"
+              onClick={() => {
+                fetch(`${API_BASE_URL}/isicepte/events`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    eventType: "ISICEPTE_OUTBOUND_CLICK",
+                    city: appliedCity !== "Tüm Şehirler" ? appliedCity : undefined,
+                  }),
+                }).catch(() => {});
+              }}
+              className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-orange-600 hover:bg-orange-500 text-white flex items-center justify-center transition shadow-lg shadow-orange-600/30 hover:scale-105 shrink-0 cursor-pointer"
+            >
+              <Plus className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />
+            </a>
+          </div>
           <p className="text-sm text-slate-400 leading-relaxed">
             {scope === "SHOWCASE_ONLY"
               ? "Aktif vitrin üyeleri arasından öne çıkan otomotiv ustalarını ve servisleri keşfedin."
