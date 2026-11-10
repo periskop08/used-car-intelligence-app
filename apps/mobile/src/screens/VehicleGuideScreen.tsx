@@ -27,16 +27,18 @@ const BrandLogo = ({ brandName, size = 24 }: { brandName?: string; size?: number
         style={{
           width: size,
           height: size,
-          borderRadius: 6,
-          backgroundColor: '#ffffff',
+          borderRadius: 10,
+          backgroundColor: '#f8fafc',
+          borderWidth: 1,
+          borderColor: '#e2e8f0',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 2,
+          padding: 4,
         }}
       >
         <Image
           source={source}
-          style={{ width: size - 4, height: size - 4 }}
+          style={{ width: size - 8, height: size - 8 }}
           resizeMode="contain"
           onError={() => setImgError(true)}
         />
@@ -125,6 +127,23 @@ const resolveGuideCardImageUrl = (card?: {
   }
 
   return formatCloudflareImageUrl(card.heroImageUrl);
+};
+
+const translateBodyType = (bodyType?: string | null) => {
+  if (!bodyType) return '';
+  const mapping: Record<string, string> = {
+    SEDAN: 'Sedan',
+    HATCHBACK: 'Hatchback',
+    SUV: 'SUV',
+    COUPE: 'Coupe',
+    STATION_WAGON: 'Station Wagon',
+    WAGON: 'Station Wagon',
+    CONVERTIBLE: 'Cabrio',
+    MINIVAN: 'Minivan',
+    VAN: 'Minivan / Panelvan',
+    PICKUP: 'Pickup',
+  };
+  return mapping[bodyType.toUpperCase()] || bodyType;
 };
 
 interface Fact {
@@ -310,37 +329,37 @@ export default function VehicleGuideScreen() {
         >
           {/* Card Hero Image Container */}
           <View style={styles.imageCard}>
-            {imageUri ? (
-              <ExpoImage
-                source={{ uri: imageUri }}
-                style={styles.heroImage}
-                contentFit="cover"
-                transition={200}
-                cachePolicy="memory-disk"
-                onError={() => {
-                  const fallbackUri = resolveGuideCardImageUrl({
-                    ...card,
-                    heroImageUrl: null,
-                  });
-                  if (fallbackUri && fallbackUri !== imageUri) {
-                    setImageUri(fallbackUri);
-                  }
-                }}
-              />
-            ) : null}
-            <View style={styles.imageDarkGradient} />
-            <View style={styles.titleOverlay}>
-              <View style={[styles.brandBadge, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-                <BrandLogo brandName={card.brand} size={18} />
-                <Text style={styles.brandBadgeText}>{card.brand.toUpperCase()}</Text>
+            <View style={styles.heroImageWrapper}>
+              {imageUri ? (
+                <ExpoImage
+                  source={{ uri: imageUri }}
+                  style={styles.heroImage}
+                  contentFit="cover"
+                  transition={200}
+                  cachePolicy="memory-disk"
+                  onError={() => {
+                    const fallbackUri = resolveGuideCardImageUrl({
+                      ...card,
+                      heroImageUrl: null,
+                    });
+                    if (fallbackUri && fallbackUri !== imageUri) {
+                      setImageUri(fallbackUri);
+                    }
+                  }}
+                />
+              ) : null}
+            </View>
+            <View style={styles.vehicleIdentityBar}>
+              <BrandLogo brandName={card.brand} size={36} />
+              <View style={styles.vehicleIdentityTexts}>
+                <Text style={styles.brandTitle}>
+                  {card.brand} <Text style={styles.modelTitleAccent}>{card.model}</Text>
+                </Text>
+                <Text style={styles.yearsText}>
+                  {card.generationName ? `${card.generationName} • ` : ''}
+                  {card.yearStart} - {card.yearEnd || 'Günümüz'} • {translateBodyType(card.bodyType)}
+                </Text>
               </View>
-              <Text style={styles.brandTitle}>
-                {card.brand} {card.model}
-              </Text>
-              <Text style={styles.yearsText}>
-                {card.generationName ? `${card.generationName} • ` : ''}
-                {card.yearStart} - {card.yearEnd || 'Günümüz'} • {card.bodyType}
-              </Text>
             </View>
           </View>
 
@@ -466,54 +485,51 @@ const styles = StyleSheet.create({
   },
   imageCard: {
     width: '100%',
-    height: 220,
     borderRadius: 24,
     overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
+  },
+  heroImageWrapper: {
+    width: '100%',
+    height: 220,
+    backgroundColor: '#f1f5f9',
   },
   heroImage: {
     width: '100%',
     height: '100%',
   },
-  imageDarkGradient: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  vehicleIdentityBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
   },
-  titleOverlay: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-    gap: 4,
-  },
-  brandBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#ea580c',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginBottom: 2,
-  },
-  brandBadgeText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+  vehicleIdentityTexts: {
+    flex: 1,
+    gap: 2,
   },
   brandTitle: {
-    color: '#ffffff',
-    fontSize: 24,
+    color: '#0f172a',
+    fontSize: 21,
     fontWeight: '900',
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
+  },
+  modelTitleAccent: {
+    color: '#ea580c',
   },
   yearsText: {
-    color: '#f1f5f9',
+    color: '#64748b',
     fontSize: 13,
     fontWeight: '600',
   },
