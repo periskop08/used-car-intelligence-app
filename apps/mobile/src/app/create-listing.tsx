@@ -14,8 +14,10 @@ import {
   KeyboardAvoidingView,
   Pressable,
   Keyboard,
+  BackHandler,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { createEdgeSwipeDismissHandlers } from '../utils/backGesture';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -1369,8 +1371,50 @@ export default function CreateListingScreen() {
   const displayBrandName = useCustomVariant ? customBrand : selectedBrand;
   const displayModelName = useCustomVariant ? customModel : selectedModel;
 
+  const handleStepOrPageBack = () => {
+    if (activePicker !== null) {
+      Keyboard.dismiss();
+      setActivePicker(null);
+      setPickerSearch('');
+      return;
+    }
+    if (step > 1) {
+      goToStep(step - 1);
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)' as any);
+    }
+  };
+
+  const handleStepOrPageBackRef = useRef(handleStepOrPageBack);
+  handleStepOrPageBackRef.current = handleStepOrPageBack;
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleStepOrPageBackRef.current();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
+
+  const screenSwipeHandlers = useMemo(
+    () => createEdgeSwipeDismissHandlers(() => handleStepOrPageBackRef.current()),
+    []
+  );
+
+  const pickerSwipeHandlers = useMemo(
+    () =>
+      createEdgeSwipeDismissHandlers(() => {
+        Keyboard.dismiss();
+        setActivePicker(null);
+        setPickerSearch('');
+      }),
+    []
+  );
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top']} {...screenSwipeHandlers}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -2904,6 +2948,7 @@ export default function CreateListingScreen() {
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.modalBackdrop}
+            {...pickerSwipeHandlers}
           >
             <Pressable
               style={StyleSheet.absoluteFill}

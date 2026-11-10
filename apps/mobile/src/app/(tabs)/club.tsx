@@ -23,6 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { createEdgeSwipeDismissHandlers } from '../../utils/backGesture';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const CLUB_HEADER_LOGO = require('../../../assets/images/torkscout-club-header-logo.png');
@@ -792,6 +793,7 @@ export default function TorqueScoutClubScreen() {
         <KeyboardAvoidingView
           style={styles.modalBackdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          {...createEdgeSwipeDismissHandlers(() => setCreatePostModalVisible(false))}
         >
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -964,6 +966,7 @@ export default function TorqueScoutClubScreen() {
         <KeyboardAvoidingView
           style={styles.modalBackdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          {...createEdgeSwipeDismissHandlers(() => setActivePostForComments(null))}
         >
           <Pressable
             style={StyleSheet.absoluteFill}

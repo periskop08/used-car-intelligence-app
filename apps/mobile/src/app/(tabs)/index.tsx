@@ -1349,9 +1349,16 @@ export default function MobileDashboard({
     }
   };
 
+  const isClosingQueryRef = useRef(false);
+
   const closeQueryModal = useCallback(() => {
     stopCategoryCycle();
     if (standaloneQueryScreen) {
+      if (isClosingQueryRef.current) return;
+      isClosingQueryRef.current = true;
+      setTimeout(() => {
+        isClosingQueryRef.current = false;
+      }, 600);
       if (router.canGoBack()) {
         router.back();
       } else {

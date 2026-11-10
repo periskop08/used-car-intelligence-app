@@ -23,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
 import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
 import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
+import { createEdgeSwipeDismissHandlers } from '../utils/backGesture';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -1566,7 +1567,10 @@ export default function ComparisonScreen() {
         visible={detailModalVisible}
         onRequestClose={() => setDetailModalVisible(false)}
       >
-        <View style={styles.detailModalOverlay}>
+        <View
+          style={styles.detailModalOverlay}
+          {...createEdgeSwipeDismissHandlers(() => setDetailModalVisible(false))}
+        >
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setDetailModalVisible(false)}
@@ -1654,14 +1658,12 @@ export default function ComparisonScreen() {
         animationType="slide"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => {
-          Keyboard.dismiss();
-          setModalVisible(false);
-        }}
+        onRequestClose={handleStepBackInModal}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
+          {...createEdgeSwipeDismissHandlers(handleStepBackInModal)}
         >
           <Pressable
             style={StyleSheet.absoluteFill}

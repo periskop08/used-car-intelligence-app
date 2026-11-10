@@ -19,6 +19,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createEdgeSwipeDismissHandlers } from '../utils/backGesture';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -1293,6 +1294,7 @@ export default function AraciniBulScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
+          {...createEdgeSwipeDismissHandlers(() => setShowFilterModal(false))}
         >
           <Pressable
             style={StyleSheet.absoluteFill}
