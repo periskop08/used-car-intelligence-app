@@ -18,9 +18,30 @@ const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
 const resolveAvatarUrl = (url?: string | null): string | null => {
   if (!url) return null;
-  if (url.includes('.r2.dev/') || url.includes('cloudflarestorage.com/')) {
-    const parts = url.split('.r2.dev/');
-    const storageKey = parts.length > 1 ? parts[1].split('?')[0] : '';
+  if (url.startsWith('data:')) return url;
+  if (url.includes('/listings/media-proxy/') || url.includes('/vehicle-guide/media-proxy/')) {
+    return url.startsWith('http') ? url : `${API_URL}${url}`;
+  }
+  if (url.startsWith('/profile-photos/') || url.startsWith('profile-photos/')) {
+    return `${API_URL}/listings/media-proxy/${url.replace(/^\//, '')}`;
+  }
+  if (url.includes('r2.dev') || url.includes('cloudflarestorage.com')) {
+    let storageKey = '';
+    if (url.includes('.r2.dev/')) {
+      const parts = url.split('.r2.dev/');
+      if (parts.length > 1) storageKey = parts[1].split('?')[0];
+    } else {
+      const parts = url.split('cloudflarestorage.com/');
+      if (parts.length > 1) {
+        const path = parts[1].split('?')[0].replace(/^\//, '');
+        const pathParts = path.split('/');
+        if (pathParts[0] === 'torquescout-listings') {
+          storageKey = pathParts.slice(1).join('/');
+        } else {
+          storageKey = path;
+        }
+      }
+    }
     if (storageKey) {
       return `${API_URL}/listings/media-proxy/${storageKey}`;
     }
@@ -38,6 +59,9 @@ interface UserProfile {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  phone2?: string;
+  phone3?: string;
+  displayNamePreference?: 'FULL_NAME' | 'SHORT_NAME' | 'USERNAME';
   profilePhotoUrl?: string;
   role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
   subscriptionTier: 'FREE' | 'TANISMA' | 'BASIC' | 'YETKIN' | 'STANDARD' | 'PRO' | 'PROFESYONEL' | 'PREMIUM';
@@ -117,10 +141,17 @@ export default function ProfileScreen() {
 
   const getDisplayName = () => {
     if (!profile) return '';
-    if (profile.firstName) {
+    const pref = profile.displayNamePreference || 'FULL_NAME';
+    if (pref === 'USERNAME' && profile.username) {
+      return `@${profile.username}`;
+    }
+    if (pref === 'SHORT_NAME' && profile.firstName) {
       return `${profile.firstName} ${profile.lastName ? profile.lastName[0] + '.' : ''}`.trim();
     }
-    if (profile.username) return profile.username;
+    if (profile.firstName || profile.lastName) {
+      return `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
+    }
+    if (profile.username) return `@${profile.username}`;
     return profile.email.split('@')[0];
   };
 
@@ -156,22 +187,31 @@ export default function ProfileScreen() {
             {/* VIP PROFILE HEADER CARD (Web Style Dark/Sleek Container) */}
             <View style={styles.profileHeaderCard}>
               <View style={styles.profileTopRow}>
-                <View style={styles.avatarWrap}>
-                  {profile.profilePhotoUrl ? (
-                    <ExpoImage
-                      source={{ uri: resolveAvatarUrl(profile.profilePhotoUrl) || '' }}
-                      style={styles.avatarImage}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                    />
-                  ) : (
-                    <View style={styles.avatarFallback}>
-                      <Text style={styles.avatarInitial}>
-                        {(profile.firstName?.[0] || profile.email?.[0] || 'U').toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                <TouchableOpacity
+                  style={styles.avatarOuterWrap}
+                  activeOpacity={0.8}
+                  onPress={() => router.push({ pathname: '/profile/personal-info', params: { section: 'photo' } } as any)}
+                >
+                  <View style={styles.avatarWrap}>
+                    {profile.profilePhotoUrl && resolveAvatarUrl(profile.profilePhotoUrl) ? (
+                      <ExpoImage
+                        source={{ uri: resolveAvatarUrl(profile.profilePhotoUrl) || '' }}
+                        style={styles.avatarImage}
+                        contentFit="cover"
+                        cachePolicy="memory"
+                      />
+                    ) : (
+                      <View style={styles.avatarFallback}>
+                        <Text style={styles.avatarInitial}>
+                          {(profile.firstName?.[0] || profile.email?.[0] || 'U').toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.avatarCameraBadge}>
+                    <Ionicons name="camera" size={11} color="#ffffff" />
+                  </View>
+                </TouchableOpacity>
 
                 <View style={styles.profileMetaInfo}>
                   <Text style={styles.welcomeGreeting}>HOŞ GELDİNİZ</Text>
@@ -232,7 +272,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/my-listings' as any)}
+                onPress={() => router.push({ pathname: '/profile/my-listings', params: { tab: 'ACTIVE' } } as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="car-sport-outline" size={18} color="#64748b" style={styles.menuIcon} />
@@ -244,7 +284,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/my-listings' as any)}
+                onPress={() => router.push({ pathname: '/profile/my-listings', params: { tab: 'PASSIVE' } } as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="time-outline" size={18} color="#64748b" style={styles.menuIcon} />
@@ -296,7 +336,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push({ pathname: '/profile/favorites', params: { tab: 'listings' } } as any)}
+                onPress={() => router.push({ pathname: '/profile/favorites', params: { tab: 'sellers' } } as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="people-outline" size={18} color="#64748b" style={styles.menuIcon} />
@@ -308,7 +348,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[styles.menuRowItem, styles.lastMenuItem]}
                 activeOpacity={0.7}
-                onPress={() => router.push({ pathname: '/profile/favorites', params: { tab: 'listings' } } as any)}
+                onPress={() => router.push({ pathname: '/profile/favorites', params: { tab: 'searches' } } as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="search-outline" size={18} color="#64748b" style={styles.menuIcon} />
@@ -373,7 +413,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/personal-info' as any)}
+                onPress={() => router.push({ pathname: '/profile/personal-info', params: { section: 'info' } } as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="person-outline" size={18} color="#64748b" style={styles.menuIcon} />
@@ -385,7 +425,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/personal-info' as any)}
+                onPress={() => router.push({ pathname: '/profile/personal-info', params: { section: 'email' } } as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="mail-outline" size={18} color="#64748b" style={styles.menuIcon} />
@@ -397,7 +437,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/personal-info' as any)}
+                onPress={() => router.push({ pathname: '/profile/personal-info', params: { section: 'phone' } } as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="call-outline" size={18} color="#64748b" style={styles.menuIcon} />
@@ -409,7 +449,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/personal-info' as any)}
+                onPress={() => router.push({ pathname: '/profile/personal-info', params: { section: 'password' } } as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="key-outline" size={18} color="#64748b" style={styles.menuIcon} />
@@ -421,7 +461,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/settings' as any)}
+                onPress={() => router.push({ pathname: '/profile/settings', params: { section: 'notifications' } } as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="notifications-outline" size={18} color="#64748b" style={styles.menuIcon} />
@@ -433,7 +473,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/settings' as any)}
+                onPress={() => router.push({ pathname: '/profile/settings', params: { section: 'security' } } as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="shield-checkmark-outline" size={18} color="#64748b" style={styles.menuIcon} />
@@ -445,7 +485,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[styles.menuRowItem, styles.lastMenuItem]}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/settings' as any)}
+                onPress={() => router.push({ pathname: '/profile/settings', params: { section: 'cancel' } } as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="close-circle-outline" size={18} color="#ef4444" style={styles.menuIcon} />
@@ -581,6 +621,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
   },
+  avatarOuterWrap: {
+    position: 'relative',
+    width: 64,
+    height: 64,
+  },
   avatarWrap: {
     width: 64,
     height: 64,
@@ -589,6 +634,19 @@ const styles = StyleSheet.create({
     borderColor: '#ea580c',
     overflow: 'hidden',
     backgroundColor: '#fff7ed',
+  },
+  avatarCameraBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#ea580c',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatarImage: {
     width: '100%',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,26 +8,58 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Modal,
+  Pressable,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+let ImagePicker: any = null;
+try {
+  ImagePicker = require('expo-image-picker');
+} catch (e) {
+  console.warn('ImagePicker could not be loaded:', e);
+}
+
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
+const SUBJECT_OPTIONS = [
+  { value: 'GENERAL_SUGGESTION', label: 'Genel Öneri' },
+  { value: 'BUG_REPORT', label: 'Hata Bildirimi' },
+  { value: 'VEHICLE_QUERY_AI_REPORT', label: 'Araç Sorgulama / AI Rapor' },
+  { value: 'INCORRECT_VEHICLE_DATA', label: 'Eksik veya Hatalı Araç Bilgisi' },
+  { value: 'LISTINGS', label: 'İlanlar' },
+  { value: 'MESSAGES', label: 'Mesajlar' },
+  { value: 'FAVORITES', label: 'Favoriler' },
+  { value: 'SUBSCRIPTION_PACKAGES', label: 'Abonelik / Paketler' },
+  { value: 'ACCOUNT_PROFILE', label: 'Hesap / Profil' },
+  { value: 'VEHICLE_GUIDE', label: 'Araç Rehberi' },
+  { value: 'VEHICLE_COMPARISON', label: 'Araç Karşılaştırma' },
+  { value: 'FIND_MY_CAR', label: 'Aracını Bul' },
+  { value: 'DESIGN_USABILITY', label: 'Tasarım / Kullanım Kolaylığı' },
+  { value: 'SECURITY_SUSPICIOUS_ACTIVITY', label: 'Güvenlik / Şüpheli İşlem' },
+  { value: 'OTHER', label: 'Diğer' },
+];
+
 const FAQ_ITEMS = [
+  {
+    q: 'Nasıl ilan eklerim?',
+    a: "Hesap menünüzden '+ İlan Ekle' butonuna basarak aracınızın marka, model, yıl, kilometre ve hasar durumunu doldurup ilanınızı yayına alabilirsiniz.",
+  },
   {
     q: 'TorqueScout Araç Raporu nasıl hazırlanır?',
     a: 'Yapay zeka modellerimiz ve Türkiye/Avrupa otomotiv veritabanlarımız, aracın marka, model, motor kodu ve üretim yılına göre bilinen tüm kronik arızalarını, şanzıman ve motor risklerini saniyeler içinde analiz eder.',
   },
   {
-    q: 'İlan kotamı nasıl artırabilirim?',
-    a: 'Profilinizdeki "Paketim" sekmesinden Yetkin veya Profesyonel VIP üyelik paketlerine geçiş yaparak ilan kotanızı ve AI rapor limitlerinizi anında yükseltebilirsiniz.',
+    q: 'Abonelik paketleri arasındaki farklar nelerdir?',
+    a: 'Tanışma paketinde 1 adet ilan yayınlanabilir. Yetkin pakette 10, Profesyonel pakette ise 50 ilana kadar aktif yayın hakkınız ve yüksek AI rapor/chatbot kotanız bulunmaktadır.',
   },
   {
-    q: 'İlanım ne zaman onaylanır?',
-    a: 'Verdiğiniz ilanlar moderasyon ekibimiz tarafından güvenlik ve kalite standartları çerçevesinde incelenir ve ortalama 15-30 dakika içerisinde yayına alınır.',
+    q: 'Kayıtlı arama nedir ve nasıl kullanılır?',
+    a: "İlanları ararken filtrelediğiniz kriterleri 'Aramayı Kaydet' diyerek favorilerinize ekleyebilirsiniz. Bu aramalara uygun yeni bir ilan eklendiğinde size e-posta/push bildirimi gönderilir.",
   },
   {
     q: 'Favori raporlarımı nereden görebilirim?',
@@ -38,17 +70,71 @@ const FAQ_ITEMS = [
 export default function SupportScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const listingId = params.listingId ? String(params.listingId) : '';
+  const isListingReport = Boolean(listingId);
+
   const [activeTab, setActiveTab] = useState<'HELP' | 'FEEDBACK'>(
-    params.tab === 'feedback' ? 'FEEDBACK' : 'HELP'
+    params.tab === 'feedback' || isListingReport ? 'FEEDBACK' : 'HELP'
   );
 
-  const [feedbackCategory, setFeedbackCategory] = useState('GENEL');
+  const [feedbackCategory, setFeedbackCategory] = useState<string>(() => {
+    if (isListingReport) return 'LISTINGS';
+    if (params.category) return String(params.category);
+    return 'GENERAL_SUGGESTION';
+  });
+  const [subjectPickerVisible, setSubjectPickerVisible] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
+  const [attachmentUri, setAttachmentUri] = useState<string | null>(null);
+  const [attachmentMime, setAttachmentMime] = useState<string>('image/jpeg');
   const [sending, setSending] = useState(false);
 
+  useEffect(() => {
+    if (params.tab === 'feedback' || isListingReport) {
+      setActiveTab('FEEDBACK');
+    } else if (params.tab === 'help') {
+      setActiveTab('HELP');
+    }
+    if (params.category) {
+      setFeedbackCategory(String(params.category));
+    }
+  }, [params.tab, params.category, isListingReport]);
+
+  const handlePickScreenshot = async () => {
+    try {
+      if (!ImagePicker) {
+        Alert.alert('Hata', 'Görsel seçici modülü yüklenemedi.');
+        return;
+      }
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('İzin Gerekli', 'Ekran görüntüsü eklemek için galeri erişim izni vermelisiniz.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions?.Images || 'Images',
+        allowsEditing: false,
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setAttachmentUri(asset.uri);
+        setAttachmentMime(asset.mimeType || 'image/jpeg');
+      }
+    } catch (e) {
+      Alert.alert('Hata', 'Görsel seçilirken bir hata oluştu.');
+    }
+  };
+
   const handleSendFeedback = async () => {
-    if (!feedbackText.trim()) {
-      Alert.alert('Uyarı', 'Lütfen geri bildiriminizi veya önerinizi yazın.');
+    const trimmed = feedbackText.trim();
+    if (trimmed.length < 10) {
+      Alert.alert('Uyarı', 'Açıklamanız en az 10 karakter olmalıdır.');
+      return;
+    }
+    if (trimmed.length > 2000) {
+      Alert.alert('Uyarı', 'Açıklamanız en fazla 2000 karakter olabilir.');
       return;
     }
 
@@ -58,30 +144,61 @@ export default function SupportScreen() {
         (await AsyncStorage.getItem('accessToken')) ||
         (await AsyncStorage.getItem('token'));
 
-      const res = await fetch(`${API_URL}/support/feedback`, {
+      if (!token) {
+        Alert.alert('Oturum Gerekli', 'Bildirim göndermek için lütfen giriş yapın.');
+        setSending(false);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('message', trimmed);
+      if (!isListingReport) {
+        formData.append('subjectCategory', feedbackCategory);
+      }
+      if (attachmentUri) {
+        const filename = attachmentUri.split('/').pop() || 'screenshot.jpg';
+        formData.append('attachment', {
+          uri: attachmentUri,
+          name: filename,
+          type: attachmentMime,
+        } as any);
+      }
+
+      const endpoint = isListingReport
+        ? `${API_URL}/listings/${listingId}/report`
+        : `${API_URL}/feedback`;
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          category: feedbackCategory,
-          message: feedbackText.trim(),
-        }),
-      }).catch(() => null);
+        body: formData,
+      });
 
+      const responseData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(responseData.message || 'Bildirim gönderilemedi.');
+      }
+
+      setFeedbackText('');
+      setAttachmentUri(null);
       Alert.alert(
         'Teşekkürler! 🎉',
-        'Geri bildiriminiz başarıyla alındı. TorqueScout ekibi olarak deneyiminizi iyileştirmek için en kısa sürede değerlendireceğiz.',
+        isListingReport
+          ? `Bildiriminiz alındı (Bildirim No: ${responseData.ticketNo || 'RPT-KAYIT'}).`
+          : 'Geri bildiriminiz alındı. TorqueScout’u geliştirmemize yardımcı olduğunuz için teşekkür ederiz.',
         [{ text: 'Tamam', onPress: () => router.back() }]
       );
-      setFeedbackText('');
-    } catch (e) {
-      Alert.alert('Bilgi', 'Geri bildiriminiz kaydedildi, teşekkür ederiz.');
+    } catch (e: any) {
+      Alert.alert('Hata', e.message || 'Bildirim gönderilemedi. Lütfen tekrar deneyin.');
     } finally {
       setSending(false);
     }
   };
+
+  const selectedSubjectLabel =
+    SUBJECT_OPTIONS.find((o) => o.value === feedbackCategory)?.label || 'Genel Öneri';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -90,40 +207,44 @@ export default function SupportScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color="#0f172a" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Destek & Yardım</Text>
+        <Text style={styles.headerTitle}>
+          {isListingReport ? 'İlanı Bildir / Şikâyet Et' : 'Destek & Yardım'}
+        </Text>
         <View style={{ width: 36 }} />
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabsRow}>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'HELP' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('HELP')}
-        >
-          <Ionicons
-            name="help-circle"
-            size={16}
-            color={activeTab === 'HELP' ? '#ea580c' : '#64748b'}
-          />
-          <Text style={[styles.tabBtnText, activeTab === 'HELP' && styles.tabBtnTextActive]}>
-            Yardım Merkezi
-          </Text>
-        </TouchableOpacity>
+      {!isListingReport && (
+        <View style={styles.tabsRow}>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'HELP' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('HELP')}
+          >
+            <Ionicons
+              name="help-circle"
+              size={16}
+              color={activeTab === 'HELP' ? '#ea580c' : '#64748b'}
+            />
+            <Text style={[styles.tabBtnText, activeTab === 'HELP' && styles.tabBtnTextActive]}>
+              Yardım Merkezi
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'FEEDBACK' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('FEEDBACK')}
-        >
-          <Ionicons
-            name="chatbubble-ellipses"
-            size={16}
-            color={activeTab === 'FEEDBACK' ? '#ea580c' : '#64748b'}
-          />
-          <Text style={[styles.tabBtnText, activeTab === 'FEEDBACK' && styles.tabBtnTextActive]}>
-            Geri Bildirim Gönder
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'FEEDBACK' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('FEEDBACK')}
+          >
+            <Ionicons
+              name="chatbubble-ellipses"
+              size={16}
+              color={activeTab === 'FEEDBACK' ? '#ea580c' : '#64748b'}
+            />
+            <Text style={[styles.tabBtnText, activeTab === 'FEEDBACK' && styles.tabBtnTextActive]}>
+              Geri Bildirim Gönder
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {activeTab === 'HELP' ? (
@@ -148,69 +269,162 @@ export default function SupportScreen() {
           </>
         ) : (
           <View style={styles.feedbackCard}>
-            <Text style={styles.feedbackTitle}>Geri Bildiriminiz Bizim İçin Değerli</Text>
+            <Text style={styles.feedbackTitle}>
+              {isListingReport
+                ? '⚑ İlanı Bildir / Şikâyet Et'
+                : 'Geri Bildiriminiz Bizim İçin Değerli'}
+            </Text>
             <Text style={styles.feedbackSub}>
-              Uygulama deneyiminiz, hata bildirimleri veya yeni özellik önerilerinizi bizimle paylaşın.
+              {isListingReport
+                ? 'Şüpheli, hatalı veya kurallara aykırı olduğunu düşündüğünüz ilanı yönetici ekibimize bildirin.'
+                : 'TorqueScout hakkındaki önerilerinizi, hata bildirimlerinizi veya görüşlerinizi bizimle paylaşın.'}
             </Text>
 
-            {/* Category Selector */}
-            <Text style={styles.inputLabel}>Kategori Seçin</Text>
-            <View style={styles.categoryRow}>
-              {[
-                { key: 'GENEL', label: 'Genel Öneri' },
-                { key: 'ARAC_RAPORU', label: 'Araç Raporu' },
-                { key: 'ILAN', label: 'İlan & Satış' },
-                { key: 'HATA_BILDIRIMI', label: 'Hata Bildirimi' },
-              ].map((c) => (
-                <TouchableOpacity
-                  key={c.key}
-                  style={[
-                    styles.catChip,
-                    feedbackCategory === c.key && styles.catChipActive,
-                  ]}
-                  onPress={() => setFeedbackCategory(c.key)}
-                >
-                  <Text
-                    style={[
-                      styles.catChipText,
-                      feedbackCategory === c.key && styles.catChipTextActive,
-                    ]}
-                  >
-                    {c.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {/* Subject Selector (15 Web Subjects) */}
+            <Text style={styles.inputLabel}>Konu</Text>
+            {isListingReport ? (
+              <View style={[styles.dropdownBtn, { borderColor: '#fed7aa', backgroundColor: '#fff7ed' }]}>
+                <Text style={[styles.dropdownBtnText, { color: '#ea580c' }]}>İlanlar (Kilitli)</Text>
+                <Ionicons name="lock-closed" size={16} color="#ea580c" />
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.dropdownBtn}
+                activeOpacity={0.8}
+                onPress={() => setSubjectPickerVisible(true)}
+              >
+                <Text style={styles.dropdownBtnText}>{selectedSubjectLabel}</Text>
+                <Ionicons name="chevron-down" size={18} color="#64748b" />
+              </TouchableOpacity>
+            )}
 
-            <Text style={styles.inputLabel}>Mesajınız</Text>
+            {/* Message Input */}
+            <View style={styles.labelRow}>
+              <Text style={styles.inputLabel}>
+                {isListingReport ? 'Şikâyetiniz / Açıklamanız' : 'Mesajınız'}
+              </Text>
+              <Text style={styles.charCounter}>{feedbackText.length} / 2000</Text>
+            </View>
             <TextInput
               style={styles.textArea}
-              placeholder="Düşüncelerinizi veya karşılaştığınız durumu detaylandırın..."
+              placeholder={
+                isListingReport
+                  ? 'Bu ilanla ilgili bildirmek istediğiniz durumu açıklayın (en az 10 karakter)...'
+                  : 'Geri bildiriminizi detaylandırın (en az 10 karakter)...'
+              }
               placeholderTextColor="#94a3b8"
               value={feedbackText}
               onChangeText={setFeedbackText}
+              maxLength={2000}
               multiline
               numberOfLines={6}
               textAlignVertical="top"
             />
 
+            {/* Optional Screenshot Upload (Matching Web) */}
+            <Text style={styles.inputLabel}>Ekran Görüntüsü Ekle (Opsiyonel)</Text>
+            {attachmentUri ? (
+              <View style={styles.attachmentPreviewBox}>
+                <ExpoImage
+                  source={{ uri: attachmentUri }}
+                  style={styles.attachmentImg}
+                  contentFit="cover"
+                />
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={styles.attachmentName}>Ekran görüntüsü eklendi</Text>
+                  <TouchableOpacity
+                    style={styles.removeAttachmentBtn}
+                    onPress={() => setAttachmentUri(null)}
+                  >
+                    <Ionicons name="trash-outline" size={14} color="#ef4444" />
+                    <Text style={styles.removeAttachmentText}>Görseli Kaldır</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.pickScreenshotBtn}
+                activeOpacity={0.8}
+                onPress={handlePickScreenshot}
+              >
+                <Ionicons name="image-outline" size={18} color="#475569" />
+                <Text style={styles.pickScreenshotText}>Galeriden Ekran Görüntüsü Seç</Text>
+              </TouchableOpacity>
+            )}
+            <Text style={styles.hintText}>
+              İzin verilen formatlar: JPG, JPEG, PNG, WEBP. Maksimum dosya boyutu: 5MB
+            </Text>
+
             <TouchableOpacity
-              style={[styles.submitBtn, sending && styles.submitBtnDisabled]}
+              style={[
+                styles.submitBtn,
+                (sending || feedbackText.trim().length < 10) && styles.submitBtnDisabled,
+              ]}
               onPress={handleSendFeedback}
-              disabled={sending}
+              disabled={sending || feedbackText.trim().length < 10}
             >
               {sending ? (
                 <ActivityIndicator size="small" color="#ffffff" />
               ) : (
                 <>
                   <Ionicons name="paper-plane" size={18} color="#ffffff" />
-                  <Text style={styles.submitBtnText}>Geri Bildirimi Gönder</Text>
+                  <Text style={styles.submitBtnText}>
+                    {isListingReport ? 'Şikâyeti Gönder' : 'Geri Bildirim Gönder'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
+
+      {/* Subject Picker Modal */}
+      <Modal
+        visible={subjectPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSubjectPickerVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setSubjectPickerVisible(false)}
+          />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Konu Seçin</Text>
+              <TouchableOpacity onPress={() => setSubjectPickerVisible(false)}>
+                <Ionicons name="close" size={22} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 420 }}>
+              {SUBJECT_OPTIONS.map((opt) => {
+                const isSelected = feedbackCategory === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[styles.modalOptionRow, isSelected && styles.modalOptionRowActive]}
+                    onPress={() => {
+                      setFeedbackCategory(opt.value);
+                      setSubjectPickerVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.modalOptionText,
+                        isSelected && styles.modalOptionTextActive,
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                    {isSelected && <Ionicons name="checkmark-circle" size={18} color="#ea580c" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -343,37 +557,38 @@ const styles = StyleSheet.create({
     color: '#64748b',
     lineHeight: 18,
   },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
   inputLabel: {
     fontSize: 12,
     fontWeight: '800',
     color: '#0f172a',
     marginTop: 4,
   },
-  categoryRow: {
+  charCounter: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  dropdownBtn: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  catChip: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
-    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
     borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  catChipActive: {
-    backgroundColor: '#fff7ed',
-    borderColor: '#ea580c',
-  },
-  catChipText: {
-    fontSize: 11.5,
+  dropdownBtnText: {
+    fontSize: 13.5,
     fontWeight: '700',
-    color: '#64748b',
-  },
-  catChipTextActive: {
-    color: '#ea580c',
-    fontWeight: '800',
+    color: '#0f172a',
   },
   textArea: {
     backgroundColor: '#f8fafc',
@@ -384,6 +599,59 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     color: '#0f172a',
     minHeight: 120,
+  },
+  pickScreenshotBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  pickScreenshotText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  attachmentPreviewBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 10,
+  },
+  attachmentImg: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  attachmentName: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  removeAttachmentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  removeAttachmentText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#ef4444',
+  },
+  hintText: {
+    fontSize: 10.5,
+    color: '#94a3b8',
   },
   submitBtn: {
     flexDirection: 'row',
@@ -402,5 +670,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 28,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  modalOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f8fafc',
+  },
+  modalOptionRowActive: {
+    backgroundColor: '#fff7ed',
+  },
+  modalOptionText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  modalOptionTextActive: {
+    fontWeight: '800',
+    color: '#ea580c',
   },
 });

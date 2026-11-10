@@ -190,7 +190,12 @@ export default function UserDashboardScreen() {
 
             <TouchableOpacity
               style={styles.actionRow}
-              onPress={() => router.push('/(tabs)' as any)}
+              onPress={() =>
+                router.push({
+                  pathname: '/(tabs)',
+                  params: { openQueryModal: String(Date.now()) },
+                } as any)
+              }
             >
               <View style={[styles.actionIconCircle, { backgroundColor: '#eff6ff' }]}>
                 <Ionicons name="search" size={20} color="#2563eb" />

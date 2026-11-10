@@ -102,8 +102,18 @@ export class UserService {
         ? 'ADMIN'
         : user.role;
 
+    let normalizedProfilePhotoUrl = user.profilePhotoUrl || null;
+    if (normalizedProfilePhotoUrl) {
+      if (normalizedProfilePhotoUrl.startsWith('/profile-photos/')) {
+        normalizedProfilePhotoUrl = `/listings/media-proxy${normalizedProfilePhotoUrl}`;
+      } else if (normalizedProfilePhotoUrl.startsWith('profile-photos/')) {
+        normalizedProfilePhotoUrl = `/listings/media-proxy/${normalizedProfilePhotoUrl}`;
+      }
+    }
+
     return {
       ...user,
+      profilePhotoUrl: normalizedProfilePhotoUrl,
       role: effectiveRole as any,
       subscriptionTier: effectiveTier,
       notificationSettings: settings,
@@ -289,7 +299,9 @@ export class UserService {
       }),
     );
 
-    const publicUrl = `${this.publicUrl}/${storageKey}`;
+    const publicUrl = this.publicUrl
+      ? `${this.publicUrl}/${storageKey}`
+      : `/listings/media-proxy/${storageKey}`;
     await this.prisma.user.update({
       where: { id: userId },
       data: { profilePhotoUrl: publicUrl },
@@ -934,8 +946,18 @@ export class UserService {
 
   private async deleteImageFromR2(url: string) {
     try {
-      const parts = url.split('.r2.dev/');
-      const key = parts[1];
+      let key = '';
+      if (url.includes('.r2.dev/')) {
+        key = url.split('.r2.dev/')[1]?.split('?')[0] || '';
+      } else if (url.includes('/listings/media-proxy/')) {
+        key = url.split('/listings/media-proxy/')[1]?.split('?')[0] || '';
+      } else if (url.includes('cloudflarestorage.com/')) {
+        const path = url.split('cloudflarestorage.com/')[1]?.split('?')[0]?.replace(/^\//, '') || '';
+        const parts = path.split('/');
+        key = parts[0] === 'torquescout-listings' ? parts.slice(1).join('/') : path;
+      } else if (url.startsWith('/profile-photos/') || url.startsWith('profile-photos/')) {
+        key = url.replace(/^\//, '');
+      }
       if (key) {
         await this.s3Client.send(
           new DeleteObjectCommand({

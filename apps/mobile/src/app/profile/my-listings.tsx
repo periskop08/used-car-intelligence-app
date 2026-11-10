@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import UrgentBadge from '../../components/UrgentBadge';
@@ -23,9 +23,27 @@ const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
 const resolveMediaUrl = (url?: string | null): string => {
   if (!url) return '';
-  if (url.includes('.r2.dev/') || url.includes('cloudflarestorage.com/')) {
-    const parts = url.split('.r2.dev/');
-    const storageKey = parts.length > 1 ? parts[1].split('?')[0] : '';
+  if (url.startsWith('data:')) return url;
+  if (url.includes('/listings/media-proxy/') || url.includes('/vehicle-guide/media-proxy/')) {
+    return url.startsWith('http') ? url : `${API_URL}${url}`;
+  }
+  if (url.includes('r2.dev') || url.includes('cloudflarestorage.com')) {
+    let storageKey = '';
+    if (url.includes('.r2.dev/')) {
+      const parts = url.split('.r2.dev/');
+      if (parts.length > 1) storageKey = parts[1].split('?')[0];
+    } else {
+      const parts = url.split('cloudflarestorage.com/');
+      if (parts.length > 1) {
+        const path = parts[1].split('?')[0].replace(/^\//, '');
+        const pathParts = path.split('/');
+        if (pathParts[0] === 'torquescout-listings') {
+          storageKey = pathParts.slice(1).join('/');
+        } else {
+          storageKey = path;
+        }
+      }
+    }
     if (storageKey) {
       return `${API_URL}/listings/media-proxy/${storageKey}`;
     }
@@ -62,11 +80,26 @@ interface ListingItem {
 
 export default function MyListingsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [listings, setListings] = useState<ListingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [quota, setQuota] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'PENDING' | 'PASSIVE'>('ACTIVE');
+  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'PENDING' | 'PASSIVE'>(() => {
+    if (params.tab === 'PASSIVE' || params.tab === 'past') return 'PASSIVE';
+    if (params.tab === 'PENDING') return 'PENDING';
+    return 'ACTIVE';
+  });
+
+  useEffect(() => {
+    if (params.tab === 'PASSIVE' || params.tab === 'past') {
+      setActiveTab('PASSIVE');
+    } else if (params.tab === 'PENDING') {
+      setActiveTab('PENDING');
+    } else if (params.tab === 'ACTIVE') {
+      setActiveTab('ACTIVE');
+    }
+  }, [params.tab]);
 
   // Promotion Management State
   const [promotionListing, setPromotionListing] = useState<ListingItem | null>(null);

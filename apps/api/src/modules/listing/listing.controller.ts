@@ -347,7 +347,10 @@ export class ListingController {
       'guide-cards/',
       'discovery/',
       'profiles/',
+      'profile-photos/',
       'avatars/',
+      'club/',
+      'feedback/',
     ];
     const isAllowed = allowedPrefixes.some((prefix) => storageKey.startsWith(prefix));
     if (storageKey.includes('..') || !isAllowed) {

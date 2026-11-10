@@ -1,11 +1,16 @@
 export const formatImageUrl = (url?: string | null) => {
   if (!url) return "";
 
-  // Idempotency safety: if already routed through media-proxy or is a local data URI, return as-is
-  if (url.includes("/listings/media-proxy/") || url.includes("/vehicle-guide/media-proxy/")) return url;
-  if (url.startsWith("/") || url.startsWith("data:")) return url;
-
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+  // Idempotency safety: if already routed through media-proxy or is a local data URI
+  if (url.includes("/listings/media-proxy/") || url.includes("/vehicle-guide/media-proxy/")) {
+    return url.startsWith("http") ? url : `${API_URL}${url}`;
+  }
+  if (url.startsWith("/profile-photos/") || url.startsWith("profile-photos/")) {
+    return `${API_URL}/listings/media-proxy/${url.replace(/^\//, "")}`;
+  }
+  if (url.startsWith("/") || url.startsWith("data:")) return url;
 
   if (url.includes("r2.dev") || url.includes("cloudflarestorage.com")) {
     let storageKey = "";

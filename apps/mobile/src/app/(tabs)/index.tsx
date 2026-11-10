@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle, Line, G } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image as ExpoImage } from 'expo-image';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
@@ -30,16 +30,22 @@ const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const formatCloudflareImageUrl = (url?: string | null): string => {
   if (!url) return '';
   if (url.startsWith('data:')) return url;
+  if (url.includes('/listings/media-proxy/') || url.includes('/vehicle-guide/media-proxy/')) {
+    return url.startsWith('http') ? url : `${API_URL}${url}`;
+  }
+  if (url.startsWith('/profile-photos/') || url.startsWith('profile-photos/')) {
+    return `${API_URL}/listings/media-proxy/${url.replace(/^\//, '')}`;
+  }
 
   if (url.includes('r2.dev') || url.includes('cloudflarestorage.com')) {
     let storageKey = '';
     if (url.includes('.r2.dev/')) {
       const parts = url.split('.r2.dev/');
-      if (parts.length > 1) storageKey = parts[1];
+      if (parts.length > 1) storageKey = parts[1].split('?')[0];
     } else {
       const parts = url.split('cloudflarestorage.com/');
       if (parts.length > 1) {
-        const path = parts[1].replace(/^\//, '');
+        const path = parts[1].split('?')[0].replace(/^\//, '');
         const pathParts = path.split('/');
         if (pathParts[0] === 'torquescout-listings') {
           storageKey = pathParts.slice(1).join('/');
@@ -501,6 +507,7 @@ export const getCategoryLabel = (
 
 export default function MobileDashboard() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [user, setUser] = useState<{
     id?: string;
     email: string;
@@ -641,6 +648,15 @@ export default function MobileDashboard() {
     'category' | 'brand' | 'model' | 'year' | 'bodyType' | 'engine' | 'fuelType' | 'transmission' | 'trim'
   >('brand');
   const [searchText, setSearchText] = useState('');
+
+  // Open Araç Sorgula modal directly when navigated with openQueryModal param (e.g. from Dashboard / Favorites)
+  useEffect(() => {
+    if (params.openQueryModal) {
+      setModalView('form');
+      startCategoryCycle();
+      setQueryModalVisible(true);
+    }
+  }, [params.openQueryModal, startCategoryCycle]);
 
   // Favorites Map
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
