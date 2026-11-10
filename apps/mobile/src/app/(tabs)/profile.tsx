@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -537,14 +538,75 @@ export default function ProfileScreen() {
         ) : (
           /* GUEST STATE WHEN NOT LOGGED IN */
           <View style={styles.guestCard}>
-            <View style={styles.guestIconCircle}>
-              <Ionicons name="person-circle-outline" size={54} color="#ea580c" />
+            <View style={styles.guestLogoWrap}>
+              <Image
+                source={require('../../../assets/images/torkscout-header-logo.png')}
+                style={styles.guestLogoImg}
+                resizeMode="contain"
+              />
             </View>
 
-            <Text style={styles.guestTitle}>TorqueScout Hesabınız</Text>
+            <View style={styles.guestSloganPill}>
+              <Ionicons name="shield-checkmark" size={12} color="#ea580c" />
+              <Text style={styles.guestSloganPillText}>İKİNCİ ELDE AKILLI KARAR PLATFORMU</Text>
+            </View>
+
+            <Text style={styles.guestTitle}>Aracı Tanı, Riski Gör,{'\n'}Doğru Kararı Ver</Text>
             <Text style={styles.guestDesc}>
-              Giriş yaparak favorilerinize erişebilir, araç sorgulama raporlarını kaydedebilir ve araçlarınızı ilan verebilirsiniz.
+              TorkScout; almayı düşündüğünüz veya satacağınız aracın kronik sorunlarını, fabrika verilerini ve piyasa analizini saniyeler içinde sunan dijital araç danışmanınızdır.
             </Text>
+
+            <View style={styles.guestWhyBox}>
+              <Text style={styles.guestWhyHeader}>NEDEN ÜCRETSİZ ÜYE OLMALISINIZ?</Text>
+
+              <View style={styles.guestFeatureRow}>
+                <View style={[styles.guestFeatureIconBox, { backgroundColor: '#fff7ed' }]}>
+                  <Ionicons name="analytics-outline" size={18} color="#ea580c" />
+                </View>
+                <View style={styles.guestFeatureTextCol}>
+                  <Text style={styles.guestFeatureTitle}>Kronik Sorun & Risk Raporları</Text>
+                  <Text style={styles.guestFeatureSub}>
+                    Motor, şanzıman ve kronik arıza analizlerini sorgulayın; raporlarınızı hesabınıza kaydedin.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.guestFeatureRow}>
+                <View style={[styles.guestFeatureIconBox, { backgroundColor: '#eff6ff' }]}>
+                  <Ionicons name="git-compare-outline" size={18} color="#0284c7" />
+                </View>
+                <View style={styles.guestFeatureTextCol}>
+                  <Text style={styles.guestFeatureTitle}>8 Kriterde Araç Karşılaştırma</Text>
+                  <Text style={styles.guestFeatureSub}>
+                    Arasında kaldığınız modelleri kafa kafaya kıyaslayın, kazanan aracın raporunu ücretsiz açın.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.guestFeatureRow}>
+                <View style={[styles.guestFeatureIconBox, { backgroundColor: '#f0fdf4' }]}>
+                  <Ionicons name="car-sport-outline" size={18} color="#16a34a" />
+                </View>
+                <View style={styles.guestFeatureTextCol}>
+                  <Text style={styles.guestFeatureTitle}>Hızlı İlan Ver & Favorileri Takip Et</Text>
+                  <Text style={styles.guestFeatureSub}>
+                    Aracınızı kolayca ilana koyun; beğendiğiniz ilanları, satıcıları ve aramaları kaçırmayın.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.guestFeatureRow}>
+                <View style={[styles.guestFeatureIconBox, { backgroundColor: '#f0fdfa' }]}>
+                  <Ionicons name="people-outline" size={18} color="#0d9488" />
+                </View>
+                <View style={styles.guestFeatureTextCol}>
+                  <Text style={styles.guestFeatureTitle}>TorkScout Club & Onaylı Ustalar</Text>
+                  <Text style={styles.guestFeatureSub}>
+                    Araç sahipleriyle tecrübe paylaşın, anketlere katılın ve güvenilir servislere ulaşın.
+                  </Text>
+                </View>
+              </View>
+            </View>
 
             <TouchableOpacity
               style={styles.primaryLoginBtn}
@@ -560,7 +622,7 @@ export default function ProfileScreen() {
               activeOpacity={0.85}
               onPress={() => router.push('/register' as any)}
             >
-              <Text style={styles.secondaryRegisterText}>Hesabınız Yok mu? Kayıt Olun</Text>
+              <Text style={styles.secondaryRegisterText}>Hesabınız Yok mu? Ücretsiz Kayıt Olun</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -817,57 +879,138 @@ const styles = StyleSheet.create({
   },
   guestCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    padding: 24,
+    padding: 22,
     alignItems: 'center',
     gap: 12,
-    marginTop: 20,
+    marginTop: 6,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
   },
-  guestIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#fff7ed',
-    justifyContent: 'center',
+  guestLogoWrap: {
     alignItems: 'center',
-    marginBottom: 6,
+    justifyContent: 'center',
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  guestLogoImg: {
+    width: 195,
+    height: 36,
+  },
+  guestSloganPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  guestSloganPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ea580c',
+    letterSpacing: 0.5,
   },
   guestTitle: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '900',
     color: '#0f172a',
+    textAlign: 'center',
+    lineHeight: 27,
   },
   guestDesc: {
     fontSize: 13,
-    color: '#64748b',
+    color: '#475569',
     textAlign: 'center',
     lineHeight: 19,
+  },
+  guestWhyBox: {
+    width: '100%',
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 14,
+    gap: 12,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  guestWhyHeader: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#0f172a',
+    letterSpacing: 0.6,
+  },
+  guestFeatureRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 11,
+  },
+  guestFeatureIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  guestFeatureTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  guestFeatureTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  guestFeatureSub: {
+    fontSize: 11.5,
+    color: '#64748b',
+    lineHeight: 16,
   },
   primaryLoginBtn: {
     backgroundColor: '#ea580c',
     borderRadius: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 8,
+    marginTop: 4,
     width: '100%',
     justifyContent: 'center',
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   primaryLoginText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
     color: '#ffffff',
   },
   secondaryRegisterBtn: {
-    paddingVertical: 8,
+    width: '100%',
+    paddingVertical: 13,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#fed7aa',
+    backgroundColor: '#fff7ed',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   secondaryRegisterText: {
-    fontSize: 12.5,
-    fontWeight: '700',
+    fontSize: 13.5,
+    fontWeight: '800',
     color: '#ea580c',
   },
 });
