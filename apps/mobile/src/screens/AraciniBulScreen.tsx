@@ -1191,14 +1191,15 @@ export default function AraciniBulScreen() {
                     const rec = resultsData.recommendation;
                     if (rec?.listingsQuery) {
                       router.push({
-                        pathname: '/listings',
+                        pathname: '/listings-browser' as any,
                         params: {
+                          category: 'ALL',
                           brandId: rec.listingsQuery.brandId,
                           modelId: rec.listingsQuery.modelId,
                         },
                       });
                     } else {
-                      router.push('/listings');
+                      router.push({ pathname: '/listings-browser' as any, params: { category: 'ALL' } });
                     }
                   }}
                   activeOpacity={0.85}

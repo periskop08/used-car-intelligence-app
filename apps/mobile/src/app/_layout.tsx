@@ -35,7 +35,9 @@ export default function RootLayout() {
         <Stack.Screen name="aracini-bul" options={{ headerShown: false, gestureEnabled: true, fullScreenGestureEnabled: false }} />
         <Stack.Screen name="login" options={{ title: 'Giriş Yap', headerBackTitle: 'Geri' }} />
         <Stack.Screen name="register" options={{ title: 'Kayıt Ol', headerBackTitle: 'Geri' }} />
-        <Stack.Screen name="vehicle-query" options={{ title: 'Araç Sorgula', headerBackTitle: 'Geri' }} />
+        <Stack.Screen name="vehicle-query" options={{ headerShown: false, gestureEnabled: true, fullScreenGestureEnabled: true }} />
+        <Stack.Screen name="messages-list" options={{ headerShown: false, gestureEnabled: true, fullScreenGestureEnabled: true }} />
+        <Stack.Screen name="listings-browser" options={{ headerShown: false, gestureEnabled: true, fullScreenGestureEnabled: true }} />
         <Stack.Screen name="vehicle-report" options={{ headerShown: false }} />
         <Stack.Screen name="comparison" options={{ headerShown: false }} />
         <Stack.Screen name="create-listing" options={{ headerShown: false }} />

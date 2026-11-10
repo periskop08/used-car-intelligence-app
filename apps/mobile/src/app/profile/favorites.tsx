@@ -396,7 +396,7 @@ export default function FavoritesScreen() {
                 </Text>
                 <TouchableOpacity
                   style={styles.browseBtn}
-                  onPress={() => router.push('/(tabs)/listings' as any)}
+                  onPress={() => router.push({ pathname: '/listings-browser', params: { category: 'ALL' } } as any)}
                 >
                   <Text style={styles.browseBtnText}>İlanları İncele</Text>
                 </TouchableOpacity>
@@ -472,12 +472,7 @@ export default function FavoritesScreen() {
                 </Text>
                 <TouchableOpacity
                   style={styles.browseBtn}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/(tabs)',
-                      params: { openQueryModal: String(Date.now()) },
-                    } as any)
-                  }
+                  onPress={() => router.push('/vehicle-query' as any)}
                 >
                   <Text style={styles.browseBtnText}>Araç Sorgula</Text>
                 </TouchableOpacity>
@@ -534,7 +529,7 @@ export default function FavoritesScreen() {
                 </Text>
                 <TouchableOpacity
                   style={styles.browseBtn}
-                  onPress={() => router.push('/(tabs)/listings' as any)}
+                  onPress={() => router.push({ pathname: '/listings-browser', params: { category: 'ALL' } } as any)}
                 >
                   <Text style={styles.browseBtnText}>İlanları İncele</Text>
                 </TouchableOpacity>
@@ -572,8 +567,8 @@ export default function FavoritesScreen() {
                         style={styles.sellerViewBtn}
                         onPress={() =>
                           router.push({
-                            pathname: '/(tabs)/listings',
-                            params: { sellerId: item.sellerId },
+                            pathname: '/listings-browser',
+                            params: { sellerId: item.sellerId, category: 'ALL' },
                           } as any)
                         }
                       >
@@ -602,7 +597,7 @@ export default function FavoritesScreen() {
                 </Text>
                 <TouchableOpacity
                   style={styles.browseBtn}
-                  onPress={() => router.push('/(tabs)/listings' as any)}
+                  onPress={() => router.push({ pathname: '/listings-browser', params: { category: 'ALL' } } as any)}
                 >
                   <Text style={styles.browseBtnText}>İlanları İncele</Text>
                 </TouchableOpacity>
@@ -685,8 +680,8 @@ export default function FavoritesScreen() {
                       style={styles.reopenSearchBtn}
                       onPress={() =>
                         router.push({
-                          pathname: '/(tabs)/listings',
-                          params: { ...(search.filters || {}) },
+                          pathname: '/listings-browser',
+                          params: { category: 'ALL', ...(search.filters || {}) },
                         } as any)
                       }
                     >

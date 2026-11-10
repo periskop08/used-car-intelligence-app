@@ -160,7 +160,7 @@ export default function UserDashboardScreen() {
             <TouchableOpacity
               style={styles.statBox}
               activeOpacity={0.75}
-              onPress={() => router.push('/(tabs)/messages' as any)}
+              onPress={() => router.push('/messages-list' as any)}
             >
               <View style={[styles.statIconWrap, { backgroundColor: '#f0fdf4' }]}>
                 <Ionicons name="chatbubbles" size={22} color="#16a34a" />
@@ -190,12 +190,7 @@ export default function UserDashboardScreen() {
 
             <TouchableOpacity
               style={styles.actionRow}
-              onPress={() =>
-                router.push({
-                  pathname: '/(tabs)',
-                  params: { openQueryModal: String(Date.now()) },
-                } as any)
-              }
+              onPress={() => router.push('/vehicle-query' as any)}
             >
               <View style={[styles.actionIconCircle, { backgroundColor: '#eff6ff' }]}>
                 <Ionicons name="search" size={20} color="#2563eb" />

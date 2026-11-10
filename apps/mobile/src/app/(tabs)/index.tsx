@@ -509,11 +509,20 @@ export const getCategoryLabel = (
   }
 };
 
-export default function MobileDashboard() {
+export default function MobileDashboard({
+  standaloneQueryScreen = false,
+}: {
+  standaloneQueryScreen?: boolean;
+} = {}) {
   const router = useRouter();
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const modalTopInset = Platform.OS === 'ios' ? Math.max(insets.top, 54) : 0;
+  const modalTopInset =
+    Platform.OS === 'ios'
+      ? Math.max(insets.top, 54)
+      : standaloneQueryScreen
+      ? Math.max(insets.top, StatusBar.currentHeight || 24)
+      : 0;
   const modalBottomInset = Math.max(insets.bottom, 16);
   const [user, setUser] = useState<{
     id?: string;
@@ -649,12 +658,20 @@ export default function MobileDashboard() {
   const [loadingOptions, setLoadingOptions] = useState(false);
 
   // Modal Control
-  const [queryModalVisible, setQueryModalVisible] = useState(false);
+  const [queryModalVisible, setQueryModalVisible] = useState(standaloneQueryScreen);
   const [modalView, setModalView] = useState<'form' | 'step'>('form');
   const [activeStep, setActiveStep] = useState<
     'category' | 'brand' | 'model' | 'year' | 'bodyType' | 'engine' | 'fuelType' | 'transmission' | 'trim'
   >('brand');
   const [searchText, setSearchText] = useState('');
+
+  // Start category cycle immediately when mounted as standalone /vehicle-query screen
+  useEffect(() => {
+    if (standaloneQueryScreen) {
+      setModalView('form');
+      startCategoryCycle();
+    }
+  }, [standaloneQueryScreen, startCategoryCycle]);
 
   // Open Araç Sorgula modal directly when navigated with openQueryModal param (e.g. from Dashboard / Favorites)
   const lastHandledQueryModalRef = useRef<string | null>(null);
@@ -715,15 +732,17 @@ export default function MobileDashboard() {
   }, []);
 
   useEffect(() => {
-    checkUserSession();
-    fetchFeaturedListings();
+    if (!standaloneQueryScreen) {
+      checkUserSession();
+      fetchFeaturedListings();
+    }
     if (selectedCategory) {
       fetchBrands(selectedCategory);
     }
     return () => {
       stopCategoryCycle();
     };
-  }, [selectedCategory, stopCategoryCycle]);
+  }, [selectedCategory, stopCategoryCycle, standaloneQueryScreen]);
 
   // 1. Brand Changes -> Fetch Models
   useEffect(() => {
@@ -853,9 +872,11 @@ export default function MobileDashboard() {
 
   useFocusEffect(
     useCallback(() => {
-      checkUserSession();
-      fetchUnreadCount();
-    }, [])
+      if (!standaloneQueryScreen) {
+        checkUserSession();
+        fetchUnreadCount();
+      }
+    }, [standaloneQueryScreen])
   );
 
   const mapApiListingItems = (apiItems: any[]): ShowcaseItem[] => {
@@ -1330,6 +1351,14 @@ export default function MobileDashboard() {
 
   const closeQueryModal = useCallback(() => {
     stopCategoryCycle();
+    if (standaloneQueryScreen) {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)' as any);
+      }
+      return;
+    }
     setQueryModalVisible(false);
     const shouldReturnToPreviousScreen = openedFromExternalParamRef.current;
     openedFromExternalParamRef.current = false;
@@ -1343,7 +1372,7 @@ export default function MobileDashboard() {
     if (shouldReturnToPreviousScreen) {
       goBackFromTab(router);
     }
-  }, [stopCategoryCycle, params.openQueryModal, router]);
+  }, [stopCategoryCycle, standaloneQueryScreen, params.openQueryModal, router]);
 
   const handleModalBackGesture = () => {
     if (modalView === 'step') {
@@ -1362,13 +1391,13 @@ export default function MobileDashboard() {
   const touchSwipeStartRef = useRef<{ x: number; y: number; time: number; handled: boolean } | null>(null);
 
   useEffect(() => {
-    if (!queryModalVisible) return;
+    if (!queryModalVisible && !standaloneQueryScreen) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       modalBackActionRef.current();
       return true;
     });
     return () => sub.remove();
-  }, [queryModalVisible]);
+  }, [queryModalVisible, standaloneQueryScreen]);
 
   const modalPanResponder = useMemo(
     () =>
@@ -1676,11 +1705,13 @@ export default function MobileDashboard() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={standaloneQueryScreen ? [] : ['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
-      {/* TOP HEADER - White Clean Navbar */}
-      <View style={styles.topNavbar}>
+      {!standaloneQueryScreen && (
+        <>
+          {/* TOP HEADER - White Clean Navbar */}
+          <View style={styles.topNavbar}>
         <View style={styles.logoRow}>
           <Image
             source={require('../../../assets/images/torkscout-header-logo.png')}
@@ -1739,10 +1770,7 @@ export default function MobileDashboard() {
                 style={styles.heroOrangeButton}
                 activeOpacity={0.85}
                 onPress={() => {
-                  openedFromExternalParamRef.current = false;
-                  setModalView('form');
-                  startCategoryCycle();
-                  setQueryModalVisible(true);
+                  router.push('/vehicle-query' as any);
                 }}
               >
                 <Text style={styles.heroOrangeButtonText}>Araç Sorgula</Text>
@@ -2119,13 +2147,11 @@ export default function MobileDashboard() {
           )}
       </View>
     </ScrollView>
+        </>
+      )}
 
-      {/* SINGLE UNIFIED MODAL MATCHING REFERENCE UI */ }
-  <Modal
-    visible={queryModalVisible}
-    animationType="slide"
-    onRequestClose={handleModalBackGesture}
-  >
+      {/* SINGLE UNIFIED MODAL / STANDALONE SCREEN MATCHING REFERENCE UI */}
+  {standaloneQueryScreen || queryModalVisible ? (
     <View
       style={[
         styles.fullModalContainer,
@@ -3103,7 +3129,7 @@ export default function MobileDashboard() {
         </View>
       )}
     </View>
-  </Modal>
+  ) : null}
     </SafeAreaView >
   );
 }

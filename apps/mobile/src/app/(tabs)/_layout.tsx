@@ -16,7 +16,7 @@ import {
   BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { recordTabVisit, goBackFromTab } from '../../utils/tabNavigation';
+import { recordTabVisit, goBackFromTab, normalizeTabRoute } from '../../utils/tabNavigation';
 
 const CLUB_TAB_ICON = require('../../../assets/images/club-tab-icon.png');
 
@@ -54,6 +54,8 @@ export default function TabsLayout() {
   };
 
   const isHomeTab = pathname === '/' || pathname === '/index' || pathname === '/(tabs)' || pathname === '/(tabs)/index';
+  const isTabRoute = Boolean(normalizeTabRoute(pathname));
+  const isNonHomeTab = isTabRoute && !isHomeTab;
 
   useEffect(() => {
     swipeTranslateX.setValue(0);
@@ -68,96 +70,46 @@ export default function TabsLayout() {
   triggerSwipeBackRef.current = triggerSwipeBack;
 
   useEffect(() => {
-    if (isHomeTab) return;
+    if (!isNonHomeTab) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       triggerSwipeBackRef.current();
       return true;
     });
     return () => sub.remove();
-  }, [isHomeTab]);
+  }, [isNonHomeTab]);
 
-  // Left edge interactive finger-following swipe-back gesture
+  // Left edge swipe-back gesture
   const leftEdgePanResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, g) =>
           g.dx > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.25,
-        onPanResponderMove: (_, g) => {
-          swipeTranslateX.setValue(Math.max(0, g.dx));
-        },
         onPanResponderRelease: (_, g) => {
           const cancelled = g.vx < -0.15;
-          if (!cancelled && (g.dx > SCREEN_WIDTH * 0.32 || (g.dx > 40 && g.vx > 0.55))) {
-            Animated.timing(swipeTranslateX, {
-              toValue: SCREEN_WIDTH,
-              duration: 160,
-              useNativeDriver: true,
-            }).start(() => {
-              triggerSwipeBack();
-              swipeTranslateX.setValue(0);
-            });
-          } else {
-            Animated.spring(swipeTranslateX, {
-              toValue: 0,
-              bounciness: 5,
-              speed: 18,
-              useNativeDriver: true,
-            }).start();
+          if (!cancelled && (g.dx > SCREEN_WIDTH * 0.22 || (g.dx > 35 && g.vx > 0.4))) {
+            triggerSwipeBackRef.current();
           }
         },
-        onPanResponderTerminate: () => {
-          Animated.spring(swipeTranslateX, {
-            toValue: 0,
-            bounciness: 5,
-            speed: 18,
-            useNativeDriver: true,
-          }).start();
-        },
       }),
-    [pathname, swipeTranslateX]
+    []
   );
 
-  // Right edge interactive finger-following swipe-back gesture
+  // Right edge swipe-back gesture
   const rightEdgePanResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, g) =>
           g.dx < -12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.25,
-        onPanResponderMove: (_, g) => {
-          swipeTranslateX.setValue(Math.min(0, g.dx));
-        },
         onPanResponderRelease: (_, g) => {
           const cancelled = g.vx > 0.15;
-          if (!cancelled && (g.dx < -SCREEN_WIDTH * 0.32 || (g.dx < -40 && g.vx < -0.55))) {
-            Animated.timing(swipeTranslateX, {
-              toValue: -SCREEN_WIDTH,
-              duration: 160,
-              useNativeDriver: true,
-            }).start(() => {
-              triggerSwipeBack();
-              swipeTranslateX.setValue(0);
-            });
-          } else {
-            Animated.spring(swipeTranslateX, {
-              toValue: 0,
-              bounciness: 5,
-              speed: 18,
-              useNativeDriver: true,
-            }).start();
+          if (!cancelled && (g.dx < -SCREEN_WIDTH * 0.22 || (g.dx < -35 && g.vx < -0.4))) {
+            triggerSwipeBackRef.current();
           }
         },
-        onPanResponderTerminate: () => {
-          Animated.spring(swipeTranslateX, {
-            toValue: 0,
-            bounciness: 5,
-            speed: 18,
-            useNativeDriver: true,
-          }).start();
-        },
       }),
-    [pathname, swipeTranslateX]
+    []
   );
 
   // Animations for the 3 floating bubbles
@@ -358,7 +310,7 @@ export default function TabsLayout() {
       </Animated.View>
 
       {/* EDGE SWIPE BACK GESTURE ZONES FOR NON-HOME TAB SCREENS (iOS & Android) */}
-      {!isHomeTab && (
+      {isNonHomeTab && (
         <>
           <View
             style={styles.leftEdgeSwipeZone}
