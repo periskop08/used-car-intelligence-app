@@ -120,6 +120,53 @@ export function ClubPostDrawer({
     }
   };
 
+  const handleApproveUserPost = async () => {
+    if (!token) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/club/posts/${post.id}/approve`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Kullanıcı gönderisi onaylanamadı.');
+      onRefresh?.();
+      onClose();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectUserPost = async () => {
+    if (!token) return;
+    const reason = window.prompt(
+      'Reddetme gerekçesini girin (kullanıcı Garajım ekranında görecektir):',
+      post.rejectionReason || 'İlan niteliğinde veya satış amaçlı paylaşım tespit edildiği için yayınlanmadı.'
+    );
+    if (reason === null) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/club/posts/${post.id}/reject`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) throw new Error('Kullanıcı gönderisi reddedilemedi.');
+      onRefresh?.();
+      onClose();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleToggleComments = async () => {
     if (!token) return;
     setActionLoading(true);
@@ -182,6 +229,9 @@ export function ClubPostDrawer({
   const isPublished = post.status === 'PUBLISHED';
   const isDraft = post.status === 'DRAFT';
   const isArchived = post.status === 'ARCHIVED';
+  const isPendingReview = post.status === 'PENDING_REVIEW';
+  const isRejected = post.status === 'REJECTED';
+  const isUserSubmission = !!post.isUserSubmission;
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex justify-end">
@@ -215,19 +265,36 @@ export function ClubPostDrawer({
 
           {/* Status & Badges */}
           <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-900/80 border border-white/5 rounded-xl">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-slate-400">Durum:</span>
               <span
                 className={`font-bold px-2.5 py-0.5 rounded-full text-[11px] ${
                   isPublished
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : isPendingReview
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    : isRejected
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                     : isDraft
                     ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                     : 'bg-slate-500/20 text-slate-400 border border-slate-500/30'
                 }`}
               >
-                {isPublished ? 'YAYINDA' : isDraft ? 'TASLAK' : 'YAYINDAN KALDIRILDI'}
+                {isPublished
+                  ? 'YAYINDA'
+                  : isPendingReview
+                  ? 'ONAY BEKLİYOR'
+                  : isRejected
+                  ? 'REDDEDİLDİ'
+                  : isDraft
+                  ? 'TASLAK'
+                  : 'YAYINDAN KALDIRILDI'}
               </span>
+              {isUserSubmission && (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                  🚗 Club Kullanıcısı Gönderisi (Garajım)
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-3 text-slate-400">
@@ -251,8 +318,14 @@ export function ClubPostDrawer({
           <div className="space-y-3 p-4 bg-slate-900/40 border border-white/5 rounded-xl">
             <h2 className="text-base font-bold text-white font-sans">{post.title || 'Başlıksız Gönderi'}</h2>
             <div className="text-slate-300 text-xs leading-relaxed whitespace-pre-wrap font-sans">
-              {post.content}
+              {post.content || 'Açıklama girilmemiş.'}
             </div>
+            {post.rejectionReason && (
+              <div className="mt-3 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-sans">
+                <strong className="block text-rose-400 mb-0.5">Reddedilme Gerekçesi:</strong>
+                {post.rejectionReason}
+              </div>
+            )}
           </div>
 
           {/* Photos / Media Gallery */}
@@ -471,8 +544,26 @@ export function ClubPostDrawer({
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            {isPublished ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            {isUserSubmission && (isPendingReview || isRejected || isDraft) && (
+              <button
+                onClick={handleApproveUserPost}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-50 font-sans"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" /> Onayla & Yayınla
+              </button>
+            )}
+            {isUserSubmission && !isRejected && (
+              <button
+                onClick={handleRejectUserPost}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-400 font-bold rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-50 font-sans"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" /> Reddet
+              </button>
+            )}
+            {!isUserSubmission && isPublished && (
               <button
                 onClick={handleUnpublish}
                 disabled={actionLoading}
@@ -480,7 +571,8 @@ export function ClubPostDrawer({
               >
                 <Archive className="w-3.5 h-3.5" /> Yayından Kaldır
               </button>
-            ) : (
+            )}
+            {!isUserSubmission && !isPublished && (
               <button
                 onClick={handlePublish}
                 disabled={actionLoading}

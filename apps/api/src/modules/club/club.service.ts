@@ -17,6 +17,7 @@ import {
   MuteUserDto,
   BanUserDto,
   AdminDirectMessageDto,
+  SubmitClubGaragePostDto,
 } from './club.dto';
 import {
   ClubPostStatus,
@@ -80,6 +81,19 @@ export class ClubService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.prisma.$executeRawUnsafe(`ALTER TABLE "ClubComment" ADD COLUMN IF NOT EXISTS "replyToCommentId" TEXT;`);
+    } catch (e) {}
+
+    try {
+      await this.prisma.$executeRawUnsafe(`ALTER TYPE "ClubPostStatus" ADD VALUE IF NOT EXISTS 'PENDING_REVIEW';`);
+    } catch (e) {}
+    try {
+      await this.prisma.$executeRawUnsafe(`ALTER TYPE "ClubPostStatus" ADD VALUE IF NOT EXISTS 'REJECTED';`);
+    } catch (e) {}
+    try {
+      await this.prisma.$executeRawUnsafe(`ALTER TABLE "ClubPost" ADD COLUMN IF NOT EXISTS "isUserSubmission" BOOLEAN NOT NULL DEFAULT false;`);
+    } catch (e) {}
+    try {
+      await this.prisma.$executeRawUnsafe(`ALTER TABLE "ClubPost" ADD COLUMN IF NOT EXISTS "rejectionReason" TEXT;`);
     } catch (e) {}
 
     try {
@@ -659,6 +673,205 @@ export class ClubService implements OnModuleInit {
         media: { take: 1, select: { mediaUrl: true } },
       },
     });
+  }
+
+  // ==========================================
+  // MEMBER GARAGE & CLUB POST SUBMISSIONS
+  // ==========================================
+
+  async getMyGarage(userId: string) {
+    const { isBanned } = await this.checkUserRestriction(userId);
+    if (isBanned) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'CLUB_BANNED',
+        message: 'Tork Scout Club erişiminiz sınırlandırılmıştır.',
+      });
+    }
+
+    const posts = await this.prisma.clubPost.findMany({
+      where: {
+        authorId: userId,
+        isUserSubmission: true,
+        deletedAt: null,
+      } as any,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        author: {
+          select: { id: true, firstName: true, lastName: true, username: true, profilePhotoUrl: true, role: true },
+        },
+        media: {
+          orderBy: { sortOrder: 'asc' },
+        },
+        _count: {
+          select: {
+            comments: { where: { status: ClubCommentStatus.VISIBLE, deletedAt: null } },
+            likes: true,
+          },
+        },
+      },
+    });
+
+    return {
+      items: posts.map((p: any) => ({
+        ...p,
+        commentCount: p._count?.comments || 0,
+        likeCount: p._count?.likes || 0,
+      })),
+    };
+  }
+
+  async submitGaragePost(userId: string, dto: SubmitClubGaragePostDto) {
+    const { isBanned, isMuted, activeRestriction } = await this.checkUserRestriction(userId);
+    if (isBanned || isMuted) {
+      throw new ForbiddenException(
+        activeRestriction?.reason
+          ? `Kulüp paylaşım yetkiniz kısıtlanmıştır: ${activeRestriction.reason}`
+          : 'Tork Scout Club paylaşım yetkiniz sınırlandırılmıştır.',
+      );
+    }
+
+    const mediaUrls = Array.isArray(dto.mediaUrls) ? dto.mediaUrls.filter(Boolean) : [];
+    if (mediaUrls.length === 0) {
+      throw new BadRequestException('Lütfen aracınıza ait en az 1 görsel yükleyin.');
+    }
+    if (mediaUrls.length > 5) {
+      throw new BadRequestException('Garajınıza tek seferde en fazla 5 adet araç görseli yükleyebilirsiniz.');
+    }
+
+    const cleanTitle = dto.title ? dto.title.replace(/</g, '&lt;').replace(/>/g, '&gt;').trim() : null;
+    const cleanContent = dto.content ? dto.content.replace(/</g, '&lt;').replace(/>/g, '&gt;').trim() : '';
+
+    if (dto.shareInClub && !cleanContent && !cleanTitle) {
+      throw new BadRequestException("Club'da paylaşmak için lütfen aracınız hakkında kısa bir açıklama yazın.");
+    }
+
+    const targetStatus = dto.shareInClub ? ('PENDING_REVIEW' as any) : ClubPostStatus.DRAFT;
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const post = await tx.clubPost.create({
+        data: {
+          authorId: userId,
+          title: cleanTitle,
+          content: cleanContent,
+          status: targetStatus,
+          isUserSubmission: true,
+          commentsEnabled: true,
+          isPinned: false,
+          publishedAt: null,
+        } as any,
+      });
+
+      await tx.clubPostMedia.createMany({
+        data: mediaUrls.slice(0, 5).map((url, idx) => ({
+          postId: post.id,
+          mediaUrl: url,
+          sortOrder: idx,
+          uploadedById: userId,
+          status: 'ATTACHED' as any,
+        })),
+      });
+
+      return post;
+    });
+
+    const fullPost = await this.prisma.clubPost.findUnique({
+      where: { id: created.id },
+      include: {
+        author: {
+          select: { id: true, firstName: true, lastName: true, username: true, profilePhotoUrl: true, role: true },
+        },
+        media: { orderBy: { sortOrder: 'asc' } },
+        _count: {
+          select: {
+            comments: { where: { status: ClubCommentStatus.VISIBLE, deletedAt: null } },
+            likes: true,
+          },
+        },
+      },
+    });
+
+    return {
+      ...fullPost,
+      commentCount: (fullPost as any)?._count?.comments || 0,
+      likeCount: (fullPost as any)?._count?.likes || 0,
+    };
+  }
+
+  async shareGaragePostToClub(
+    userId: string,
+    postId: string,
+    dto?: { title?: string; content?: string },
+  ) {
+    const { isBanned, isMuted, activeRestriction } = await this.checkUserRestriction(userId);
+    if (isBanned || isMuted) {
+      throw new ForbiddenException(
+        activeRestriction?.reason
+          ? `Kulüp paylaşım yetkiniz kısıtlanmıştır: ${activeRestriction.reason}`
+          : 'Tork Scout Club paylaşım yetkiniz sınırlandırılmıştır.',
+      );
+    }
+
+    const post = await this.prisma.clubPost.findFirst({
+      where: {
+        id: postId,
+        authorId: userId,
+        isUserSubmission: true,
+        deletedAt: null,
+      } as any,
+    });
+
+    if (!post) {
+      throw new NotFoundException('Garaj kaydı bulunamadı.');
+    }
+
+    const nextTitle =
+      dto?.title !== undefined ? dto.title.replace(/</g, '&lt;').replace(/>/g, '&gt;').trim() || null : post.title;
+    const nextContent =
+      dto?.content !== undefined ? dto.content.replace(/</g, '&lt;').replace(/>/g, '&gt;').trim() : post.content;
+
+    const updated = await this.prisma.clubPost.update({
+      where: { id: postId },
+      data: {
+        title: nextTitle,
+        content: nextContent,
+        status: 'PENDING_REVIEW' as any,
+        rejectionReason: null,
+      } as any,
+      include: {
+        author: {
+          select: { id: true, firstName: true, lastName: true, username: true, profilePhotoUrl: true, role: true },
+        },
+        media: { orderBy: { sortOrder: 'asc' } },
+      },
+    });
+
+    return updated;
+  }
+
+  async deleteMyGaragePost(userId: string, postId: string) {
+    const post = await this.prisma.clubPost.findFirst({
+      where: {
+        id: postId,
+        authorId: userId,
+        isUserSubmission: true,
+        deletedAt: null,
+      } as any,
+    });
+
+    if (!post) {
+      throw new NotFoundException('Garaj kaydı bulunamadı.');
+    }
+
+    await this.prisma.clubPost.update({
+      where: { id: postId },
+      data: {
+        status: ClubPostStatus.ARCHIVED,
+        deletedAt: new Date(),
+      },
+    });
+
+    return { success: true };
   }
 
   // ==========================================
@@ -1481,8 +1694,14 @@ export class ClubService implements OnModuleInit {
     };
   }
 
-  async getAdminPosts(status?: string) {
+  async getAdminPosts(status?: string, source?: string) {
     const where: any = { deletedAt: null };
+    if (source === 'USER_SUBMISSIONS') {
+      where.isUserSubmission = true;
+    } else if (source === 'ADMIN') {
+      where.isUserSubmission = false;
+    }
+
     if (status && status !== 'ALL') {
       where.status = status as ClubPostStatus;
     }
@@ -1491,9 +1710,21 @@ export class ClubService implements OnModuleInit {
       where,
       orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
       include: {
-        author: { select: { id: true, firstName: true, lastName: true, username: true, email: true } },
-        media: true,
-        _count: { select: { comments: true } },
+        author: {
+          select: {
+            id: true,
+            customerNo: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            email: true,
+            profilePhotoUrl: true,
+            role: true,
+            createdAt: true,
+          },
+        },
+        media: { orderBy: { sortOrder: 'asc' } },
+        _count: { select: { comments: true, likes: true } },
       },
     });
 
@@ -1501,6 +1732,99 @@ export class ClubService implements OnModuleInit {
       ...p,
       authorFormatted: formatUserDisplayName(p.author),
     }));
+  }
+
+  async approveUserPost(postId: string, adminId: string) {
+    const post = await this.prisma.clubPost.findUnique({ where: { id: postId } });
+    if (!post || post.deletedAt) throw new NotFoundException('Gönderi bulunamadı.');
+
+    const updated = await this.prisma.clubPost.update({
+      where: { id: postId },
+      data: {
+        status: ClubPostStatus.PUBLISHED,
+        publishedAt: new Date(),
+        rejectionReason: null,
+      } as any,
+      include: {
+        author: {
+          select: {
+            id: true,
+            customerNo: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            email: true,
+            profilePhotoUrl: true,
+            role: true,
+            createdAt: true,
+          },
+        },
+        media: { orderBy: { sortOrder: 'asc' } },
+      },
+    });
+
+    try {
+      await this.prisma.clubModerationLog.create({
+        data: {
+          actorId: adminId,
+          actorRole: 'ADMIN',
+          actionType: 'USER_POST_APPROVED',
+          targetUserId: post.authorId,
+          postId: post.id,
+          reason: 'Kullanıcı gönderisi onaylandı ve TorkScout Club akışında yayınlandı.',
+        },
+      });
+    } catch (e) {}
+
+    return updated;
+  }
+
+  async rejectUserPost(postId: string, adminId: string, reason?: string) {
+    const post = await this.prisma.clubPost.findUnique({ where: { id: postId } });
+    if (!post || post.deletedAt) throw new NotFoundException('Gönderi bulunamadı.');
+
+    const rejectionReason =
+      reason?.trim() ||
+      'Görsel veya açıklama satış ilanı niteliği taşıdığı ya da topluluk kurallarına uymadığı için yayınlanmadı.';
+
+    const updated = await this.prisma.clubPost.update({
+      where: { id: postId },
+      data: {
+        status: 'REJECTED' as any,
+        rejectionReason,
+      } as any,
+      include: {
+        author: {
+          select: {
+            id: true,
+            customerNo: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            email: true,
+            profilePhotoUrl: true,
+            role: true,
+            createdAt: true,
+          },
+        },
+        media: { orderBy: { sortOrder: 'asc' } },
+      },
+    });
+
+    try {
+      await this.prisma.clubModerationLog.create({
+        data: {
+          actorId: adminId,
+          actorRole: 'ADMIN',
+          actionType: 'USER_POST_REJECTED',
+          targetUserId: post.authorId,
+          postId: post.id,
+          reason: rejectionReason,
+        },
+      });
+    } catch (e) {}
+
+    return updated;
   }
 
   async getAdminComments(status?: string, customerNo?: string) {

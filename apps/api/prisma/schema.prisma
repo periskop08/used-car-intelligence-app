@@ -2070,7 +2070,9 @@ model AiVehicleComparisonCache {
 
 enum ClubPostStatus {
   DRAFT
+  PENDING_REVIEW
   PUBLISHED
+  REJECTED
   ARCHIVED
 }
 
@@ -2093,18 +2095,20 @@ enum ClubMediaStatus {
 }
 
 model ClubPost {
-  id              String         @id @default(uuid())
-  authorId        String
-  title           String?
-  content         String
-  status          ClubPostStatus @default(DRAFT)
-  commentsEnabled Boolean        @default(true)
-  isPinned        Boolean        @default(false)
-  pinnedOrder     Int?
-  publishedAt     DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  deletedAt       DateTime?
+  id               String         @id @default(uuid())
+  authorId         String
+  title            String?
+  content          String
+  status           ClubPostStatus @default(DRAFT)
+  isUserSubmission Boolean        @default(false)
+  rejectionReason  String?
+  commentsEnabled  Boolean        @default(true)
+  isPinned         Boolean        @default(false)
+  pinnedOrder      Int?
+  publishedAt      DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
 
   author          User           @relation("ClubPostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   media           ClubPostMedia[]

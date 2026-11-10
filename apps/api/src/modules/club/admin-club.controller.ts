@@ -26,6 +26,7 @@ import {
   BulkAssignModeratorDto,
   BulkAdminMessageDto,
   GetAdminUsersQueryDto,
+  RejectClubPostDto,
 } from './club.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Role } from '@prisma/client';
@@ -158,6 +159,22 @@ export class AdminClubController {
     return this.clubService.archivePost(postId);
   }
 
+  @Post('posts/:postId/approve')
+  async approveUserPost(@Param('postId') postId: string, @Req() req: any) {
+    await this.verifyModeratorOrAdmin(req);
+    return this.clubService.approveUserPost(postId, req.user.id);
+  }
+
+  @Post('posts/:postId/reject')
+  async rejectUserPost(
+    @Param('postId') postId: string,
+    @Body() dto: RejectClubPostDto,
+    @Req() req: any,
+  ) {
+    await this.verifyModeratorOrAdmin(req);
+    return this.clubService.rejectUserPost(postId, req.user.id, dto?.reason);
+  }
+
   @Post('polls/:pollId/close')
   async closePoll(@Param('pollId') pollId: string, @Req() req: any) {
     await this.verifyAdminOnly(req);
@@ -227,9 +244,13 @@ export class AdminClubController {
   }
 
   @Get('posts')
-  async getPosts(@Query('status') status: string, @Req() req: any) {
+  async getPosts(
+    @Query('status') status: string,
+    @Query('source') source: string,
+    @Req() req: any,
+  ) {
     await this.verifyModeratorOrAdmin(req);
-    return this.clubService.getAdminPosts(status);
+    return this.clubService.getAdminPosts(status, source);
   }
 
   @Get('comments')

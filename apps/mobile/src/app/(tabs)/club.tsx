@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -27,6 +27,18 @@ import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { createEdgeSwipeDismissHandlers } from '../../utils/backGesture';
 import TorkScoutLoader from '../../components/TorkScoutLoader';
 
+let ImagePicker: any = null;
+try {
+  ImagePicker = require('expo-image-picker');
+} catch (e) {
+  console.warn('ImagePicker could not be loaded:', e);
+}
+
+const API_URL = 'https://used-car-api-hzmu.onrender.com';
+const CLUB_HEADER_LOGO = require('../../../assets/images/torkscout-club-header-logo.png');
+const { width: windowWidth } = Dimensions.get('window');
+const CARD_MEDIA_WIDTH = windowWidth - 60;
+
 function ScoutRgbWelcomeBanner() {
   const [boxSize, setBoxSize] = useState({ width: windowWidth - 28, height: 124 });
   const [angle, setAngle] = useState(0);
@@ -51,10 +63,7 @@ function ScoutRgbWelcomeBanner() {
   const x2 = `${(50 - 50 * Math.cos(angle)).toFixed(1)}%`;
   const y2 = `${(50 - 50 * Math.sin(angle)).toFixed(1)}%`;
 
-  const perimeter = Math.max(
-    400,
-    2 * (boxSize.width + boxSize.height)
-  );
+  const perimeter = Math.max(400, 2 * (boxSize.width + boxSize.height));
   const dashLength = Math.round(perimeter * 0.36);
   const gapLength = Math.round(perimeter - dashLength);
   const dashOffset = -Math.round((angle / (Math.PI * 2)) * perimeter);
@@ -90,7 +99,6 @@ function ScoutRgbWelcomeBanner() {
           </LinearGradient>
         </Defs>
 
-        {/* Base continuous rotating Scout gradient border */}
         <Rect
           x={1.25}
           y={1.25}
@@ -104,7 +112,6 @@ function ScoutRgbWelcomeBanner() {
           opacity={0.75}
         />
 
-        {/* Traveling bright Scout RGB light strip */}
         <Rect
           x={1.25}
           y={1.25}
@@ -132,10 +139,6 @@ function ScoutRgbWelcomeBanner() {
     </View>
   );
 }
-
-const API_URL = 'https://used-car-api-hzmu.onrender.com';
-const CLUB_HEADER_LOGO = require('../../../assets/images/torkscout-club-header-logo.png');
-const { width: windowWidth } = Dimensions.get('window');
 
 const resolvePostMediaUrl = (url?: string | null): string => {
   if (!url) return '';
@@ -186,8 +189,12 @@ interface ClubPost {
   id: string;
   title?: string;
   content: string;
+  status?: 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
+  isUserSubmission?: boolean;
+  rejectionReason?: string | null;
   isPinned: boolean;
   publishedAt: string;
+  createdAt?: string;
   author: PostAuthor;
   media: PostMedia[];
   poll?: PostPoll;
@@ -214,17 +221,30 @@ export default function TorqueScoutClubScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [posts, setPosts] = useState<ClubPost[]>([]);
+  const [activeMediaIndices, setActiveMediaIndices] = useState<Record<string, number>>({});
   const [lightboxPostId, setLightboxPostId] = useState<string | null>(null);
+  const [lightboxMediaIndex, setLightboxMediaIndex] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'POLLS'>('ALL');
+  const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'POLLS' | 'GARAGE'>('ALL');
   const [token, setToken] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{
+    id?: string;
     profilePhotoUrl?: string;
     firstName?: string;
     lastName?: string;
     role?: string;
   } | null>(null);
+
+  // Garage State
+  const [garageItems, setGarageItems] = useState<ClubPost[]>([]);
+  const [loadingGarage, setLoadingGarage] = useState(false);
+  const [garagePhotos, setGaragePhotos] = useState<string[]>([]);
+  const [garageTitle, setGarageTitle] = useState('');
+  const [garageCaption, setGarageCaption] = useState('');
+  const [shareInClub, setShareInClub] = useState(true);
+  const [submittingGarage, setSubmittingGarage] = useState(false);
+  const [sharingPostId, setSharingPostId] = useState<string | null>(null);
 
   // Admin Create Post Modal State
   const [createPostModalVisible, setCreatePostModalVisible] = useState(false);
@@ -266,6 +286,10 @@ export default function TorqueScoutClubScreen() {
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => d && setUserProfile(d))
           .catch(() => {});
+        fetchMyGarage(storedToken);
+      } else {
+        setUserProfile(null);
+        setGarageItems([]);
       }
 
       await fetchClubPosts(storedToken);
@@ -298,20 +322,265 @@ export default function TorqueScoutClubScreen() {
     }
   };
 
+  const fetchMyGarage = async (authToken?: string | null) => {
+    const activeToken = authToken ?? token;
+    if (!activeToken) return;
+    setLoadingGarage(true);
+    try {
+      const res = await fetch(`${API_URL}/club/garage`, {
+        headers: { Authorization: `Bearer ${activeToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : data.items || [];
+        setGarageItems(items);
+      }
+    } catch (e) {
+      console.warn('Error fetching garage:', e);
+    } finally {
+      setLoadingGarage(false);
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchClubPosts(token);
+    if (token) {
+      fetchMyGarage(token);
+    }
   };
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPER_ADMIN';
 
-  const formatTimeAgo = (dateStr: string) => {
+  const formatTimeAgo = (dateStr?: string) => {
+    if (!dateStr) return '';
     try {
       const d = new Date(dateStr);
       return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
     } catch {
       return '';
     }
+  };
+
+  // GARAGE IMAGE PICKER & SUBMISSION
+  const handlePickGaragePhotos = async () => {
+    try {
+      if (!ImagePicker) {
+        Alert.alert('Hata', 'Fotoğraf seçici modülü yüklenemedi.');
+        return;
+      }
+      if (garagePhotos.length >= 5) {
+        Alert.alert('Limit Doldu', 'Garajınıza en fazla 5 adet araç görseli ekleyebilirsiniz.');
+        return;
+      }
+
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('İzin Gerekli', 'Araç görsellerinizi yüklemek için galeri erişim izni vermelisiniz.');
+        return;
+      }
+
+      const remainingSlots = 5 - garagePhotos.length;
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions?.Images || 'Images',
+        allowsMultipleSelection: true,
+        selectionLimit: remainingSlots,
+        quality: 0.82,
+      });
+
+      if (!result.canceled && result.assets) {
+        const pickedUris = result.assets.map((a: any) => a.uri).filter(Boolean);
+        setGaragePhotos((prev) => [...prev, ...pickedUris].slice(0, 5));
+      }
+    } catch (e) {
+      console.error('Garage photo pick error:', e);
+      Alert.alert('Hata', 'Fotoğraflar seçilirken bir hata oluştu.');
+    }
+  };
+
+  const handleRemoveGaragePhoto = (index: number) => {
+    setGaragePhotos((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const uploadSinglePhotoToClub = async (uri: string, authToken: string): Promise<string> => {
+    if (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('data:')) {
+      return uri;
+    }
+    const formData = new FormData();
+    const filename = uri.split('/').pop() || `garage-${Date.now()}.jpg`;
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+    formData.append('file', {
+      uri,
+      name: filename,
+      type,
+    } as any);
+
+    const res = await fetch(`${API_URL}/club/media/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.message || 'Görsel yüklenemedi.');
+    }
+    const data = await res.json();
+    if (!data?.url) {
+      throw new Error('Görsel bağlantısı alınamadı.');
+    }
+    return data.url;
+  };
+
+  const handleSubmitGarage = async () => {
+    const currentToken =
+      token ||
+      (await AsyncStorage.getItem('accessToken')) ||
+      (await AsyncStorage.getItem('token'));
+
+    if (!currentToken) {
+      Alert.alert('Giriş Yapın', 'Garajınıza araç eklemek ve Club\'da paylaşmak için lütfen giriş yapın.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Giriş Yap', onPress: () => router.push('/(tabs)/profile' as any) },
+      ]);
+      return;
+    }
+
+    if (garagePhotos.length === 0) {
+      Alert.alert('Görsel Seçin', 'Lütfen aracınıza ait en az 1 görsel (en fazla 5 görsel) seçin.');
+      return;
+    }
+
+    if (shareInClub && !garageCaption.trim() && !garageTitle.trim()) {
+      Alert.alert(
+        'Açıklama Ekleyin',
+        "Club'da paylaşmak için lütfen aracınız hakkında kısa bir açıklama veya model başlığı yazın."
+      );
+      return;
+    }
+
+    setSubmittingGarage(true);
+    try {
+      const uploadedUrls: string[] = [];
+      for (const localUri of garagePhotos.slice(0, 5)) {
+        const remoteUrl = await uploadSinglePhotoToClub(localUri, currentToken);
+        uploadedUrls.push(remoteUrl);
+      }
+
+      const res = await fetch(`${API_URL}/club/garage`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${currentToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: garageTitle.trim() || undefined,
+          content: garageCaption.trim(),
+          mediaUrls: uploadedUrls,
+          shareInClub,
+        }),
+      });
+
+      if (res.ok) {
+        setGaragePhotos([]);
+        setGarageTitle('');
+        setGarageCaption('');
+        await fetchMyGarage(currentToken);
+        if (shareInClub) {
+          Alert.alert(
+            'Onaya Gönderildi 🎉',
+            'Aracınızın görselleri ve açıklaması yönetici onayına gönderildi. İlan kontrolünden geçtikten sonra TorkScout Club "Tümü" akışında yayınlanacaktır.'
+          );
+        } else {
+          Alert.alert(
+            'Garajınıza Kaydedildi 🚗',
+            'Aracınızın görselleri Garajınıza eklendi. Dilediğiniz zaman "Club\'da Paylaş" butonuyla topluluk akışında paylaşabilirsiniz.'
+          );
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert('Bilgi', err.message || 'Gönderi kaydedilemedi.');
+      }
+    } catch (e: any) {
+      Alert.alert('Hata', e?.message || 'Görseller yüklenirken bağlantı hatası oluştu.');
+    } finally {
+      setSubmittingGarage(false);
+    }
+  };
+
+  const handleShareSavedGarageItem = async (item: ClubPost) => {
+    const currentToken =
+      token ||
+      (await AsyncStorage.getItem('accessToken')) ||
+      (await AsyncStorage.getItem('token'));
+    if (!currentToken) return;
+
+    setSharingPostId(item.id);
+    try {
+      const res = await fetch(`${API_URL}/club/garage/${item.id}/share`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${currentToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: item.title || undefined,
+          content: item.content || '',
+        }),
+      });
+
+      if (res.ok) {
+        await fetchMyGarage(currentToken);
+        Alert.alert(
+          'Onaya Gönderildi 🎉',
+          'Garajınızdaki araç paylaşımı yönetici onayına gönderildi. Onaylandığında "Tümü" sekmesinde yayınlanacaktır.'
+        );
+      } else {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert('Bilgi', err.message || 'Paylaşım onaya gönderilemedi.');
+      }
+    } catch (e) {
+      Alert.alert('Hata', 'Bağlantı hatası oluştu.');
+    } finally {
+      setSharingPostId(null);
+    }
+  };
+
+  const handleDeleteGarageItem = (item: ClubPost) => {
+    Alert.alert(
+      'Garajdan Kaldır',
+      'Bu araç paylaşımını garajınızdan ve kulüp akışından kaldırmak istediğinize emin misiniz?',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: async () => {
+            const currentToken =
+              token ||
+              (await AsyncStorage.getItem('accessToken')) ||
+              (await AsyncStorage.getItem('token'));
+            if (!currentToken) return;
+            try {
+              const res = await fetch(`${API_URL}/club/garage/${item.id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${currentToken}` },
+              });
+              if (res.ok) {
+                await fetchMyGarage(currentToken);
+                await fetchClubPosts(currentToken);
+              }
+            } catch (e) {
+              Alert.alert('Hata', 'Silme işlemi başarısız oldu.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   // ADMIN ACTIONS
@@ -587,7 +856,7 @@ export default function TorqueScoutClubScreen() {
           Authorization: `Bearer ${currentToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ optionId }),
+        body: JSON.stringify({ optionIds: [optionId], optionId }),
       });
 
       if (res.ok) {
@@ -631,12 +900,102 @@ export default function TorqueScoutClubScreen() {
     }
   };
 
-  const activeLightboxPost = posts.find((p) => p.id === lightboxPostId) || null;
+  const activeLightboxPost =
+    posts.find((p) => p.id === lightboxPostId) ||
+    garageItems.find((g) => g.id === lightboxPostId) ||
+    null;
 
   const filteredPosts = posts.filter((p) => {
     if (selectedCategory === 'POLLS') return !!p.poll;
     return true;
   });
+
+  const renderMediaCarousel = (post: ClubPost, allowLightbox: boolean = true) => {
+    const mediaList = Array.isArray(post.media) ? post.media : [];
+    if (mediaList.length === 0) return null;
+
+    const currentIdx = activeMediaIndices[post.id] || 0;
+
+    if (mediaList.length === 1) {
+      return (
+        <TouchableOpacity
+          activeOpacity={0.92}
+          onPress={() => {
+            if (allowLightbox) {
+              setLightboxMediaIndex(0);
+              setLightboxPostId(post.id);
+            }
+          }}
+          style={styles.postMediaContainer}
+        >
+          <ExpoImage
+            source={{ uri: resolvePostMediaUrl(mediaList[0].mediaUrl) }}
+            style={styles.postMediaImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <View style={styles.carouselWrapper}>
+        <View style={styles.postMediaContainer}>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => {
+              const offsetX = e.nativeEvent.contentOffset.x;
+              const width = e.nativeEvent.layoutMeasurement.width || CARD_MEDIA_WIDTH;
+              const nextIndex = Math.round(offsetX / width);
+              setActiveMediaIndices((prev) => ({ ...prev, [post.id]: nextIndex }));
+            }}
+          >
+            {mediaList.map((m, idx) => (
+              <TouchableOpacity
+                key={m.id || idx}
+                activeOpacity={0.94}
+                onPress={() => {
+                  if (allowLightbox) {
+                    setLightboxMediaIndex(idx);
+                    setLightboxPostId(post.id);
+                  }
+                }}
+                style={{ width: CARD_MEDIA_WIDTH, height: 235 }}
+              >
+                <ExpoImage
+                  source={{ uri: resolvePostMediaUrl(m.mediaUrl) }}
+                  style={styles.postMediaImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <View style={styles.carouselCounterPill}>
+            <Ionicons name="images-outline" size={11} color="#ffffff" />
+            <Text style={styles.carouselCounterText}>
+              {Math.min(currentIdx + 1, mediaList.length)}/{mediaList.length}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.carouselDotsRow}>
+          {mediaList.map((_, idx) => (
+            <View
+              key={idx}
+              style={[
+                styles.carouselDot,
+                idx === currentIdx && styles.carouselDotActive,
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -670,39 +1029,332 @@ export default function TorqueScoutClubScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* CATEGORY FILTER PILLS (TÜMÜ & ANKETLER) */}
+      {/* CATEGORY FILTER PILLS (LEFT: TÜMÜ & ANKETLER — RIGHT: GARAJIM) */}
       <View style={styles.filterScrollWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContainer}
-        >
-          {[
-            { key: 'ALL', label: '🔥 Tümü' },
-            { key: 'POLLS', label: '📊 Anketler' },
-          ].map((cat) => {
-            const isActive = selectedCategory === cat.key;
-            return (
-              <TouchableOpacity
-                key={cat.key}
-                style={[styles.filterPill, isActive && styles.filterPillActive]}
-                onPress={() => setSelectedCategory(cat.key as any)}
-              >
-                <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <View style={styles.filterBarRow}>
+          <View style={styles.filterLeftGroup}>
+            {[
+              { key: 'ALL', label: '🔥 Tümü' },
+              { key: 'POLLS', label: '📊 Anketler' },
+            ].map((cat) => {
+              const isActive = selectedCategory === cat.key;
+              return (
+                <TouchableOpacity
+                  key={cat.key}
+                  style={[styles.filterPill, isActive && styles.filterPillActive]}
+                  onPress={() => setSelectedCategory(cat.key as any)}
+                >
+                  <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.filterPill,
+              styles.garagePill,
+              selectedCategory === 'GARAGE' && styles.filterPillActive,
+            ]}
+            onPress={() => {
+              setSelectedCategory('GARAGE');
+              if (token) {
+                fetchMyGarage(token);
+              }
+            }}
+          >
+            <Text
+              style={[
+                styles.filterPillText,
+                selectedCategory === 'GARAGE' && styles.filterPillTextActive,
+              ]}
+            >
+              🚗 Garajım
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* FEED CONTENT */}
+      {/* FEED OR GARAGE CONTENT */}
       {loading ? (
         <View style={styles.centerLoading}>
           <TorkScoutLoader />
           <Text style={styles.loadingText}>Kulüp akışı yükleniyor...</Text>
         </View>
+      ) : selectedCategory === 'GARAGE' ? (
+        <ScrollView
+          contentContainerStyle={styles.feedScrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ea580c" />}
+        >
+          {/* ANTI-LISTING WARNING BANNER */}
+          <View style={styles.garageWarningCard}>
+            <View style={styles.garageWarningHeader}>
+              <Ionicons name="warning" size={18} color="#dc2626" />
+              <Text style={styles.garageWarningTitle}>Önemli Topluluk & Paylaşım Kuralı</Text>
+            </View>
+            <Text style={styles.garageWarningText}>
+              Yüklediğiniz araç görsellerini <Text style={{ fontWeight: '800' }}>satış ilanı olarak veya ilan gibi</Text> (fiyat, telefon numarası, satılık ibaresi vb. ekleyerek) paylaşmak kesinlikle yasaktır. İlan niteliği tespit edilen gönderiler yayınlanmaz ve bu durumun birkaç kez tespit edilmesi halinde hesabınız <Text style={{ fontWeight: '800' }}>TorkScout Club&apos;dan çıkarılır.</Text>
+            </Text>
+          </View>
+
+          {!token ? (
+            <View style={styles.garageAuthPromptCard}>
+              <View style={styles.garageAuthIconCircle}>
+                <Ionicons name="car-sport" size={28} color="#ea580c" />
+              </View>
+              <Text style={styles.garageAuthTitle}>Kendi Garajınızı Oluşturun</Text>
+              <Text style={styles.garageAuthSub}>
+                Aracınızın en güzel fotoğraflarını (en fazla 5 adet) yüklemek ve TorkScout Club akışında paylaşmak için lütfen giriş yapın.
+              </Text>
+              <TouchableOpacity
+                style={styles.garageAuthBtn}
+                onPress={() => router.push('/(tabs)/profile' as any)}
+              >
+                <Text style={styles.garageAuthBtnText}>Giriş Yap / Üye Ol</Text>
+                <Ionicons name="arrow-forward" size={16} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {/* GARAGE UPLOAD & SHARE COMPOSER CARD */}
+              <View style={styles.garageComposerCard}>
+                <View style={styles.garageComposerHeader}>
+                  <View style={styles.garageComposerIconBox}>
+                    <Ionicons name="camera" size={18} color="#ea580c" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.garageComposerTitle}>Aracını Garajına Ekle & Paylaş</Text>
+                    <Text style={styles.garageComposerSub}>
+                      En fazla 5 adet fotoğraf seçip açıklamanızla birlikte Club akışında paylaşabilirsiniz.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Photo Slots (1..5) */}
+                <View style={styles.garagePhotoSection}>
+                  <View style={styles.garagePhotoHeaderRow}>
+                    <Text style={styles.inputLabel}>ARAÇ GÖRSELLERİ ({garagePhotos.length}/5)</Text>
+                    {garagePhotos.length < 5 && (
+                      <TouchableOpacity onPress={handlePickGaragePhotos}>
+                        <Text style={styles.garageAddPhotoLink}>+ Fotoğraf Seç</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.garagePhotoStrip}
+                  >
+                    {garagePhotos.map((uri, idx) => (
+                      <View key={`${uri}-${idx}`} style={styles.garageThumbBox}>
+                        <ExpoImage
+                          source={{ uri }}
+                          style={styles.garageThumbImage}
+                          contentFit="cover"
+                        />
+                        <View style={styles.garageThumbBadge}>
+                          <Text style={styles.garageThumbBadgeText}>{idx + 1}/5</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.garageThumbRemoveBtn}
+                          onPress={() => handleRemoveGaragePhoto(idx)}
+                        >
+                          <Ionicons name="close" size={13} color="#ffffff" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+
+                    {garagePhotos.length < 5 && (
+                      <TouchableOpacity
+                        style={styles.garageAddPhotoSlot}
+                        onPress={handlePickGaragePhotos}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="images-outline" size={24} color="#ea580c" />
+                        <Text style={styles.garageAddPhotoSlotTitle}>Görsel Yükle</Text>
+                        <Text style={styles.garageAddPhotoSlotSub}>
+                          {5 - garagePhotos.length} hak kaldı
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </ScrollView>
+                </View>
+
+                {/* Vehicle Model / Title */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>ARAÇ / MODEL BAŞLIĞI (OPSİYONEL)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Örn: 2021 BMW 320i M Sport / Hafta Sonu Kurulumu"
+                    placeholderTextColor="#94a3b8"
+                    value={garageTitle}
+                    onChangeText={setGarageTitle}
+                  />
+                </View>
+
+                {/* Instagram Post Style Caption */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>GÖNDERİ AÇIKLAMASI *</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.textAreaInput]}
+                    placeholder="Aracınızla ilgili hikayenizi, sürüş deneyiminizi veya yaptığınız dokunuşları paylaşın (İlan / fiyat bilgisi yazmayınız)..."
+                    placeholderTextColor="#94a3b8"
+                    multiline
+                    numberOfLines={3}
+                    value={garageCaption}
+                    onChangeText={setGarageCaption}
+                  />
+                </View>
+
+                {/* Club'da Paylaş Toggle */}
+                <View style={styles.garageShareSwitchBox}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={styles.switchTitle}>Club&apos;da Paylaş 🌍</Text>
+                    <Text style={styles.switchSub}>
+                      Açık olduğunda gönderiniz yönetici onayından sonra &quot;Tümü&quot; sekmesi altında Instagram gönderisi gibi tüm kulüp üyeleriyle paylaşılır.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={shareInClub}
+                    onValueChange={setShareInClub}
+                    trackColor={{ false: '#cbd5e1', true: '#ea580c' }}
+                    thumbColor="#ffffff"
+                    ios_backgroundColor="#cbd5e1"
+                  />
+                </View>
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  style={[styles.submitPostBtn, submittingGarage && { opacity: 0.65 }]}
+                  disabled={submittingGarage}
+                  onPress={handleSubmitGarage}
+                >
+                  {submittingGarage ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name={shareInClub ? 'paper-plane' : 'bookmark'}
+                        size={16}
+                        color="#ffffff"
+                      />
+                      <Text style={styles.submitPostBtnText}>
+                        {shareInClub ? "Garaja Ekle & Club'da Paylaş" : 'Sadece Garajıma Kaydet'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* MY GARAGE ITEMS LIST */}
+              <View style={styles.myGarageSectionHeader}>
+                <Text style={styles.myGarageSectionTitle}>Garajım & Paylaşımlarım ({garageItems.length})</Text>
+              </View>
+
+              {loadingGarage ? (
+                <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                  <ActivityIndicator color="#ea580c" />
+                </View>
+              ) : garageItems.length === 0 ? (
+                <View style={styles.emptyFeed}>
+                  <Ionicons name="car-sport-outline" size={44} color="#94a3b8" />
+                  <Text style={styles.emptyFeedTitle}>Garajınızda henüz araç görseli yok</Text>
+                  <Text style={styles.emptyFeedSub}>
+                    Yukarıdaki alandan aracınızın fotoğraflarını yükleyip TorkScout Club&apos;da paylaşabilirsiniz.
+                  </Text>
+                </View>
+              ) : (
+                garageItems.map((item) => {
+                  const isPublished = item.status === 'PUBLISHED';
+                  const isPending = item.status === 'PENDING_REVIEW';
+                  const isRejected = item.status === 'REJECTED';
+
+                  return (
+                    <View key={item.id} style={styles.postCard}>
+                      <View style={styles.postTopBar}>
+                        <View
+                          style={[
+                            styles.garageStatusBadge,
+                            isPublished
+                              ? styles.garageStatusPublished
+                              : isPending
+                              ? styles.garageStatusPending
+                              : isRejected
+                              ? styles.garageStatusRejected
+                              : styles.garageStatusDraft,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.garageStatusBadgeText,
+                              isPublished
+                                ? { color: '#15803d' }
+                                : isPending
+                                ? { color: '#b45309' }
+                                : isRejected
+                                ? { color: '#b91c1c' }
+                                : { color: '#475569' },
+                            ]}
+                          >
+                            {isPublished
+                              ? "✅ CLUB'DA YAYINDA"
+                              : isPending
+                              ? '⏳ YÖNETİCİ ONAYI BEKLİYOR'
+                              : isRejected
+                              ? '❌ REDDEDİLDİ'
+                              : '🔒 SADECE GARAJIMDA'}
+                          </Text>
+                        </View>
+
+                        <TouchableOpacity
+                          style={styles.postAdminMenuBtn}
+                          onPress={() => handleDeleteGarageItem(item)}
+                        >
+                          <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+
+                      {item.title ? <Text style={styles.postTitle}>{item.title}</Text> : null}
+                      {item.content ? <Text style={styles.postContent}>{item.content}</Text> : null}
+
+                      {item.rejectionReason ? (
+                        <View style={styles.rejectionReasonBox}>
+                          <Text style={styles.rejectionReasonLabel}>Reddedilme Gerekçesi:</Text>
+                          <Text style={styles.rejectionReasonText}>{item.rejectionReason}</Text>
+                        </View>
+                      ) : null}
+
+                      {renderMediaCarousel(item, true)}
+
+                      {(!isPublished && !isPending) && (
+                        <TouchableOpacity
+                          style={styles.shareToClubSecondaryBtn}
+                          disabled={sharingPostId === item.id}
+                          onPress={() => handleShareSavedGarageItem(item)}
+                        >
+                          {sharingPostId === item.id ? (
+                            <ActivityIndicator size="small" color="#ea580c" />
+                          ) : (
+                            <>
+                              <Ionicons name="paper-plane-outline" size={15} color="#ea580c" />
+                              <Text style={styles.shareToClubSecondaryBtnText}>
+                                Club&apos;da Paylaş (Onaya Gönder)
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })
+              )}
+            </>
+          )}
+        </ScrollView>
       ) : (
         <ScrollView
           contentContainerStyle={styles.feedScrollContent}
@@ -753,12 +1405,17 @@ export default function TorqueScoutClubScreen() {
           ) : (
             filteredPosts.map((post, postIndex) => (
               <View key={post.id || `post-${postIndex}`} style={styles.postCard}>
-                {/* Top Row: Pinned Tag & Admin Actions */}
+                {/* Top Row: Pinned Tag / User Garage Tag & Admin Actions */}
                 <View style={styles.postTopBar}>
                   {post.isPinned ? (
                     <View style={styles.pinnedRow}>
                       <Ionicons name="pin" size={13} color="#ea580c" />
                       <Text style={styles.pinnedText}>SABİTLENMİŞ DUYURU</Text>
+                    </View>
+                  ) : post.isUserSubmission ? (
+                    <View style={styles.userGarageFeedBadge}>
+                      <Ionicons name="car-sport" size={12} color="#0284c7" />
+                      <Text style={styles.userGarageFeedBadgeText}>ÜYE GARAJI PAYLAŞIMI</Text>
                     </View>
                   ) : (
                     <View />
@@ -800,39 +1457,26 @@ export default function TorqueScoutClubScreen() {
                           ? `${post.author.firstName} ${post.author.lastName || ''}`.trim()
                           : post.author?.username || 'TorqueScout Üyesi'}
                       </Text>
-                      {post.author?.role === 'ADMIN' ? (
+                      {post.author?.role === 'ADMIN' || post.author?.role === 'SUPER_ADMIN' ? (
                         <View style={styles.adminBadge}>
                           <Text style={styles.adminBadgeText}>YÖNETİCİ</Text>
                         </View>
                       ) : (
                         <View style={styles.proBadge}>
-                          <Text style={styles.proBadgeText}>PRO ÜYE</Text>
+                          <Text style={styles.proBadgeText}>CLUB ÜYESİ</Text>
                         </View>
                       )}
                     </View>
-                    <Text style={styles.postDate}>{formatTimeAgo(post.publishedAt)}</Text>
+                    <Text style={styles.postDate}>{formatTimeAgo(post.publishedAt || post.createdAt)}</Text>
                   </View>
                 </View>
 
                 {/* Title & Body */}
-                {post.title && <Text style={styles.postTitle}>{post.title}</Text>}
-                <Text style={styles.postContent}>{post.content}</Text>
+                {post.title ? <Text style={styles.postTitle}>{post.title}</Text> : null}
+                {post.content ? <Text style={styles.postContent}>{post.content}</Text> : null}
 
-                {/* Post Media (Images) */}
-                {post.media && post.media.length > 0 && (
-                  <TouchableOpacity
-                    activeOpacity={0.92}
-                    onPress={() => setLightboxPostId(post.id)}
-                    style={styles.postMediaContainer}
-                  >
-                    <ExpoImage
-                      source={{ uri: resolvePostMediaUrl(post.media[0].mediaUrl) }}
-                      style={styles.postMediaImage}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                    />
-                  </TouchableOpacity>
-                )}
+                {/* Post Media (Single or Multi-Photo Instagram Carousel) */}
+                {renderMediaCarousel(post, true)}
 
                 {/* Interactive Poll Component */}
                 {post.poll && (
@@ -844,10 +1488,13 @@ export default function TorqueScoutClubScreen() {
 
                     <View style={styles.pollOptionsList}>
                       {post.poll.options.map((opt, optIndex) => {
-                        const optId = opt.id || `opt-${optIndex}`;
-                        const isSelected = post.poll?.myVotedOptionId === opt.id;
+                        const optId = (opt as any).optionId || opt.id || `opt-${optIndex}`;
+                        const isSelected =
+                          (opt as any).selectedByCurrentUser || post.poll?.myVotedOptionId === optId;
                         const percentage =
-                          post.poll && post.poll.totalVotes > 0
+                          typeof (opt as any).percentage === 'number'
+                            ? (opt as any).percentage
+                            : post.poll && post.poll.totalVotes > 0
                             ? Math.round(((opt.voteCount || 0) / post.poll.totalVotes) * 100)
                             : 0;
 
@@ -855,10 +1502,15 @@ export default function TorqueScoutClubScreen() {
                           <TouchableOpacity
                             key={optId}
                             style={[styles.pollOptionItem, isSelected && styles.pollOptionSelected]}
-                            onPress={() => handleVotePoll(post.poll!.id, opt.id || String(optIndex), post.id)}
-                            disabled={votingPollIds[post.poll!.id]}
+                            onPress={() =>
+                              handleVotePoll(
+                                (post.poll as any).pollId || post.poll!.id,
+                                optId,
+                                post.id
+                              )
+                            }
+                            disabled={votingPollIds[(post.poll as any).pollId || post.poll!.id]}
                           >
-                            {/* Percentage fill bar */}
                             <View style={[styles.pollPercentageBar, { width: `${percentage}%` }]} />
 
                             <View style={styles.pollOptionContentRow}>
@@ -886,9 +1538,9 @@ export default function TorqueScoutClubScreen() {
 
                     <View style={styles.pollFooterRow}>
                       <Text style={styles.pollTotalVotesText}>
-                        👥 Toplam {post.poll.totalVotes || 0} oy kullanıldı
+                        👥 Toplam {(post.poll as any).participantCount ?? post.poll.totalVotes ?? 0} oy kullanıldı
                       </Text>
-                      {post.poll.myVotedOptionId && (
+                      {(post.poll.myVotedOptionId || (post.poll as any).currentUserVote) && (
                         <Text style={styles.pollVotedBadge}>✓ Oyunuz Kaydedildi</Text>
                       )}
                     </View>
@@ -946,7 +1598,12 @@ export default function TorqueScoutClubScreen() {
             style={StyleSheet.absoluteFill}
             onPress={() => setCreatePostModalVisible(false)}
           />
-          <View style={styles.createPostModalSheet}>
+          <View
+            style={[
+              styles.createPostModalSheet,
+              { paddingBottom: Math.max(insets.bottom + 14, 24) },
+            ]}
+          >
             {/* Modal Header */}
             <View style={styles.modalHeaderBar}>
               <View style={styles.modalHeaderTitleRow}>
@@ -962,8 +1619,12 @@ export default function TorqueScoutClubScreen() {
             </View>
 
             <ScrollView
-              style={{ maxHeight: '80%' }}
-              contentContainerStyle={{ padding: 18, gap: 14 }}
+              style={{ maxHeight: '82%' }}
+              contentContainerStyle={{
+                padding: 18,
+                paddingBottom: Math.max(insets.bottom + 24, 36),
+                gap: 14,
+              }}
               showsVerticalScrollIndicator={false}
             >
               {/* Post Title */}
@@ -1004,40 +1665,46 @@ export default function TorqueScoutClubScreen() {
                 />
               </View>
 
-              {/* Switch Controls */}
+              {/* Switch Controls with High-Contrast Off-State Track */}
               <View style={styles.switchRow}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
                   <Text style={styles.switchTitle}>Sabitlenmiş Duyuru Yap 📌</Text>
                   <Text style={styles.switchSub}>Akışın en üstünde sabitlenmiş rozetle görünür.</Text>
                 </View>
                 <Switch
                   value={isPinned}
                   onValueChange={setIsPinned}
-                  trackColor={{ false: '#e2e8f0', true: '#ea580c' }}
+                  trackColor={{ false: '#cbd5e1', true: '#ea580c' }}
+                  thumbColor="#ffffff"
+                  ios_backgroundColor="#cbd5e1"
                 />
               </View>
 
               <View style={styles.switchRow}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
                   <Text style={styles.switchTitle}>Yorumlara İzin Ver 💬</Text>
                   <Text style={styles.switchSub}>Kullanıcılar bu gönderiye yorum yazabilir.</Text>
                 </View>
                 <Switch
                   value={commentsEnabled}
                   onValueChange={setCommentsEnabled}
-                  trackColor={{ false: '#e2e8f0', true: '#ea580c' }}
+                  trackColor={{ false: '#cbd5e1', true: '#ea580c' }}
+                  thumbColor="#ffffff"
+                  ios_backgroundColor="#cbd5e1"
                 />
               </View>
 
               <View style={styles.switchRow}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
                   <Text style={styles.switchTitle}>Anket Ekle 📊</Text>
                   <Text style={styles.switchSub}>Gönderiye interaktif oylama anketi bağlayın.</Text>
                 </View>
                 <Switch
                   value={hasPoll}
                   onValueChange={setHasPoll}
-                  trackColor={{ false: '#e2e8f0', true: '#ea580c' }}
+                  trackColor={{ false: '#cbd5e1', true: '#ea580c' }}
+                  thumbColor="#ffffff"
+                  ios_backgroundColor="#cbd5e1"
                 />
               </View>
 
@@ -1190,7 +1857,12 @@ export default function TorqueScoutClubScreen() {
             )}
 
             {/* Comment Input Bar */}
-            <View style={styles.commentInputBar}>
+            <View
+              style={[
+                styles.commentInputBar,
+                { paddingBottom: Math.max(insets.bottom + 8, 12) },
+              ]}
+            >
               <TextInput
                 style={styles.commentInput}
                 placeholder="Fikrinizi veya tecrübenizi paylaşın..."
@@ -1218,7 +1890,7 @@ export default function TorqueScoutClubScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* POST PHOTO LIGHTBOX BANNER MODAL WITH ACTIVE LIKE / COMMENT / SHARE BAR */}
+      {/* POST PHOTO LIGHTBOX BANNER MODAL WITH MULTI-PHOTO SWIPE & ACTIVE LIKE / COMMENT / SHARE BAR */}
       <Modal
         visible={!!activeLightboxPost}
         animationType="fade"
@@ -1262,10 +1934,20 @@ export default function TorqueScoutClubScreen() {
                     : activeLightboxPost?.author?.username || 'TorqueScout Üyesi'}
                 </Text>
                 <Text style={styles.lightboxPostDate}>
-                  {activeLightboxPost ? formatTimeAgo(activeLightboxPost.publishedAt) : ''}
+                  {activeLightboxPost
+                    ? formatTimeAgo(activeLightboxPost.publishedAt || activeLightboxPost.createdAt)
+                    : ''}
                 </Text>
               </View>
             </View>
+
+            {activeLightboxPost && activeLightboxPost.media && activeLightboxPost.media.length > 1 && (
+              <View style={[styles.carouselCounterPill, { position: 'relative', top: 0, right: 0, marginRight: 10 }]}>
+                <Text style={styles.carouselCounterText}>
+                  {Math.min(lightboxMediaIndex + 1, activeLightboxPost.media.length)}/{activeLightboxPost.media.length}
+                </Text>
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.lightboxCloseBtn}
@@ -1275,20 +1957,50 @@ export default function TorqueScoutClubScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Enlarged Uncropped Banner Image */}
-          <Pressable
-            style={styles.lightboxImageStage}
-            onPress={() => setLightboxPostId(null)}
-          >
-            {activeLightboxPost?.media?.[0]?.mediaUrl && (
-              <ExpoImage
-                source={{ uri: resolvePostMediaUrl(activeLightboxPost.media[0].mediaUrl) }}
-                style={styles.lightboxFullImage}
-                contentFit="contain"
-                cachePolicy="memory-disk"
-              />
+          {/* Enlarged Uncropped Banner Image(s) */}
+          <View style={styles.lightboxImageStage}>
+            {activeLightboxPost?.media && activeLightboxPost.media.length > 1 ? (
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                contentOffset={{ x: lightboxMediaIndex * windowWidth, y: 0 }}
+                onMomentumScrollEnd={(e) => {
+                  const idx = Math.round(e.nativeEvent.contentOffset.x / windowWidth);
+                  setLightboxMediaIndex(idx);
+                }}
+              >
+                {activeLightboxPost.media.map((m, idx) => (
+                  <Pressable
+                    key={m.id || idx}
+                    style={{ width: windowWidth, height: '100%', justifyContent: 'center', alignItems: 'center' }}
+                    onPress={() => setLightboxPostId(null)}
+                  >
+                    <ExpoImage
+                      source={{ uri: resolvePostMediaUrl(m.mediaUrl) }}
+                      style={styles.lightboxFullImage}
+                      contentFit="contain"
+                      cachePolicy="memory-disk"
+                    />
+                  </Pressable>
+                ))}
+              </ScrollView>
+            ) : (
+              <Pressable
+                style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => setLightboxPostId(null)}
+              >
+                {activeLightboxPost?.media?.[0]?.mediaUrl && (
+                  <ExpoImage
+                    source={{ uri: resolvePostMediaUrl(activeLightboxPost.media[0].mediaUrl) }}
+                    style={styles.lightboxFullImage}
+                    contentFit="contain"
+                    cachePolicy="memory-disk"
+                  />
+                )}
+              </Pressable>
             )}
-          </Pressable>
+          </View>
 
           {/* Bottom Caption & Active Like / Comment / Share Buttons */}
           {activeLightboxPost && (
@@ -1381,28 +2093,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  shieldBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#ea580c',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#ea580c',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  clubMainTitle: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: '#0f172a',
-    letterSpacing: 0.2,
-  },
-  clubAccentTitle: {
-    color: '#ea580c',
-  },
   clubSubTitle: {
     fontSize: 11,
     color: '#64748b',
@@ -1428,9 +2118,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
     paddingVertical: 8,
-  },
-  filterContainer: {
     paddingHorizontal: 16,
+  },
+  filterBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  filterLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   filterPill: {
@@ -1440,6 +2137,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+  },
+  garagePill: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#cbd5e1',
   },
   filterPillActive: {
     backgroundColor: '#fff7ed',
@@ -1469,6 +2170,325 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 12,
     paddingBottom: 40,
+  },
+  garageWarningCard: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#fecaca',
+    padding: 14,
+    gap: 6,
+  },
+  garageWarningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  garageWarningTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#991b1b',
+  },
+  garageWarningText: {
+    fontSize: 12,
+    color: '#7f1d1d',
+    lineHeight: 17.5,
+    fontWeight: '500',
+  },
+  garageAuthPromptCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    padding: 24,
+    alignItems: 'center',
+    gap: 10,
+  },
+  garageAuthIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  garageAuthTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  garageAuthSub: {
+    fontSize: 12.5,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  garageAuthBtn: {
+    marginTop: 6,
+    backgroundColor: '#ea580c',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  garageAuthBtnText: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  garageComposerCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    padding: 16,
+    gap: 14,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  garageComposerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  garageComposerIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  garageComposerTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  garageComposerSub: {
+    fontSize: 11.5,
+    color: '#64748b',
+    marginTop: 1,
+  },
+  garagePhotoSection: {
+    gap: 8,
+  },
+  garagePhotoHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  garageAddPhotoLink: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ea580c',
+  },
+  garagePhotoStrip: {
+    gap: 10,
+    paddingVertical: 2,
+  },
+  garageThumbBox: {
+    width: 96,
+    height: 96,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    position: 'relative',
+  },
+  garageThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  garageThumbBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  garageThumbBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  garageThumbRemoveBtn: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(220, 38, 38, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  garageAddPhotoSlot: {
+    width: 96,
+    height: 96,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#fdba74',
+    backgroundColor: '#fff7ed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
+  },
+  garageAddPhotoSlotTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ea580c',
+    marginTop: 2,
+  },
+  garageAddPhotoSlotSub: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: '#9a3412',
+  },
+  garageShareSwitchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 12,
+  },
+  myGarageSectionHeader: {
+    marginTop: 4,
+    paddingHorizontal: 2,
+  },
+  myGarageSectionTitle: {
+    fontSize: 14.5,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  garageStatusBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  garageStatusPublished: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
+  },
+  garageStatusPending: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+  },
+  garageStatusRejected: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  garageStatusDraft: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#cbd5e1',
+  },
+  garageStatusBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  rejectionReasonBox: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    padding: 10,
+    gap: 2,
+  },
+  rejectionReasonLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#b91c1c',
+  },
+  rejectionReasonText: {
+    fontSize: 11.5,
+    color: '#7f1d1d',
+    lineHeight: 16,
+  },
+  shareToClubSecondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+  },
+  shareToClubSecondaryBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#ea580c',
+  },
+  userGarageFeedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#f0f9ff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  userGarageFeedBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#0284c7',
+    letterSpacing: 0.4,
+  },
+  carouselWrapper: {
+    gap: 8,
+  },
+  carouselCounterPill: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  carouselCounterText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  carouselDotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  carouselDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#cbd5e1',
+  },
+  carouselDotActive: {
+    width: 18,
+    backgroundColor: '#ea580c',
   },
   adminHeroCard: {
     backgroundColor: '#ffffff',
@@ -1562,24 +2582,6 @@ const styles = StyleSheet.create({
   welcomeContent: {
     gap: 6,
   },
-  welcomeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    backgroundColor: '#fff7ed',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#fed7aa',
-  },
-  welcomeBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#ea580c',
-    letterSpacing: 0.5,
-  },
   welcomeTitle: {
     fontSize: 18,
     fontWeight: '900',
@@ -1605,6 +2607,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94a3b8',
     textAlign: 'center',
+    paddingHorizontal: 20,
   },
   postCard: {
     backgroundColor: '#ffffff',
@@ -1733,8 +2736,9 @@ const styles = StyleSheet.create({
   postMediaContainer: {
     borderRadius: 14,
     overflow: 'hidden',
-    height: 200,
+    height: 235,
     backgroundColor: '#f1f5f9',
+    position: 'relative',
   },
   postMediaImage: {
     width: '100%',
@@ -1863,7 +2867,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '90%',
+    maxHeight: '92%',
   },
   modalHeaderBar: {
     flexDirection: 'row',
@@ -1912,14 +2916,14 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   textAreaInput: {
-    minHeight: 90,
+    minHeight: 84,
     textAlignVertical: 'top',
   },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
@@ -1931,7 +2935,8 @@ const styles = StyleSheet.create({
   switchSub: {
     fontSize: 11,
     color: '#64748b',
-    marginTop: 1,
+    marginTop: 2,
+    lineHeight: 15,
   },
   pollBuilderBox: {
     backgroundColor: '#f8fafc',
@@ -2094,7 +3099,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingTop: 10,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
@@ -2164,7 +3169,6 @@ const styles = StyleSheet.create({
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 8,
   },
   lightboxFullImage: {
     width: '100%',

@@ -10,13 +10,17 @@ import {
   Query,
   UseGuards,
   Req,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ClubService } from './club.service';
 import {
   CreateClubCommentDto,
   UpdateClubCommentDto,
   CastPollVoteDto,
   UpdatePollEndTimeDto,
+  SubmitClubGaragePostDto,
 } from './club.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 
@@ -113,5 +117,44 @@ export class ClubController {
   async getPollResults(@Param('pollId') pollId: string, @Req() req?: any) {
     const userId = req?.user?.id;
     return this.clubService.getPollResults(pollId, userId);
+  }
+
+  // ==========================================
+  // GARAGE & MEMBER MEDIA / POST SUBMISSIONS
+  // ==========================================
+
+  @UseGuards(JwtAuthGuard)
+  @Post('media/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadMemberMedia(@UploadedFile() file: any, @Req() req: any) {
+    return this.clubService.uploadPostMedia(file, req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('garage')
+  async getMyGarage(@Req() req: any) {
+    return this.clubService.getMyGarage(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('garage')
+  async submitGaragePost(@Body() dto: SubmitClubGaragePostDto, @Req() req: any) {
+    return this.clubService.submitGaragePost(req.user.id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('garage/:postId/share')
+  async shareGaragePostToClub(
+    @Param('postId') postId: string,
+    @Body() body: { title?: string; content?: string },
+    @Req() req: any,
+  ) {
+    return this.clubService.shareGaragePostToClub(req.user.id, postId, body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('garage/:postId')
+  async deleteMyGaragePost(@Param('postId') postId: string, @Req() req: any) {
+    return this.clubService.deleteMyGaragePost(req.user.id, postId);
   }
 }

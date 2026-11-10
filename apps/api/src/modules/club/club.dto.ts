@@ -288,3 +288,47 @@ export class GetAdminUsersQueryDto {
   @IsString()
   status?: string;
 }
+
+export class SaveClubGarageDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  content?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  mediaUrls: string[];
+}
+
+export class SubmitClubGaragePostDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  content?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  mediaUrls: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  shareInClub?: boolean;
+}
+
+export class RejectClubPostDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
