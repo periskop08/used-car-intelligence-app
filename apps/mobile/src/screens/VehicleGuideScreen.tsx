@@ -10,8 +10,10 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
 import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
 import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
+import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
 import TorkScoutLoader from '../components/TorkScoutLoader';
 
 const BrandLogo = ({ brandName, size = 24 }: { brandName?: string; size?: number }) => {
@@ -49,7 +51,10 @@ const { width } = Dimensions.get('window');
 
 const formatCloudflareImageUrl = (url?: string | null): string => {
   if (!url) return '';
-  if (url.startsWith('/') || url.startsWith('data:')) return url;
+  if (url.startsWith('data:')) return url;
+  if (url.startsWith('/')) {
+    return `${API_URL}${url}`;
+  }
 
   if (url.includes('r2.dev') || url.includes('cloudflarestorage.com')) {
     let storageKey = '';
@@ -70,11 +75,56 @@ const formatCloudflareImageUrl = (url?: string | null): string => {
     }
 
     if (storageKey) {
+      if (storageKey.startsWith('guide-cards/')) {
+        return `${API_URL}/vehicle-guide/media-proxy/${storageKey}`;
+      }
       return `${API_URL}/listings/media-proxy/${storageKey}`;
     }
   }
 
   return url;
+};
+
+const resolveGuideCardImageUrl = (card?: {
+  heroImageUrl?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  generationName?: string | null;
+} | null): string => {
+  if (!card) return '';
+  if (
+    card.heroImageUrl &&
+    !card.heroImageUrl.includes('photo-1542282088-72c9c27ed0cd') &&
+    !card.heroImageUrl.includes('unsplash.com')
+  ) {
+    return formatCloudflareImageUrl(card.heroImageUrl);
+  }
+
+  const b = (card.brand || '').trim().toLowerCase();
+  const m = (card.model || '').trim().toLowerCase();
+  const g = (card.generationName || '').trim().toLowerCase();
+  const cleanM = m.replace(/ailesi|serisi/gi, '').trim();
+
+  if (g && CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m} ${g}`]) {
+    return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m} ${g}`]);
+  }
+  if (CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m}`]) {
+    return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m}`]);
+  }
+  if (cleanM && CLOUDFLARE_VEHICLE_IMAGES[`${b} ${cleanM}`]) {
+    return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[`${b} ${cleanM}`]);
+  }
+  if (CLOUDFLARE_VEHICLE_IMAGES[m]) {
+    return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[m]);
+  }
+  if (cleanM && CLOUDFLARE_VEHICLE_IMAGES[cleanM]) {
+    return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[cleanM]);
+  }
+  if (b && CLOUDFLARE_VEHICLE_IMAGES[b]) {
+    return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[b]);
+  }
+
+  return formatCloudflareImageUrl(card.heroImageUrl);
 };
 
 interface Fact {
@@ -116,9 +166,9 @@ export default function VehicleGuideScreen() {
       const res = await fetch(`${API_URL}/vehicle-guide/cards/random?locale=tr`);
       if (res.ok) {
         const data: GuideCard = await res.json();
-        const proxiedUrl = formatCloudflareImageUrl(data.heroImageUrl);
+        const proxiedUrl = resolveGuideCardImageUrl(data);
         if (proxiedUrl) {
-          Image.prefetch(proxiedUrl).catch(() => {});
+          ExpoImage.prefetch(proxiedUrl).catch(() => {});
         }
         return data;
       }
@@ -148,7 +198,7 @@ export default function VehicleGuideScreen() {
       const firstCard = await prefetchSingleCard();
       if (firstCard) {
         setCard(firstCard);
-        setImageUri(formatCloudflareImageUrl(firstCard.heroImageUrl));
+        setImageUri(resolveGuideCardImageUrl(firstCard));
       }
       refillBuffer();
     } finally {
@@ -162,7 +212,7 @@ export default function VehicleGuideScreen() {
     if (cardQueueRef.current.length > 0) {
       const nextCard = cardQueueRef.current.shift()!;
       setCard(nextCard);
-      setImageUri(formatCloudflareImageUrl(nextCard.heroImageUrl));
+      setImageUri(resolveGuideCardImageUrl(nextCard));
       refillBuffer();
     } else {
       setSwitching(true);
@@ -170,7 +220,7 @@ export default function VehicleGuideScreen() {
         const newCard = await prefetchSingleCard();
         if (newCard) {
           setCard(newCard);
-          setImageUri(formatCloudflareImageUrl(newCard.heroImageUrl));
+          setImageUri(resolveGuideCardImageUrl(newCard));
         }
         refillBuffer();
       } finally {
@@ -261,10 +311,21 @@ export default function VehicleGuideScreen() {
           {/* Card Hero Image Container */}
           <View style={styles.imageCard}>
             {imageUri ? (
-              <Image
+              <ExpoImage
                 source={{ uri: imageUri }}
                 style={styles.heroImage}
-                resizeMode="cover"
+                contentFit="cover"
+                transition={200}
+                cachePolicy="memory-disk"
+                onError={() => {
+                  const fallbackUri = resolveGuideCardImageUrl({
+                    ...card,
+                    heroImageUrl: null,
+                  });
+                  if (fallbackUri && fallbackUri !== imageUri) {
+                    setImageUri(fallbackUri);
+                  }
+                }}
               />
             ) : null}
             <View style={styles.imageDarkGradient} />

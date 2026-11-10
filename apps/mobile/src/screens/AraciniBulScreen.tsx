@@ -28,7 +28,10 @@ const SWIPE_THRESHOLD = 0.25 * SCREEN_WIDTH;
 
 const formatCloudflareImageUrl = (url?: string | null): string => {
   if (!url) return '';
-  if (url.startsWith('/') || url.startsWith('data:')) return url;
+  if (url.startsWith('data:')) return url;
+  if (url.startsWith('/')) {
+    return `${API_URL}${url}`;
+  }
 
   if (url.includes('r2.dev') || url.includes('cloudflarestorage.com')) {
     let storageKey = '';
@@ -49,6 +52,9 @@ const formatCloudflareImageUrl = (url?: string | null): string => {
     }
 
     if (storageKey) {
+      if (storageKey.startsWith('guide-cards/')) {
+        return `${API_URL}/vehicle-guide/media-proxy/${storageKey}`;
+      }
       return `${API_URL}/listings/media-proxy/${storageKey}`;
     }
   }
@@ -64,8 +70,13 @@ const resolveVehicleImageUrl = (
   modelFamily?: string,
   generationName?: string
 ): string => {
-  // 1. If backend gave an authentic Cloudflare R2 / S3 URL, use it directly
-  if (url && (url.includes('r2.dev') || url.includes('cloudflarestorage.com'))) {
+  // 1. If backend gave an authentic Cloudflare R2 / S3 or media-proxy URL, use it directly
+  if (
+    url &&
+    (url.includes('r2.dev') ||
+      url.includes('cloudflarestorage.com') ||
+      url.includes('/media-proxy/'))
+  ) {
     return formatCloudflareImageUrl(url);
   }
 
@@ -75,24 +86,24 @@ const resolveVehicleImageUrl = (
   const cleanM = m.replace(/ailesi|serisi/gi, '').trim();
 
   // 2. Direct exact Brand + Model + Gen lookup in Cloudflare R2 map
-  if (g && CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m} ${g}`]) return CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m} ${g}`];
-  if (CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m}`]) return CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m}`];
-  if (cleanM && CLOUDFLARE_VEHICLE_IMAGES[`${b} ${cleanM}`]) return CLOUDFLARE_VEHICLE_IMAGES[`${b} ${cleanM}`];
-  if (CLOUDFLARE_VEHICLE_IMAGES[m]) return CLOUDFLARE_VEHICLE_IMAGES[m];
-  if (cleanM && CLOUDFLARE_VEHICLE_IMAGES[cleanM]) return CLOUDFLARE_VEHICLE_IMAGES[cleanM];
+  if (g && CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m} ${g}`]) return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m} ${g}`]);
+  if (CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m}`]) return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[`${b} ${m}`]);
+  if (cleanM && CLOUDFLARE_VEHICLE_IMAGES[`${b} ${cleanM}`]) return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[`${b} ${cleanM}`]);
+  if (CLOUDFLARE_VEHICLE_IMAGES[m]) return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[m]);
+  if (cleanM && CLOUDFLARE_VEHICLE_IMAGES[cleanM]) return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[cleanM]);
 
   // 3. Partial keyword matching against all Cloudflare R2 keys
   if (cleanM && cleanM.length >= 2) {
     for (const [key, r2Url] of Object.entries(CLOUDFLARE_VEHICLE_IMAGES)) {
       if (key.includes(`${b} ${cleanM}`) || key === cleanM) {
-        return r2Url;
+        return formatCloudflareImageUrl(r2Url);
       }
     }
   }
 
   // 4. Brand lookup in Cloudflare R2 map
   if (b && CLOUDFLARE_VEHICLE_IMAGES[b]) {
-    return CLOUDFLARE_VEHICLE_IMAGES[b];
+    return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[b]);
   }
 
   // 5. If backend provided any custom URL (and not generic Unsplash placeholder)
