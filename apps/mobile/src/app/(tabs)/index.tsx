@@ -12,6 +12,8 @@ import {
   TextInput,
   Dimensions,
   StatusBar,
+  PanResponder,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle, Line, G } from 'react-native-svg';
@@ -650,8 +652,11 @@ export default function MobileDashboard() {
   const [searchText, setSearchText] = useState('');
 
   // Open Araç Sorgula modal directly when navigated with openQueryModal param (e.g. from Dashboard / Favorites)
+  const lastHandledQueryModalRef = useRef<string | null>(null);
   useEffect(() => {
-    if (params.openQueryModal) {
+    const paramVal = Array.isArray(params.openQueryModal) ? params.openQueryModal[0] : params.openQueryModal;
+    if (paramVal && paramVal !== lastHandledQueryModalRef.current) {
+      lastHandledQueryModalRef.current = paramVal;
       setModalView('form');
       startCategoryCycle();
       setQueryModalVisible(true);
@@ -1307,6 +1312,154 @@ export default function MobileDashboard() {
     }
   };
 
+  const closeQueryModal = useCallback(() => {
+    stopCategoryCycle();
+    setQueryModalVisible(false);
+    if (params.openQueryModal) {
+      try {
+        router.setParams({ openQueryModal: '' });
+      } catch {
+        // ignore if router is transitioning
+      }
+    }
+  }, [stopCategoryCycle, params.openQueryModal, router]);
+
+  const handleModalBackGesture = () => {
+    if (modalView === 'step') {
+      handleStepBack();
+    } else {
+      closeQueryModal();
+    }
+  };
+
+  const modalBackActionRef = useRef<() => void>(() => {});
+  modalBackActionRef.current = handleModalBackGesture;
+
+  const modalStateRef = useRef({ modalView, activeStep });
+  modalStateRef.current = { modalView, activeStep };
+
+  const touchSwipeStartRef = useRef<{ x: number; y: number; time: number; handled: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!queryModalVisible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      modalBackActionRef.current();
+      return true;
+    });
+    return () => sub.remove();
+  }, [queryModalVisible]);
+
+  const modalPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponderCapture: () => false,
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+          const { dx, dy, x0 } = gestureState;
+          const absDx = Math.abs(dx);
+          const absDy = Math.abs(dy);
+          if (absDx < 18 || absDx < absDy * 1.35) return false;
+
+          const isLeftEdge = x0 <= 55 && dx > 18;
+          const isRightEdge =
+            x0 >= windowWidth - 55 &&
+            dx < -18 &&
+            !(modalStateRef.current.modalView === 'step' && modalStateRef.current.activeStep === 'brand');
+          const isFormHorizontalSwipe = modalStateRef.current.modalView === 'form' && dx > 28 && absDx > absDy * 1.7;
+
+          return isLeftEdge || isRightEdge || isFormHorizontalSwipe;
+        },
+        onPanResponderMove: (_, gestureState) => {
+          if (touchSwipeStartRef.current?.handled) return;
+          const { dx, dy, x0 } = gestureState;
+          const absDx = Math.abs(dx);
+          const absDy = Math.abs(dy);
+          const isLeftSwipeBack = (x0 <= 60 || modalStateRef.current.modalView === 'form') && dx > 52 && absDx > absDy * 1.35;
+          const isRightSwipeBack =
+            x0 >= windowWidth - 60 &&
+            dx < -52 &&
+            absDx > absDy * 1.35 &&
+            !(modalStateRef.current.modalView === 'step' && modalStateRef.current.activeStep === 'brand');
+
+          if (isLeftSwipeBack || isRightSwipeBack) {
+            if (touchSwipeStartRef.current) {
+              touchSwipeStartRef.current.handled = true;
+            }
+            modalBackActionRef.current();
+          }
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (touchSwipeStartRef.current?.handled) return;
+          const { dx, dy, vx, x0 } = gestureState;
+          const absDx = Math.abs(dx);
+          const absDy = Math.abs(dy);
+          const isLeftSwipeBack =
+            (x0 <= 60 || modalStateRef.current.modalView === 'form') &&
+            (dx > 42 || (dx > 24 && vx > 0.35)) &&
+            absDx > absDy * 1.3;
+          const isRightSwipeBack =
+            x0 >= windowWidth - 60 &&
+            (dx < -42 || (dx < -24 && vx < -0.35)) &&
+            absDx > absDy * 1.3 &&
+            !(modalStateRef.current.modalView === 'step' && modalStateRef.current.activeStep === 'brand');
+
+          if (isLeftSwipeBack || isRightSwipeBack) {
+            if (touchSwipeStartRef.current) {
+              touchSwipeStartRef.current.handled = true;
+            }
+            modalBackActionRef.current();
+          }
+        },
+      }),
+    []
+  );
+
+  const leftEdgePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+        onPanResponderMove: (_, g) => {
+          if (touchSwipeStartRef.current?.handled) return;
+          if (g.dx > 42 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2) {
+            if (touchSwipeStartRef.current) touchSwipeStartRef.current.handled = true;
+            modalBackActionRef.current();
+          }
+        },
+        onPanResponderRelease: (_, g) => {
+          if (touchSwipeStartRef.current?.handled) return;
+          if ((g.dx > 32 || (g.dx > 18 && g.vx > 0.3)) && Math.abs(g.dx) > Math.abs(g.dy) * 1.2) {
+            if (touchSwipeStartRef.current) touchSwipeStartRef.current.handled = true;
+            modalBackActionRef.current();
+          }
+        },
+      }),
+    []
+  );
+
+  const rightEdgePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+        onPanResponderMove: (_, g) => {
+          if (touchSwipeStartRef.current?.handled) return;
+          if (g.dx < -42 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2) {
+            if (touchSwipeStartRef.current) touchSwipeStartRef.current.handled = true;
+            modalBackActionRef.current();
+          }
+        },
+        onPanResponderRelease: (_, g) => {
+          if (touchSwipeStartRef.current?.handled) return;
+          if ((g.dx < -32 || (g.dx < -18 && g.vx < -0.3)) && Math.abs(g.dx) > Math.abs(g.dy) * 1.2) {
+            if (touchSwipeStartRef.current) touchSwipeStartRef.current.handled = true;
+            modalBackActionRef.current();
+          }
+        },
+      }),
+    []
+  );
+
   const selectOption = (rawItem: any) => {
     const itemString = typeof rawItem === 'string' ? rawItem : rawItem.name || rawItem.value || rawItem.label || String(rawItem);
     const itemObj = typeof rawItem === 'object' && rawItem.id ? rawItem : { id: itemString, name: itemString };
@@ -1949,12 +2102,90 @@ export default function MobileDashboard() {
   <Modal
     visible={queryModalVisible}
     animationType="slide"
-    onRequestClose={() => {
-      stopCategoryCycle();
-      setQueryModalVisible(false);
-    }}
+    onRequestClose={handleModalBackGesture}
   >
-    <SafeAreaView style={styles.fullModalContainer} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={styles.fullModalContainer}
+      edges={['top', 'bottom']}
+      {...modalPanResponder.panHandlers}
+      onTouchStart={(e) => {
+        const touch = e.nativeEvent;
+        touchSwipeStartRef.current = {
+          x: touch.pageX,
+          y: touch.pageY,
+          time: Date.now(),
+          handled: false,
+        };
+      }}
+      onTouchMove={(e) => {
+        const start = touchSwipeStartRef.current;
+        if (!start || start.handled) return;
+        const touch = e.nativeEvent;
+        const dx = touch.pageX - start.x;
+        const dy = touch.pageY - start.y;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+
+        const isLeftEdgeSwipe = (start.x <= 60 || modalStateRef.current.modalView === 'form') && dx > 55 && absDx > absDy * 1.4;
+        const isRightEdgeSwipe =
+          start.x >= windowWidth - 60 &&
+          dx < -55 &&
+          absDx > absDy * 1.4 &&
+          !(modalStateRef.current.modalView === 'step' && modalStateRef.current.activeStep === 'brand');
+
+        if (isLeftEdgeSwipe || isRightEdgeSwipe) {
+          start.handled = true;
+          modalBackActionRef.current();
+        }
+      }}
+      onTouchEnd={(e) => {
+        const start = touchSwipeStartRef.current;
+        if (!start || start.handled) return;
+        const touch = e.nativeEvent;
+        const dx = touch.pageX - start.x;
+        const dy = touch.pageY - start.y;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+
+        const isLeftEdgeSwipe = (start.x <= 60 || modalStateRef.current.modalView === 'form') && dx > 42 && absDx > absDy * 1.35;
+        const isRightEdgeSwipe =
+          start.x >= windowWidth - 60 &&
+          dx < -42 &&
+          absDx > absDy * 1.35 &&
+          !(modalStateRef.current.modalView === 'step' && modalStateRef.current.activeStep === 'brand');
+
+        if (isLeftEdgeSwipe || isRightEdgeSwipe) {
+          start.handled = true;
+          modalBackActionRef.current();
+        }
+        touchSwipeStartRef.current = null;
+      }}
+    >
+      {/* iOS & Android Left-Edge Native-Feel Swipe Zone */}
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 68,
+          bottom: 0,
+          width: 20,
+          zIndex: 999,
+        }}
+        {...leftEdgePanResponder.panHandlers}
+      />
+      {!(modalView === 'step' && activeStep === 'brand') && (
+        <View
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 68,
+            bottom: 0,
+            width: 20,
+            zIndex: 999,
+          }}
+          {...rightEdgePanResponder.panHandlers}
+        />
+      )}
       {modalView === 'form' ? (
         /* FORM VIEW MATCHING REFERENCE IMAGE 2 */
         <ScrollView contentContainerStyle={styles.refFormPadding} showsVerticalScrollIndicator={false}>
@@ -1962,10 +2193,7 @@ export default function MobileDashboard() {
           <View style={styles.refHeaderRow}>
             <TouchableOpacity
               style={styles.refBackButton}
-              onPress={() => {
-                stopCategoryCycle();
-                setQueryModalVisible(false);
-              }}
+              onPress={closeQueryModal}
             >
               <Ionicons name="chevron-back" size={24} color="#0f172a" />
             </TouchableOpacity>
