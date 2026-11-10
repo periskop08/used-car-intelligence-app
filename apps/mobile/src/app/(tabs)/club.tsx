@@ -23,8 +23,119 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { createEdgeSwipeDismissHandlers } from '../../utils/backGesture';
 import TorkScoutLoader from '../../components/TorkScoutLoader';
+
+function ScoutRgbWelcomeBanner() {
+  const [boxSize, setBoxSize] = useState({ width: windowWidth - 28, height: 124 });
+  const [angle, setAngle] = useState(0);
+
+  useEffect(() => {
+    const start = Date.now();
+    let frameId: number;
+
+    const tick = () => {
+      const elapsed = (Date.now() - start) / 1000;
+      const nextAngle = ((elapsed / 2.8) * Math.PI * 2) % (Math.PI * 2);
+      setAngle(nextAngle);
+      frameId = requestAnimationFrame(tick);
+    };
+
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
+  const x1 = `${(50 + 50 * Math.cos(angle)).toFixed(1)}%`;
+  const y1 = `${(50 + 50 * Math.sin(angle)).toFixed(1)}%`;
+  const x2 = `${(50 - 50 * Math.cos(angle)).toFixed(1)}%`;
+  const y2 = `${(50 - 50 * Math.sin(angle)).toFixed(1)}%`;
+
+  const perimeter = Math.max(
+    400,
+    2 * (boxSize.width + boxSize.height)
+  );
+  const dashLength = Math.round(perimeter * 0.36);
+  const gapLength = Math.round(perimeter - dashLength);
+  const dashOffset = -Math.round((angle / (Math.PI * 2)) * perimeter);
+
+  return (
+    <View
+      style={styles.welcomeBannerOuter}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        if (width > 0 && height > 0) {
+          setBoxSize({ width, height });
+        }
+      }}
+    >
+      <Svg
+        width={boxSize.width}
+        height={boxSize.height}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      >
+        <Defs>
+          <LinearGradient id="scout-rgb-orbit" x1={x1} y1={y1} x2={x2} y2={y2}>
+            <Stop offset="0%" stopColor="#0052d4" />
+            <Stop offset="25%" stopColor="#0284c7" />
+            <Stop offset="50%" stopColor="#00d2ff" />
+            <Stop offset="75%" stopColor="#14b8a6" />
+            <Stop offset="100%" stopColor="#10b981" />
+          </LinearGradient>
+          <LinearGradient id="scout-rgb-comet" x1={x2} y1={y2} x2={x1} y2={y1}>
+            <Stop offset="0%" stopColor="#00f2fe" />
+            <Stop offset="50%" stopColor="#2dd4bf" />
+            <Stop offset="100%" stopColor="#38bdf8" />
+          </LinearGradient>
+        </Defs>
+
+        {/* Base continuous rotating Scout gradient border */}
+        <Rect
+          x={1.25}
+          y={1.25}
+          width={Math.max(10, boxSize.width - 2.5)}
+          height={Math.max(10, boxSize.height - 2.5)}
+          rx={19}
+          ry={19}
+          fill="#ffffff"
+          stroke="url(#scout-rgb-orbit)"
+          strokeWidth={2}
+          opacity={0.75}
+        />
+
+        {/* Traveling bright Scout RGB light strip */}
+        <Rect
+          x={1.25}
+          y={1.25}
+          width={Math.max(10, boxSize.width - 2.5)}
+          height={Math.max(10, boxSize.height - 2.5)}
+          rx={19}
+          ry={19}
+          fill="none"
+          stroke="url(#scout-rgb-comet)"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeDasharray={`${dashLength} ${gapLength}`}
+          strokeDashoffset={dashOffset}
+        />
+      </Svg>
+
+      <View style={styles.welcomeBanner}>
+        <View style={styles.welcomeContent}>
+          <View style={styles.welcomeBadge}>
+            <Ionicons name="sparkles" size={12} color="#ea580c" />
+            <Text style={styles.welcomeBadgeText}>TOPLULUK</Text>
+          </View>
+          <Text style={styles.welcomeTitle}>Kulübe Hoş Geldiniz!</Text>
+          <Text style={styles.welcomeSub}>
+            Araç sahipleriyle tecrübe paylaşın, anketlere katılın ve özel duyurulardan anında haberdar olun.
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const CLUB_HEADER_LOGO = require('../../../assets/images/torkscout-club-header-logo.png');
@@ -588,18 +699,7 @@ export default function TorqueScoutClubScreen() {
           )}
 
           {/* COMMUNITY WELCOME CARD */}
-          <View style={styles.welcomeBanner}>
-            <View style={styles.welcomeContent}>
-              <View style={styles.welcomeBadge}>
-                <Ionicons name="sparkles" size={12} color="#ea580c" />
-                <Text style={styles.welcomeBadgeText}>TOPLULUK</Text>
-              </View>
-              <Text style={styles.welcomeTitle}>Kulübe Hoş Geldiniz!</Text>
-              <Text style={styles.welcomeSub}>
-                Araç sahipleriyle tecrübe paylaşın, anketlere katılın ve özel duyurulardan anında haberdar olun.
-              </Text>
-            </View>
-          </View>
+          <ScoutRgbWelcomeBanner />
 
           {/* POSTS LIST */}
           {filteredPosts.length === 0 ? (
@@ -1258,15 +1358,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffffff',
   },
+  welcomeBannerOuter: {
+    position: 'relative',
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    shadowColor: '#06b6d4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 3,
+  },
   welcomeBanner: {
-    backgroundColor: '#0f172a',
+    backgroundColor: 'transparent',
     borderRadius: 20,
     padding: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
   },
   welcomeContent: {
     gap: 6,
@@ -1276,28 +1381,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(234, 88, 12, 0.15)',
+    backgroundColor: '#fff7ed',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(234, 88, 12, 0.3)',
+    borderColor: '#fed7aa',
   },
   welcomeBadgeText: {
     fontSize: 9.5,
     fontWeight: '800',
-    color: '#fb923c',
+    color: '#ea580c',
     letterSpacing: 0.5,
   },
   welcomeTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#ffffff',
+    color: '#ea580c',
   },
   welcomeSub: {
-    fontSize: 12,
-    color: '#cbd5e1',
-    lineHeight: 17,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#0f172a',
+    lineHeight: 18,
   },
   emptyFeed: {
     alignItems: 'center',
