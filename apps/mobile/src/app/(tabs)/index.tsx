@@ -14,8 +14,9 @@ import {
   StatusBar,
   PanResponder,
   BackHandler,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle, Line, G } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -510,6 +511,9 @@ export const getCategoryLabel = (
 export default function MobileDashboard() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
+  const modalTopInset = Platform.OS === 'ios' ? Math.max(insets.top, 54) : 0;
+  const modalBottomInset = Math.max(insets.bottom, 16);
   const [user, setUser] = useState<{
     id?: string;
     email: string;
@@ -2104,9 +2108,14 @@ export default function MobileDashboard() {
     animationType="slide"
     onRequestClose={handleModalBackGesture}
   >
-    <SafeAreaView
-      style={styles.fullModalContainer}
-      edges={['top', 'bottom']}
+    <View
+      style={[
+        styles.fullModalContainer,
+        {
+          paddingTop: modalTopInset,
+          paddingBottom: modalBottomInset,
+        },
+      ]}
       {...modalPanResponder.panHandlers}
       onTouchStart={(e) => {
         const touch = e.nativeEvent;
@@ -2166,7 +2175,7 @@ export default function MobileDashboard() {
         style={{
           position: 'absolute',
           left: 0,
-          top: 68,
+          top: modalTopInset + 56,
           bottom: 0,
           width: 20,
           zIndex: 999,
@@ -2178,7 +2187,7 @@ export default function MobileDashboard() {
           style={{
             position: 'absolute',
             right: 0,
-            top: 68,
+            top: modalTopInset + 56,
             bottom: 0,
             width: 20,
             zIndex: 999,
@@ -3075,7 +3084,7 @@ export default function MobileDashboard() {
           </View>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   </Modal>
     </SafeAreaView >
   );

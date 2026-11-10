@@ -13,6 +13,7 @@ import {
   Modal,
   PanResponder,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
@@ -871,7 +872,7 @@ export default function ListingDetailScreen() {
         <StatusBar barStyle="light-content" backgroundColor="#000000" />
         <View style={styles.lightboxContainer}>
           {/* Lightbox Top Controls */}
-          <View style={[styles.lightboxHeader, { paddingTop: Math.max(insets.top, 16) }]}>
+          <View style={[styles.lightboxHeader, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 54 : 28) }]}>
             <Text style={styles.lightboxCounter}>
               {activePhotoIndex + 1} / {displayPhotos.length}
             </Text>
