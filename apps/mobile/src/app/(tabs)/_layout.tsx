@@ -13,9 +13,10 @@ import {
   PanResponder,
   Dimensions,
   Image,
+  BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import HomeScreen from './index';
+import { recordTabVisit, goBackFromTab } from '../../utils/tabNavigation';
 
 const CLUB_TAB_ICON = require('../../../assets/images/club-tab-icon.png');
 
@@ -54,23 +55,26 @@ export default function TabsLayout() {
 
   const isHomeTab = pathname === '/' || pathname === '/index' || pathname === '/(tabs)' || pathname === '/(tabs)/index';
 
-  const underlayTranslateX = swipeTranslateX.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-    outputRange: [SCREEN_WIDTH * 0.25, -SCREEN_WIDTH * 0.25, 0],
-    extrapolate: 'clamp',
-  });
-
   useEffect(() => {
     swipeTranslateX.setValue(0);
-  }, [pathname, swipeTranslateX]);
+    recordTabVisit(pathname, router.canGoBack());
+  }, [pathname, swipeTranslateX, router]);
 
   const triggerSwipeBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else if (!isHomeTab) {
-      router.replace('/(tabs)' as any);
-    }
+    goBackFromTab(router);
   };
+
+  const triggerSwipeBackRef = useRef(triggerSwipeBack);
+  triggerSwipeBackRef.current = triggerSwipeBack;
+
+  useEffect(() => {
+    if (isHomeTab) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      triggerSwipeBackRef.current();
+      return true;
+    });
+    return () => sub.remove();
+  }, [isHomeTab]);
 
   // Left edge interactive finger-following swipe-back gesture
   const leftEdgePanResponder = useMemo(
@@ -201,7 +205,7 @@ export default function TabsLayout() {
 
   const handleOpenListings = (urgent: boolean) => {
     setMenuVisible(false);
-    router.push({
+    router.navigate({
       pathname: '/(tabs)/listings',
       params: {
         urgentOnly: urgent ? 'true' : 'false',
@@ -217,22 +221,6 @@ export default function TabsLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      {/* Live Underlay Preview of Home Screen when swiping back inside (tabs) */}
-      {!isHomeTab && (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              transform: [{ translateX: underlayTranslateX }],
-              opacity: 0.92,
-            },
-          ]}
-        >
-          <HomeScreen />
-        </Animated.View>
-      )}
-
       <Animated.View
         style={{
           flex: 1,
@@ -246,7 +234,7 @@ export default function TabsLayout() {
         }}
       >
         <Tabs
-          backBehavior="history"
+          backBehavior="none"
         screenOptions={{
           tabBarStyle: {
             backgroundColor: '#ffffff',

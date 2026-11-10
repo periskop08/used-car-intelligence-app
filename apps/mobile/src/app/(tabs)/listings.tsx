@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -20,9 +20,10 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { goBackFromTab, setCustomTabBackHandler } from '../../utils/tabNavigation';
 import {
   TURKEY_81_PROVINCES,
   getDistrictsForCity,
@@ -331,6 +332,8 @@ export default function ListingsScreen() {
     showcaseOnly?: string;
     promptCategory?: string;
     category?: string;
+    sellerId?: string;
+    brand?: string;
   }>();
 
   const [listings, setListings] = useState<ListingItem[]>([]);
@@ -343,9 +346,15 @@ export default function ListingsScreen() {
   const [selectedCategory, setSelectedCategory] = useState<ListingVehicleCategory>(
     (params.category as ListingVehicleCategory) || 'ALL'
   );
-  const [categoryGateVisible, setCategoryGateVisible] = useState<boolean>(
-    params.urgentOnly !== 'true' && params.showcaseOnly !== 'true' && !params.category
-  );
+  const hasDirectFilterEntry =
+    params.urgentOnly === 'true' ||
+    params.showcaseOnly === 'true' ||
+    Boolean(params.category) ||
+    Boolean(params.sellerId) ||
+    Boolean(params.brand);
+
+  const [categoryGateVisible, setCategoryGateVisible] = useState<boolean>(!hasDirectFilterEntry);
+  const enteredViaCategoryGateRef = useRef<boolean>(!hasDirectFilterEntry);
 
   // View Mode: 'LIST' or 'CARD'
   const [viewMode, setViewMode] = useState<'LIST' | 'CARD'>('LIST');
@@ -387,6 +396,7 @@ export default function ListingsScreen() {
   useEffect(() => {
     if (params.urgentOnly === 'true') {
       setUrgentOnly(true);
+      enteredViaCategoryGateRef.current = false;
       setCategoryGateVisible(false);
     } else if (params.urgentOnly === 'false') {
       setUrgentOnly(false);
@@ -395,9 +405,25 @@ export default function ListingsScreen() {
 
   useEffect(() => {
     if (params.promptCategory) {
+      enteredViaCategoryGateRef.current = true;
       setCategoryGateVisible(true);
     }
   }, [params.promptCategory]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setCustomTabBackHandler(() => {
+        if (!categoryGateVisible && enteredViaCategoryGateRef.current) {
+          setCategoryGateVisible(true);
+          return true;
+        }
+        return false;
+      });
+      return () => {
+        setCustomTabBackHandler(null);
+      };
+    }, [categoryGateVisible])
+  );
 
   // Sorting
   const [sortOption, setSortOption] = useState<SortOption>('newest');
@@ -547,6 +573,7 @@ export default function ListingsScreen() {
       setSelectedModel(null);
     }
     setSelectedCategory(cat);
+    enteredViaCategoryGateRef.current = true;
     setCategoryGateVisible(false);
   };
 
@@ -943,11 +970,7 @@ export default function ListingsScreen() {
           <TouchableOpacity
             style={{ padding: 4 }}
             onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/(tabs)' as any);
-              }
+              goBackFromTab(router);
             }}
           >
             <Ionicons name="chevron-back" size={24} color="#0f172a" />
@@ -1111,14 +1134,10 @@ export default function ListingsScreen() {
         <TouchableOpacity
           style={styles.appBarIconBtn}
           onPress={() => {
-            if (params.urgentOnly === 'true' || params.showcaseOnly === 'true') {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/(tabs)' as any);
-              }
-            } else {
+            if (enteredViaCategoryGateRef.current) {
               setCategoryGateVisible(true);
+            } else {
+              goBackFromTab(router);
             }
           }}
         >

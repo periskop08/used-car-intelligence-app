@@ -17,6 +17,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { goBackFromTab } from '../../utils/tabNavigation';
 import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle, Line, G } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -657,10 +658,12 @@ export default function MobileDashboard() {
 
   // Open Araç Sorgula modal directly when navigated with openQueryModal param (e.g. from Dashboard / Favorites)
   const lastHandledQueryModalRef = useRef<string | null>(null);
+  const openedFromExternalParamRef = useRef<boolean>(false);
   useEffect(() => {
     const paramVal = Array.isArray(params.openQueryModal) ? params.openQueryModal[0] : params.openQueryModal;
     if (paramVal && paramVal !== lastHandledQueryModalRef.current) {
       lastHandledQueryModalRef.current = paramVal;
+      openedFromExternalParamRef.current = true;
       setModalView('form');
       startCategoryCycle();
       setQueryModalVisible(true);
@@ -1218,8 +1221,12 @@ export default function MobileDashboard() {
       const isMoto = selectedCategory === 'MOTORCYCLE' || isMotoBrand;
       const effectiveCategory = isMoto ? 'MOTORCYCLE' : (selectedCategory || 'AUTOMOBILE');
 
-      router.push({
-        pathname: '/vehicle-report',
+      const wasExternal = openedFromExternalParamRef.current;
+      openedFromExternalParamRef.current = false;
+      setQueryModalVisible(false);
+
+      const reportRoute = {
+        pathname: '/vehicle-report' as const,
         params: {
           brand: selectedBrand.name,
           model: selectedModel.name,
@@ -1231,8 +1238,13 @@ export default function MobileDashboard() {
           trim: selectedTrim && !selectedTrim.startsWith('Tüm') ? selectedTrim : undefined,
           category: effectiveCategory,
         },
-      });
-      setQueryModalVisible(false);
+      };
+
+      if (wasExternal) {
+        router.replace(reportRoute as any);
+      } else {
+        router.push(reportRoute as any);
+      }
     } else {
       openStepView('brand');
     }
@@ -1319,12 +1331,17 @@ export default function MobileDashboard() {
   const closeQueryModal = useCallback(() => {
     stopCategoryCycle();
     setQueryModalVisible(false);
+    const shouldReturnToPreviousScreen = openedFromExternalParamRef.current;
+    openedFromExternalParamRef.current = false;
     if (params.openQueryModal) {
       try {
         router.setParams({ openQueryModal: '' });
       } catch {
         // ignore if router is transitioning
       }
+    }
+    if (shouldReturnToPreviousScreen) {
+      goBackFromTab(router);
     }
   }, [stopCategoryCycle, params.openQueryModal, router]);
 
@@ -1675,7 +1692,7 @@ export default function MobileDashboard() {
         <View style={styles.topRightActions}>
           <TouchableOpacity
             style={styles.headerProfileButton}
-            onPress={() => router.push('/(tabs)/profile' as any)}
+            onPress={() => router.navigate('/(tabs)/profile' as any)}
             activeOpacity={0.8}
           >
             {user?.profilePhotoUrl ? (
@@ -1722,6 +1739,7 @@ export default function MobileDashboard() {
                 style={styles.heroOrangeButton}
                 activeOpacity={0.85}
                 onPress={() => {
+                  openedFromExternalParamRef.current = false;
                   setModalView('form');
                   startCategoryCycle();
                   setQueryModalVisible(true);
@@ -1751,7 +1769,7 @@ export default function MobileDashboard() {
         {/* KEŞFET SECTION */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Keşfet</Text>
-          <TouchableOpacity onPress={() => router.push('/kesfet')}>
+          <TouchableOpacity onPress={() => router.navigate('/(tabs)/kesfet' as any)}>
             <Text style={styles.sectionLinkText}>Keşfete Git</Text>
           </TouchableOpacity>
         </View>

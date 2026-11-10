@@ -88,9 +88,12 @@ export function BottomTabBarFooter() {
 
   const handleOpenListings = (urgent: boolean) => {
     setMenuVisible(false);
-    router.push({
+    router.navigate({
       pathname: '/(tabs)/listings',
-      params: { urgentOnly: urgent ? 'true' : 'false' },
+      params: {
+        urgentOnly: urgent ? 'true' : 'false',
+        promptCategory: urgent ? undefined : String(Date.now()),
+      },
     } as any);
   };
 

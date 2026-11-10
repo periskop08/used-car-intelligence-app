@@ -364,7 +364,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[styles.menuRowItem, styles.lastMenuItem]}
                 activeOpacity={0.7}
-                onPress={() => router.push('/(tabs)/messages' as any)}
+                onPress={() => router.navigate('/(tabs)/messages' as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="chatbubbles-outline" size={18} color="#64748b" style={styles.menuIcon} />

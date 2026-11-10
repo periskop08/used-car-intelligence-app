@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { goBackFromTab } from '../../utils/tabNavigation';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -163,7 +164,7 @@ export default function MessageInboxScreen() {
       {/* Top Navbar */}
       <View style={styles.headerBar}>
         <View style={styles.headerLeftGroup}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => goBackFromTab(router)}>
             <Ionicons name="arrow-back" size={20} color="#0f172a" />
           </TouchableOpacity>
           <View style={styles.headerLeft}>

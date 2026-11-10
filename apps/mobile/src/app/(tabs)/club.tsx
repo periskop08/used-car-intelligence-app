@@ -500,7 +500,7 @@ export default function TorqueScoutClubScreen() {
 
         <TouchableOpacity
           style={styles.profileBtn}
-          onPress={() => router.push('/(tabs)/profile' as any)}
+          onPress={() => router.navigate('/(tabs)/profile' as any)}
         >
           {userProfile?.profilePhotoUrl ? (
             <ExpoImage
