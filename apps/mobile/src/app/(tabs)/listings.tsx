@@ -24,6 +24,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { goBackFromTab, setCustomTabBackHandler } from '../../utils/tabNavigation';
+import TorkScoutLoader from '../../components/TorkScoutLoader';
 import {
   TURKEY_81_PROVINCES,
   getDistrictsForCity,
@@ -1365,7 +1366,7 @@ export default function ListingsScreen() {
       {/* MAIN LISTINGS FEED */}
       {loading ? (
         <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color="#ea580c" />
+          <TorkScoutLoader />
           <Text style={styles.loadingText}>İlanlar yükleniyor...</Text>
         </View>
       ) : listings.length === 0 ? (

@@ -22,6 +22,7 @@ import {
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import TorkScoutLoader from './TorkScoutLoader';
 
 const ISICEPTE_LOGO = require('../../assets/images/isicepte-logo.png');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -398,7 +399,7 @@ export default function IsiCepteRecommendationWidget({
       {/* Provider List / Loading */}
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator size="small" color="#ea580c" />
+          <TorkScoutLoader size="small" />
           <Text style={styles.loadingText}>Önerilen ustalar getiriliyor...</Text>
         </View>
       ) : items.length === 0 ? (

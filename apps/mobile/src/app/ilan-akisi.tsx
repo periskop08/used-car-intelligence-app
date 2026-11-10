@@ -21,6 +21,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
 import UrgentBadge from '../components/UrgentBadge';
+import TorkScoutLoader from '../components/TorkScoutLoader';
 import ShowcaseBadge from '../components/ShowcaseBadge';
 import VehicleConditionVisualizer, { PART_LABELS, CompactMobileVehicleBodySvg } from '../components/VehicleConditionVisualizer';
 
@@ -754,7 +755,7 @@ export default function ListingFeedScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#f0f4f9" />
       {loading && listings.length === 0 ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#ea580c" />
+          <TorkScoutLoader />
           <Text style={styles.loadingText}>Akış hazırlanıyor...</Text>
         </View>
       ) : error && listings.length === 0 ? (

@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createEdgeSwipeDismissHandlers } from '../utils/backGesture';
+import TorkScoutLoader from '../components/TorkScoutLoader';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -957,7 +958,7 @@ export default function AraciniBulScreen() {
       {/* 2. LOADING STATE */}
       {gameState === 'loading' && (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#ea580c" />
+          <TorkScoutLoader />
           <Text style={styles.loadingText}>Yapay zeka araçları hazırlanıyor...</Text>
         </View>
       )}
@@ -1245,7 +1246,7 @@ export default function AraciniBulScreen() {
       {/* 5. SWIPING LOADING FALLBACK */}
       {gameState === 'swiping' && !currentTopCard && (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#ea580c" />
+          <TorkScoutLoader />
           <Text style={styles.loadingText}>Sıradaki araç yükleniyor...</Text>
         </View>
       )}

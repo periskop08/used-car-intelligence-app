@@ -13,6 +13,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TorkScoutLoader from '../../components/TorkScoutLoader';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -165,7 +166,7 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.center} edges={['top']}>
-        <ActivityIndicator size="large" color="#ea580c" />
+        <TorkScoutLoader />
         <Text style={styles.loadingText}>Profiliniz yükleniyor...</Text>
       </SafeAreaView>
     );

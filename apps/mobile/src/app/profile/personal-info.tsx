@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TorkScoutLoader from '../../components/TorkScoutLoader';
 
 let ImagePicker: any = null;
 try {
@@ -373,7 +374,7 @@ export default function PersonalInfoScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" color="#ea580c" />
+        <TorkScoutLoader />
         <Text style={styles.loadingText}>Bilgileriniz yükleniyor...</Text>
       </SafeAreaView>
     );

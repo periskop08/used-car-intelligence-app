@@ -24,6 +24,7 @@ import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligen
 import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
 import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
 import { createEdgeSwipeDismissHandlers } from '../utils/backGesture';
+import TorkScoutLoader from '../components/TorkScoutLoader';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -1092,7 +1093,7 @@ export default function ComparisonScreen() {
         {/* COMPARISON RESULTS DOSSIER (EXACT WEB UI PARITY) */}
         {loadingComparison ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0284c7" />
+            <TorkScoutLoader />
             <Text style={styles.loadingTitle}>Web Karşılaştırma Servisi Çalışıyor...</Text>
             <Text style={styles.loadingSub}>8 kriter matrisi, yıldız değerlendirmeleri ve fabrika teknik verileri analiz ediliyor.</Text>
           </View>
@@ -1828,7 +1829,7 @@ export default function ComparisonScreen() {
             {/* Options List */}
             {loadingOptions ? (
               <View style={styles.modalLoadingBox}>
-                <ActivityIndicator size="large" color="#0284c7" />
+                <TorkScoutLoader />
                 <Text style={styles.modalLoadingText}>Seçenekler Yükleniyor...</Text>
               </View>
             ) : (() => {

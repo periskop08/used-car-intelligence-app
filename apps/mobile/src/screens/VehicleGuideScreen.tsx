@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
 import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
+import TorkScoutLoader from '../components/TorkScoutLoader';
 
 const BrandLogo = ({ brandName, size = 24 }: { brandName?: string; size?: number }) => {
   const [imgError, setImgError] = useState(false);
@@ -248,7 +249,7 @@ export default function VehicleGuideScreen() {
     <View style={styles.container}>
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#ea580c" />
+          <TorkScoutLoader />
           <Text style={styles.loadingText}>Cloudflare R2 araç görseli ve veriler yükleniyor...</Text>
         </View>
       ) : card ? (

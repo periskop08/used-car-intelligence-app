@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TorkScoutLoader from '../components/TorkScoutLoader';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -1066,7 +1067,7 @@ export default function VehicleReportScreen() {
                 <Text style={styles.countdownNumLight}>{countdown}</Text>
               </View>
             ) : (
-              <ActivityIndicator size="large" color="#ea580c" style={{ marginBottom: 12 }} />
+              <TorkScoutLoader style={{ marginBottom: 12 }} />
             )}
             <Text style={styles.loadingTitleLight}>
               {countdown !== null ? 'Analiz Hazırlanıyor...' : 'Rapor Hazırlanıyor...'}

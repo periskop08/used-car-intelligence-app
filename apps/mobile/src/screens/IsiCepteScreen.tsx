@@ -21,6 +21,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TorkScoutLoader from '../components/TorkScoutLoader';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { Ionicons } from '@expo/vector-icons';
@@ -1156,7 +1157,7 @@ export default function IsiCepteOneriyorScreen() {
       {/* MAIN CONTENT LIST */}
       {loading && !refreshing ? (
         <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color="#ea580c" />
+          <TorkScoutLoader />
           <Text style={styles.centerLoadingText}>
             {scope === 'SHOWCASE_ONLY'
               ? 'Vitrin üyeleri yükleniyor...'

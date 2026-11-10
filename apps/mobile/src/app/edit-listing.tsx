@@ -19,6 +19,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TorkScoutLoader from '../components/TorkScoutLoader';
 import { Image as ExpoImage } from 'expo-image';
 import { TURKEY_81_PROVINCES, getDistrictsForCity, getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
 import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
@@ -279,7 +280,7 @@ export default function EditListingScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#ea580c" />
+        <TorkScoutLoader />
         <Text style={styles.loadingText}>İlan bilgileri yükleniyor...</Text>
       </View>
     );

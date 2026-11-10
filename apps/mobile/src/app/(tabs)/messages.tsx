@@ -16,6 +16,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { goBackFromTab } from '../../utils/tabNavigation';
+import TorkScoutLoader from '../../components/TorkScoutLoader';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -180,7 +181,7 @@ export default function MessageInboxScreen() {
       {/* Content */}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#ea580c" />
+          <TorkScoutLoader />
           <Text style={styles.loadingText}>Sohbetleriniz yükleniyor...</Text>
         </View>
       ) : conversations.length === 0 ? (

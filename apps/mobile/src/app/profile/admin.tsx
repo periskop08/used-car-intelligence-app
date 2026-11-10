@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TorkScoutLoader from '../../components/TorkScoutLoader';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -70,7 +71,7 @@ export default function AdminScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#f97316" />
+          <TorkScoutLoader />
         </View>
       ) : pending.length > 0 ? (
         <FlatList

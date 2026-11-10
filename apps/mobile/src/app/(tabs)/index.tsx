@@ -26,6 +26,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
+import TorkScoutLoader from '../../components/TorkScoutLoader';
 import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
 
 const { width: windowWidth } = Dimensions.get('window');
@@ -1980,7 +1981,7 @@ export default function MobileDashboard({
           </Text>
 
           {loadingListings ? (
-            <ActivityIndicator size="large" color="#ea580c" style={{ marginVertical: 32 }} />
+            <TorkScoutLoader style={{ marginVertical: 32 }} />
           ) : vitrinListings.length > 0 ? (
             <View style={styles.vitrinRowsWrapper}>
               {vitrinRows.map((rowItems, rowIndex) => (
@@ -2827,7 +2828,7 @@ export default function MobileDashboard({
               )}
 
               {loadingOptions ? (
-                <ActivityIndicator size="large" color="#ea580c" style={{ marginVertical: 40 }} />
+                <TorkScoutLoader style={{ marginVertical: 40 }} />
               ) : activeStep === 'category' ? (
                 /* CATEGORY SELECTION LIST */
                 <View style={styles.categoryStepContainer}>

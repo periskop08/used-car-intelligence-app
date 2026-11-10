@@ -17,6 +17,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import UrgentBadge from '../../components/UrgentBadge';
+import TorkScoutLoader from '../../components/TorkScoutLoader';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -467,7 +468,7 @@ export default function MyListingsScreen() {
       {/* Content */}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#ea580c" />
+          <TorkScoutLoader />
           <Text style={styles.loadingText}>İlanlarınız yükleniyor...</Text>
         </View>
       ) : (

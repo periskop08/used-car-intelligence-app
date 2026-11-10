@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
+import TorkScoutLoader from '../../components/TorkScoutLoader';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
 import VehicleConditionVisualizer from '../../components/VehicleConditionVisualizer';
 import IsiCepteRecommendationWidget from '../../components/IsiCepteRecommendationWidget';
@@ -391,7 +392,7 @@ export default function ListingDetailScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#ea580c" />
+        <TorkScoutLoader />
         <Text style={styles.loadingText}>İlan detayları yükleniyor...</Text>
       </View>
     );

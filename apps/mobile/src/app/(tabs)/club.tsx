@@ -24,6 +24,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createEdgeSwipeDismissHandlers } from '../../utils/backGesture';
+import TorkScoutLoader from '../../components/TorkScoutLoader';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const CLUB_HEADER_LOGO = require('../../../assets/images/torkscout-club-header-logo.png');
@@ -546,7 +547,7 @@ export default function TorqueScoutClubScreen() {
       {/* FEED CONTENT */}
       {loading ? (
         <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color="#ea580c" />
+          <TorkScoutLoader />
           <Text style={styles.loadingText}>Kulüp akışı yükleniyor...</Text>
         </View>
       ) : (
@@ -992,7 +993,7 @@ export default function TorqueScoutClubScreen() {
             {/* Comments List */}
             {loadingComments ? (
               <View style={styles.modalLoading}>
-                <ActivityIndicator size="small" color="#ea580c" />
+                <TorkScoutLoader size="small" />
                 <Text style={styles.loadingText}>Yorumlar yükleniyor...</Text>
               </View>
             ) : (

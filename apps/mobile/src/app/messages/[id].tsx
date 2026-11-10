@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TorkScoutLoader from '../../components/TorkScoutLoader';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -291,7 +292,7 @@ export default function ChatDetailScreen() {
       >
         {loading ? (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color="#ea580c" />
+            <TorkScoutLoader />
           </View>
         ) : (
           <FlatList
