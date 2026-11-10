@@ -18,6 +18,12 @@ import TorkScoutLoader from '../../components/TorkScoutLoader';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
+const ARAC_REHBERI_ICON = require('../../../assets/images/arac-rehberi-icon.png');
+const ARACINI_BUL_ICON = require('../../../assets/images/aracini-bul-icon.png');
+const ISICEPTE_LOGO = require('../../../assets/images/isicepte-logo.png');
+const AKIS_ICON = require('../../../assets/images/akis-icon.png');
+const CLUB_TAB_ICON = require('../../../assets/images/club-tab-icon.png');
+
 const resolveAvatarUrl = (url?: string | null): string | null => {
   if (!url) return null;
   if (url.startsWith('data:')) return url;
@@ -74,6 +80,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [whyExpanded, setWhyExpanded] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -557,55 +564,131 @@ export default function ProfileScreen() {
             </Text>
 
             <View style={styles.guestWhyBox}>
-              <Text style={styles.guestWhyHeader}>NEDEN ÜCRETSİZ ÜYE OLMALISINIZ?</Text>
+              <TouchableOpacity
+                style={styles.guestWhyToggleBar}
+                activeOpacity={0.8}
+                onPress={() => setWhyExpanded((prev) => !prev)}
+              >
+                <View style={styles.guestWhyToggleLeft}>
+                  <View style={styles.guestWhySparkleBox}>
+                    <Ionicons name="sparkles" size={15} color="#ea580c" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.guestWhyHeader}>NEDEN ÜCRETSİZ ÜYE OLMALISINIZ?</Text>
+                    <Text style={styles.guestWhySubHint}>
+                      {whyExpanded
+                        ? 'Uygulamadaki tüm modülleri gizlemek için dokunun'
+                        : 'TorkScout’ta sizi bekleyen tüm özellikleri görmek için dokunun'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.guestWhyChevronCircle, whyExpanded && styles.guestWhyChevronCircleActive]}>
+                  <Ionicons
+                    name={whyExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color={whyExpanded ? '#ffffff' : '#ea580c'}
+                  />
+                </View>
+              </TouchableOpacity>
 
-              <View style={styles.guestFeatureRow}>
-                <View style={[styles.guestFeatureIconBox, { backgroundColor: '#fff7ed' }]}>
-                  <Ionicons name="analytics-outline" size={18} color="#ea580c" />
-                </View>
-                <View style={styles.guestFeatureTextCol}>
-                  <Text style={styles.guestFeatureTitle}>Kronik Sorun & Risk Raporları</Text>
-                  <Text style={styles.guestFeatureSub}>
-                    Motor, şanzıman ve kronik arıza analizlerini sorgulayın; raporlarınızı hesabınıza kaydedin.
-                  </Text>
-                </View>
-              </View>
+              {whyExpanded && (
+                <View style={styles.guestWhyExpandedList}>
+                  <Text style={styles.guestSectionGroupLabel}>ANA ANALİZ & TOPLULUK MODÜLLERİ</Text>
 
-              <View style={styles.guestFeatureRow}>
-                <View style={[styles.guestFeatureIconBox, { backgroundColor: '#eff6ff' }]}>
-                  <Ionicons name="git-compare-outline" size={18} color="#0284c7" />
-                </View>
-                <View style={styles.guestFeatureTextCol}>
-                  <Text style={styles.guestFeatureTitle}>8 Kriterde Araç Karşılaştırma</Text>
-                  <Text style={styles.guestFeatureSub}>
-                    Arasında kaldığınız modelleri kafa kafaya kıyaslayın, kazanan aracın raporunu ücretsiz açın.
-                  </Text>
-                </View>
-              </View>
+                  {/* 1. Araç Sorgula */}
+                  <View style={[styles.guestModuleCard, { borderColor: '#ea580c25' }]}>
+                    <View style={[styles.guestModuleIconBox, { backgroundColor: '#fff7ed' }]}>
+                      <Ionicons name="search" size={24} color="#ea580c" />
+                    </View>
+                    <View style={styles.guestModuleTextCol}>
+                      <Text style={[styles.guestModuleTitle, { color: '#ea580c' }]}>Araç Sorgula</Text>
+                      <Text style={styles.guestModuleDesc}>
+                        Otomobil, SUV/Pickup, Minivan/Panelvan ve Motosiklet kategorilerinde aracın fabrika teknik verilerini, kronik sorunlarını, ekspertizde bakılması gereken kritik noktaları, satıcıya sorulacak soruları ve 100 üzerinden satın alma puanını öğrenin; raporlarınızı hesabınıza kaydedin.
+                      </Text>
+                    </View>
+                  </View>
 
-              <View style={styles.guestFeatureRow}>
-                <View style={[styles.guestFeatureIconBox, { backgroundColor: '#f0fdf4' }]}>
-                  <Ionicons name="car-sport-outline" size={18} color="#16a34a" />
-                </View>
-                <View style={styles.guestFeatureTextCol}>
-                  <Text style={styles.guestFeatureTitle}>Hızlı İlan Ver & Favorileri Takip Et</Text>
-                  <Text style={styles.guestFeatureSub}>
-                    Aracınızı kolayca ilana koyun; beğendiğiniz ilanları, satıcıları ve aramaları kaçırmayın.
-                  </Text>
-                </View>
-              </View>
+                  {/* 2. Araç Karşılaştır */}
+                  <View style={[styles.guestModuleCard, { borderColor: '#0284c725' }]}>
+                    <View style={[styles.guestModuleIconBox, { backgroundColor: '#eff6ff' }]}>
+                      <Ionicons name="scale-outline" size={24} color="#0284c7" />
+                    </View>
+                    <View style={styles.guestModuleTextCol}>
+                      <Text style={[styles.guestModuleTitle, { color: '#0284c7' }]}>Araç Karşılaştır</Text>
+                      <Text style={styles.guestModuleDesc}>
+                        Arasında kaldığınız araçları performans, yakıt ekonomisi, kronik arıza riski, bakım maliyeti, ikinci el piyasası ve donanım dahil 8 farklı kriterde kafa kafaya kıyaslayın; 1. sırayı alan kazanan aracın detaylı raporunu tamamen ücretsiz açın.
+                      </Text>
+                    </View>
+                  </View>
 
-              <View style={styles.guestFeatureRow}>
-                <View style={[styles.guestFeatureIconBox, { backgroundColor: '#f0fdfa' }]}>
-                  <Ionicons name="people-outline" size={18} color="#0d9488" />
+                  {/* 3. TorkScout Club */}
+                  <View style={[styles.guestModuleCard, { borderColor: '#0f172a22' }]}>
+                    <View style={[styles.guestModuleIconBox, { backgroundColor: '#f1f5f9' }]}>
+                      <Image source={CLUB_TAB_ICON} style={styles.guestModuleCustomImg} resizeMode="contain" />
+                    </View>
+                    <View style={styles.guestModuleTextCol}>
+                      <Text style={[styles.guestModuleTitle, { color: '#0f172a' }]}>TorkScout Club</Text>
+                      <Text style={styles.guestModuleDesc}>
+                        Otomobil Tutkunları Topluluğu’nda araç sahipleriyle gerçek kullanıcı tecrübelerini paylaşın, anketlere oy verin, gönderileri beğenin, yorum yapın ve özel duyurulardan anında haberdar olun.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={[styles.guestSectionGroupLabel, { marginTop: 4 }]}>KEŞFET MODÜLLERİ</Text>
+
+                  {/* 4. Araç Rehberi (Exact Keşfet Card) */}
+                  <View style={[styles.guestModuleCard, { borderColor: '#0284c722' }]}>
+                    <View style={styles.guestModuleLogoWrap}>
+                      <Image source={ARAC_REHBERI_ICON} style={styles.guestModuleCustomImg} resizeMode="contain" />
+                    </View>
+                    <View style={styles.guestModuleTextCol}>
+                      <Text style={[styles.guestModuleTitle, { color: '#0284c7' }]}>Araç Rehberi</Text>
+                      <Text style={styles.guestModuleDesc}>
+                        Araçların teknik özelliklerini, kronik sorunlarını ve önemli detaylarını keşfedin.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* 5. Aracını Bul (Exact Keşfet Card) */}
+                  <View style={[styles.guestModuleCard, { borderColor: '#ea580c22' }]}>
+                    <View style={styles.guestModuleLogoWrap}>
+                      <Image source={ARACINI_BUL_ICON} style={styles.guestModuleCustomImg} resizeMode="contain" />
+                    </View>
+                    <View style={styles.guestModuleTextCol}>
+                      <Text style={[styles.guestModuleTitle, { color: '#ea580c' }]}>Aracını Bul</Text>
+                      <Text style={styles.guestModuleDesc}>
+                        Araçları kaydırarak değerlendir, tercihlerine göre sana en uygun modelleri keşfet.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* 6. Akış (Exact Keşfet Card) */}
+                  <View style={[styles.guestModuleCard, { borderColor: '#16a34a22' }]}>
+                    <View style={styles.guestModuleLogoWrap}>
+                      <Image source={AKIS_ICON} style={styles.guestModuleCustomImg} resizeMode="contain" />
+                    </View>
+                    <View style={styles.guestModuleTextCol}>
+                      <Text style={[styles.guestModuleTitle, { color: '#16a34a' }]}>Akış</Text>
+                      <Text style={styles.guestModuleDesc}>
+                        İlanları kart kart kaydırarak yeni araçları hızlı ve keyifli şekilde keşfedin.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* 7. İşi Cepte Öneriyor (Exact Keşfet Card) */}
+                  <View style={[styles.guestModuleCard, { borderColor: '#131b2e22' }]}>
+                    <View style={styles.guestModuleLogoWrap}>
+                      <Image source={ISICEPTE_LOGO} style={styles.guestModuleCustomImg} resizeMode="contain" />
+                    </View>
+                    <View style={styles.guestModuleTextCol}>
+                      <Text style={[styles.guestModuleTitle, { color: '#131b2e' }]}>İşi Cepte Öneriyor</Text>
+                      <Text style={styles.guestModuleDesc}>
+                        Bölgenizdeki onaylı oto servisleri, yetkili ve özel mekanik ustaları, oto ekspertiz noktalarını keşfedin.
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-                <View style={styles.guestFeatureTextCol}>
-                  <Text style={styles.guestFeatureTitle}>TorkScout Club & Onaylı Ustalar</Text>
-                  <Text style={styles.guestFeatureSub}>
-                    Araç sahipleriyle tecrübe paylaşın, anketlere katılın ve güvenilir servislere ulaşın.
-                  </Text>
-                </View>
-              </View>
+              )}
             </View>
 
             <TouchableOpacity
@@ -936,45 +1019,123 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: '#f8fafc',
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 14,
-    gap: 12,
+    borderWidth: 1.5,
+    borderColor: '#fed7aa',
+    overflow: 'hidden',
     marginTop: 4,
     marginBottom: 4,
   },
+  guestWhyToggleBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    backgroundColor: '#fff7ed',
+    gap: 10,
+  },
+  guestWhyToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  guestWhySparkleBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   guestWhyHeader: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: '900',
     color: '#0f172a',
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
   },
-  guestFeatureRow: {
+  guestWhySubHint: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ea580c',
+    marginTop: 2,
+  },
+  guestWhyChevronCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guestWhyChevronCircleActive: {
+    backgroundColor: '#ea580c',
+    borderColor: '#ea580c',
+  },
+  guestWhyExpandedList: {
+    padding: 12,
+    gap: 10,
+    backgroundColor: '#f8fafc',
+    borderTopWidth: 1,
+    borderTopColor: '#fed7aa',
+  },
+  guestSectionGroupLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#64748b',
+    letterSpacing: 0.7,
+    paddingHorizontal: 2,
+  },
+  guestModuleCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 11,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  guestFeatureIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  guestModuleIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 1,
   },
-  guestFeatureTextCol: {
+  guestModuleLogoWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  guestModuleCustomImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+  },
+  guestModuleTextCol: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
-  guestFeatureTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#0f172a',
+  guestModuleTitle: {
+    fontSize: 14.5,
+    fontWeight: '900',
   },
-  guestFeatureSub: {
+  guestModuleDesc: {
     fontSize: 11.5,
-    color: '#64748b',
-    lineHeight: 16,
+    color: '#475569',
+    lineHeight: 16.5,
   },
   primaryLoginBtn: {
     backgroundColor: '#ea580c',
