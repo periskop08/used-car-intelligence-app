@@ -22,7 +22,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { createEdgeSwipeDismissHandlers } from '../../utils/backGesture';
 import TorkScoutLoader from '../../components/TorkScoutLoader';
@@ -123,10 +123,6 @@ function ScoutRgbWelcomeBanner() {
 
       <View style={styles.welcomeBanner}>
         <View style={styles.welcomeContent}>
-          <View style={styles.welcomeBadge}>
-            <Ionicons name="sparkles" size={12} color="#ea580c" />
-            <Text style={styles.welcomeBadgeText}>TOPLULUK</Text>
-          </View>
           <Text style={styles.welcomeTitle}>Kulübe Hoş Geldiniz!</Text>
           <Text style={styles.welcomeSub}>
             Araç sahipleriyle tecrübe paylaşın, anketlere katılın ve özel duyurulardan anında haberdar olun.
@@ -216,7 +212,9 @@ interface ClubComment {
 
 export default function TorqueScoutClubScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [posts, setPosts] = useState<ClubPost[]>([]);
+  const [lightboxPostId, setLightboxPostId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'POLLS'>('ALL');
@@ -480,6 +478,29 @@ export default function TorqueScoutClubScreen() {
   };
 
   const handleOpenComments = async (post: ClubPost) => {
+    const currentToken =
+      token ||
+      (await AsyncStorage.getItem('accessToken')) ||
+      (await AsyncStorage.getItem('token'));
+
+    if (!currentToken) {
+      Alert.alert('Giriş Yapın', 'Yorumları görüntülemek ve yorum yapmak için lütfen giriş yapın.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Giriş Yap',
+          onPress: () => {
+            setLightboxPostId(null);
+            router.push('/(tabs)/profile' as any);
+          },
+        },
+      ]);
+      return;
+    }
+
+    if (lightboxPostId) {
+      setLightboxPostId(null);
+    }
+
     setActivePostForComments(post);
     setLoadingComments(true);
     setComments([]);
@@ -582,6 +603,25 @@ export default function TorqueScoutClubScreen() {
   };
 
   const handleShare = async (post: ClubPost) => {
+    const currentToken =
+      token ||
+      (await AsyncStorage.getItem('accessToken')) ||
+      (await AsyncStorage.getItem('token'));
+
+    if (!currentToken) {
+      Alert.alert('Giriş Yapın', 'Gönderileri paylaşmak için lütfen giriş yapın.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Giriş Yap',
+          onPress: () => {
+            setLightboxPostId(null);
+            router.push('/(tabs)/profile' as any);
+          },
+        },
+      ]);
+      return;
+    }
+
     try {
       await Share.share({
         message: `${post.title ? post.title + '\n' : ''}${post.content}\n\nTorqueScout Club ile paylaşıldı: https://torquescout.com/club`,
@@ -590,6 +630,8 @@ export default function TorqueScoutClubScreen() {
       console.error('Share error:', e);
     }
   };
+
+  const activeLightboxPost = posts.find((p) => p.id === lightboxPostId) || null;
 
   const filteredPosts = posts.filter((p) => {
     if (selectedCategory === 'POLLS') return !!p.poll;
@@ -778,14 +820,18 @@ export default function TorqueScoutClubScreen() {
 
                 {/* Post Media (Images) */}
                 {post.media && post.media.length > 0 && (
-                  <View style={styles.postMediaContainer}>
+                  <TouchableOpacity
+                    activeOpacity={0.92}
+                    onPress={() => setLightboxPostId(post.id)}
+                    style={styles.postMediaContainer}
+                  >
                     <ExpoImage
                       source={{ uri: resolvePostMediaUrl(post.media[0].mediaUrl) }}
                       style={styles.postMediaImage}
                       contentFit="cover"
                       cachePolicy="memory-disk"
                     />
-                  </View>
+                  </TouchableOpacity>
                 )}
 
                 {/* Interactive Poll Component */}
@@ -1170,6 +1216,146 @@ export default function TorqueScoutClubScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* POST PHOTO LIGHTBOX BANNER MODAL WITH ACTIVE LIKE / COMMENT / SHARE BAR */}
+      <Modal
+        visible={!!activeLightboxPost}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setLightboxPostId(null)}
+      >
+        <View
+          style={[
+            styles.lightboxBackdrop,
+            { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 50 : 24) },
+          ]}
+          {...createEdgeSwipeDismissHandlers(() => setLightboxPostId(null))}
+        >
+          {/* Top Bar */}
+          <View style={styles.lightboxTopBar}>
+            <View style={styles.lightboxAuthorRow}>
+              <View style={styles.authorAvatarWrap}>
+                {activeLightboxPost?.author?.profilePhotoUrl ? (
+                  <ExpoImage
+                    source={{ uri: resolvePostMediaUrl(activeLightboxPost.author.profilePhotoUrl) }}
+                    style={styles.authorAvatar}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                  />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Text style={styles.avatarInitial}>
+                      {(
+                        activeLightboxPost?.author?.firstName?.[0] ||
+                        activeLightboxPost?.author?.username?.[0] ||
+                        'T'
+                      ).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.lightboxAuthorName} numberOfLines={1}>
+                  {activeLightboxPost?.author?.firstName
+                    ? `${activeLightboxPost.author.firstName} ${activeLightboxPost.author.lastName || ''}`.trim()
+                    : activeLightboxPost?.author?.username || 'TorqueScout Üyesi'}
+                </Text>
+                <Text style={styles.lightboxPostDate}>
+                  {activeLightboxPost ? formatTimeAgo(activeLightboxPost.publishedAt) : ''}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.lightboxCloseBtn}
+              onPress={() => setLightboxPostId(null)}
+            >
+              <Ionicons name="close" size={22} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Enlarged Uncropped Banner Image */}
+          <Pressable
+            style={styles.lightboxImageStage}
+            onPress={() => setLightboxPostId(null)}
+          >
+            {activeLightboxPost?.media?.[0]?.mediaUrl && (
+              <ExpoImage
+                source={{ uri: resolvePostMediaUrl(activeLightboxPost.media[0].mediaUrl) }}
+                style={styles.lightboxFullImage}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+              />
+            )}
+          </Pressable>
+
+          {/* Bottom Caption & Active Like / Comment / Share Buttons */}
+          {activeLightboxPost && (
+            <View
+              style={[
+                styles.lightboxFooterCard,
+                { paddingBottom: Math.max(insets.bottom + 12, 20) },
+              ]}
+            >
+              {activeLightboxPost.title ? (
+                <Text style={styles.lightboxTitle} numberOfLines={2}>
+                  {activeLightboxPost.title}
+                </Text>
+              ) : null}
+              {activeLightboxPost.content ? (
+                <Text style={styles.lightboxCaption} numberOfLines={3}>
+                  {activeLightboxPost.content}
+                </Text>
+              ) : null}
+
+              <View style={styles.lightboxActionsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.lightboxActionBtn,
+                    activeLightboxPost.isLiked && styles.lightboxActionBtnLiked,
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={() => handleLikeToggle(activeLightboxPost)}
+                >
+                  <Ionicons
+                    name={activeLightboxPost.isLiked ? 'heart' : 'heart-outline'}
+                    size={19}
+                    color={activeLightboxPost.isLiked ? '#ef4444' : '#ffffff'}
+                  />
+                  <Text
+                    style={[
+                      styles.lightboxActionText,
+                      activeLightboxPost.isLiked && styles.lightboxActionTextLiked,
+                    ]}
+                  >
+                    {activeLightboxPost.likeCount || 0} Beğeni
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.lightboxActionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => handleOpenComments(activeLightboxPost)}
+                >
+                  <Ionicons name="chatbubble-outline" size={18} color="#ffffff" />
+                  <Text style={styles.lightboxActionText}>
+                    {activeLightboxPost.commentCount || 0} Yorum
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.lightboxActionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => handleShare(activeLightboxPost)}
+                >
+                  <Ionicons name="share-social-outline" size={18} color="#ffffff" />
+                  <Text style={styles.lightboxActionText}>Paylaş</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -1935,5 +2121,101 @@ const styles = StyleSheet.create({
   },
   sendCommentBtnDisabled: {
     backgroundColor: '#cbd5e1',
+  },
+  lightboxBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.96)',
+    justifyContent: 'space-between',
+  },
+  lightboxTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  lightboxAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 12,
+  },
+  lightboxAuthorName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  lightboxPostDate: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 1,
+  },
+  lightboxCloseBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lightboxImageStage: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  lightboxFullImage: {
+    width: '100%',
+    height: '100%',
+  },
+  lightboxFooterCard: {
+    backgroundColor: '#0f172a',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    gap: 10,
+  },
+  lightboxTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  lightboxCaption: {
+    fontSize: 13,
+    color: '#cbd5e1',
+    lineHeight: 18,
+  },
+  lightboxActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  lightboxActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  lightboxActionBtnLiked: {
+    backgroundColor: 'rgba(239, 68, 68, 0.18)',
+    borderColor: 'rgba(239, 68, 68, 0.45)',
+  },
+  lightboxActionText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  lightboxActionTextLiked: {
+    color: '#fca5a5',
   },
 });
