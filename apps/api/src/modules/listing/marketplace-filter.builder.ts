@@ -200,24 +200,38 @@ export function buildMarketplaceListingWhere(
 
   // Urgent promotion filter
   if (params.urgentOnly === 'true') {
-    where.promotionEntitlements = {
-      some: {
-        promotionType: ListingPromotionType.URGENT_LISTING,
-        lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
-        expiresAt: { gt: now },
-      },
-    };
+    where.AND.push({
+      OR: [
+        { isUrgent: true },
+        {
+          promotionEntitlements: {
+            some: {
+              promotionType: ListingPromotionType.URGENT_LISTING,
+              lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+              expiresAt: { gt: now },
+            },
+          },
+        },
+      ],
+    });
   }
 
   // Showcase promotion filter
   if (params.showcaseOnly === 'true') {
-    where.promotionEntitlements = {
-      some: {
-        promotionType: ListingPromotionType.SHOWCASE_FEED,
-        lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
-        expiresAt: { gt: now },
-      },
-    };
+    where.AND.push({
+      OR: [
+        { isShowcaseFeedActive: true },
+        {
+          promotionEntitlements: {
+            some: {
+              promotionType: ListingPromotionType.SHOWCASE_FEED,
+              lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+              expiresAt: { gt: now },
+            },
+          },
+        },
+      ],
+    });
   }
 
   if (params.sellerId) {

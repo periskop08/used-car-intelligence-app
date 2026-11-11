@@ -344,11 +344,10 @@ export default function ListingDetail() {
                   (e.target as HTMLElement).style.opacity = '0.5';
                 }}
               />
-              {listing.isAiReady && (
-                <span className="absolute top-2.5 left-2.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-600/90 text-white border border-orange-500/30 backdrop-blur-sm">
-                  ✨ AI Analizli İlan
-                </span>
-              )}
+              <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
+                {listing.isUrgent && <UrgentListingBadge size="sm" animated />}
+                {listing.isShowcaseFeedActive && <ShowcaseBadge size="sm" />}
+              </div>
 
               {/* Tam Ekran / Lightbox Rozeti */}
               <div className="absolute bottom-2.5 right-2.5 z-10 bg-slate-950/80 border border-white/15 text-slate-200 px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5 backdrop-blur-sm group-hover:bg-orange-600 group-hover:border-orange-500 group-hover:text-white transition">

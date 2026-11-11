@@ -119,11 +119,6 @@ export default function MyFavorites() {
                     alt={listing.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                   />
-                  {listing.isAiReady && (
-                    <span className="absolute top-3 left-3 text-[10px] font-bold px-2 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md">
-                      ✨ AI Analizli
-                    </span>
-                  )}
                 </div>
 
                 <div className="p-4 flex flex-col justify-between flex-1 gap-4">

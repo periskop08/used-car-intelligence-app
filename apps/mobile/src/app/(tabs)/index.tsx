@@ -2056,8 +2056,71 @@ export default function MobileDashboard({
                 </ScrollView>
               ))}
             </View>
-        ) : (
-          <View>
+          ) : recentListings.length > 0 ? (
+            <View style={{ marginTop: 6 }}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Son Eklenen İlanlar</Text>
+                <TouchableOpacity onPress={() => router.push('/listings')}>
+                  <Text style={styles.sectionLinkText}>Tümünü Gör</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.vitrinHorizontalScrollContent}
+                style={styles.vitrinRowScrollView}
+              >
+                {recentListings.map((item) => {
+                  const isFav = !!favorites[item.id];
+                  return (
+                    <TouchableOpacity
+                      key={`recent-${item.id}`}
+                      style={styles.vitrinCard}
+                      activeOpacity={0.9}
+                      onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
+                    >
+                      <View style={styles.vitrinImageContainer}>
+                        <ExpoImage
+                          source={{ uri: item.imageUrl }}
+                          style={styles.vitrinCarImage}
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
+                        />
+                        <View style={styles.vitrinBadgesOverlay}>
+                          {item.isUrgent && <UrgentBadge size="small" />}
+                          {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
+                        </View>
+                        <TouchableOpacity
+                          style={styles.favCircleButton}
+                          onPress={() => toggleFavorite(item.id)}
+                        >
+                          <Ionicons
+                            name={isFav ? 'heart' : 'heart-outline'}
+                            size={17}
+                            color={isFav ? '#ef4444' : '#ffffff'}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.vitrinCardBody}>
+                        <Text style={styles.vitrinTitle} numberOfLines={2}>
+                          {item.title}
+                        </Text>
+                        <Text style={styles.vitrinSpecs}>
+                          {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
+                        </Text>
+                        <View style={styles.vitrinPriceRow}>
+                          <Text style={styles.vitrinPrice}>
+                            {(item.price ?? 0).toLocaleString('tr-TR')} ₺
+                          </Text>
+                          <Text style={styles.vitrinCityBadge}>{item.city}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : (
             <View style={styles.emptyPromoBox}>
               <View style={styles.emptyPromoCompactLeft}>
                 <View style={styles.emptyPromoIconWrap}>
@@ -2085,73 +2148,6 @@ export default function MobileDashboard({
                 <Text style={styles.emptyPromoBtnText}>Akışa Git ➔</Text>
               </TouchableOpacity>
             </View>
-
-            {recentListings.length > 0 && (
-              <View style={{ marginTop: 18 }}>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionTitle}>Son Eklenen İlanlar</Text>
-                  <TouchableOpacity onPress={() => router.push('/listings')}>
-                    <Text style={styles.sectionLinkText}>Tümünü Gör</Text>
-                  </TouchableOpacity>
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.vitrinHorizontalScrollContent}
-                  style={styles.vitrinRowScrollView}
-                >
-                  {recentListings.map((item) => {
-                    const isFav = !!favorites[item.id];
-                    return (
-                      <TouchableOpacity
-                        key={`recent-${item.id}`}
-                        style={styles.vitrinCard}
-                        activeOpacity={0.9}
-                        onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
-                      >
-                        <View style={styles.vitrinImageContainer}>
-                          <ExpoImage
-                            source={{ uri: item.imageUrl }}
-                            style={styles.vitrinCarImage}
-                            contentFit="cover"
-                            cachePolicy="memory-disk"
-                          />
-                          <View style={styles.vitrinBadgesOverlay}>
-                            {item.isUrgent && <UrgentBadge size="small" />}
-                            {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
-                          </View>
-                          <TouchableOpacity
-                            style={styles.favCircleButton}
-                            onPress={() => toggleFavorite(item.id)}
-                          >
-                            <Ionicons
-                              name={isFav ? 'heart' : 'heart-outline'}
-                              size={17}
-                              color={isFav ? '#ef4444' : '#ffffff'}
-                            />
-                          </TouchableOpacity>
-                        </View>
-                        <View style={styles.vitrinCardBody}>
-                          <Text style={styles.vitrinTitle} numberOfLines={2}>
-                            {item.title}
-                          </Text>
-                          <Text style={styles.vitrinSpecs}>
-                            {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
-                          </Text>
-                          <View style={styles.vitrinPriceRow}>
-                            <Text style={styles.vitrinPrice}>
-                              {(item.price ?? 0).toLocaleString('tr-TR')} ₺
-                            </Text>
-                            <Text style={styles.vitrinCityBadge}>{item.city}</Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-          </View>
           )}
       </View>
     </ScrollView>

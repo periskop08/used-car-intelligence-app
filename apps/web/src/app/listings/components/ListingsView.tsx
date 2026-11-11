@@ -1462,20 +1462,6 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
             </label>
           </div>
 
-          {/* AI Ready Toggle */}
-          <div className="flex items-center gap-2 cursor-pointer mt-2 border-t border-white/5 pt-3">
-            <input
-              type="checkbox"
-              id="aiReadyCheckbox"
-              checked={isAiReady}
-              onChange={(e) => setIsAiReady(e.target.checked)}
-              className="accent-orange-500 rounded border-white/10"
-            />
-            <label htmlFor="aiReadyCheckbox" className="text-xs font-black text-slate-200 cursor-pointer select-none flex items-center gap-1">
-              ✨ Yalnızca AI Analizli
-            </label>
-          </div>
-
           {/* Acil İlanlar Toggle */}
           {!isUrgentPage && (
             <div className="flex items-center gap-2 cursor-pointer mt-2">
@@ -1717,11 +1703,6 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
                       <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
                         {listing.isUrgent && <UrgentListingBadge size="sm" animated />}
                         {listing.isShowcaseFeedActive && <ShowcaseBadge size="sm" />}
-                        {listing.isAiReady && (
-                          <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md">
-                            ✨ AI
-                          </span>
-                        )}
                       </div>
                     </div>
 
@@ -1822,11 +1803,6 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
                         )}
                         {listing.isShowcaseFeedActive && (
                           <ShowcaseBadge size="sm" />
-                        )}
-                        {listing.isAiReady && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md flex items-center gap-1">
-                            ✨ AI Analizli
-                          </span>
                         )}
                       </div>
                     </div>

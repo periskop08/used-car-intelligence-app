@@ -1138,11 +1138,6 @@ export default function Home() {
                           {listing.isShowcaseFeedActive && (
                             <ShowcaseBadge size="sm" />
                           )}
-                          {listing.isAiReady && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 flex items-center gap-1 shadow">
-                              ✨ AI Analizli
-                            </span>
-                          )}
                         </div>
                         <button
                           type="button"
@@ -1185,7 +1180,7 @@ export default function Home() {
                             {formatCurrency(listing.priceAmount, listing.currency)}
                           </span>
                           <span className="text-[9px] text-slate-500 font-mono">
-                            {listing.vehicleVariant?.brand.name}
+                            {listing.vehicleVariant?.brand?.name || listing.customBrand || ""}
                           </span>
                         </div>
                       </div>
@@ -1195,123 +1190,114 @@ export default function Home() {
               </div>
             ))}
           </div>
-        ) : (
-          <div className="flex flex-col gap-6">
-            <div className="py-14 text-center rounded-2xl bg-slate-950/50 border border-white/5 space-y-2">
-              <span className="text-2xl">{promoTab === 'vitrin' ? '⭐' : '⚡'}</span>
-              <p className="text-xs font-bold text-slate-300">
-                {promoTab === 'vitrin'
-                  ? 'Şu anda vitrinde aktif araç ilanı bulunmuyor.'
-                  : 'Şu anda acil satılık aktif araç ilanı bulunmuyor.'}
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Tüm satılık araçları incelemek için pazar yerine göz atabilirsiniz.
-              </p>
-              <div className="pt-2">
-                <a
-                  href="/listings"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 text-xs font-bold transition"
-                >
-                  Tüm Araç İlanları ➔
-                </a>
-              </div>
+        ) : recentListings.length > 0 ? (
+          <div className="flex flex-col gap-3 mt-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-extrabold text-slate-200 tracking-tight">
+                Son Eklenen İlanlar
+              </h3>
+              <a
+                href="/listings"
+                className="text-xs font-bold text-orange-500 hover:text-orange-400 transition"
+              >
+                Tümünü Gör →
+              </a>
             </div>
-
-            {recentListings.length > 0 && (
-              <div className="flex flex-col gap-3 mt-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-200 tracking-tight">
-                    Son Eklenen İlanlar
-                  </h3>
+            <div className="flex items-stretch justify-start gap-4 overflow-x-auto scroll-smooth pb-3 select-none scrollbar-none snap-x snap-mandatory">
+              {recentListings.map((listing: any) => {
+                const coverImg =
+                  listing.media && listing.media[0]
+                    ? formatImageUrl(listing.media[0].url)
+                    : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
+                return (
                   <a
-                    href="/listings"
-                    className="text-xs font-bold text-orange-500 hover:text-orange-400 transition"
+                    key={`recent-${listing.id}`}
+                    href={`/listings/${listing.id}`}
+                    className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300 w-[230px] sm:w-[280px] lg:w-[205px] flex-shrink-0 snap-start"
                   >
-                    Tümünü Gör →
-                  </a>
-                </div>
-                <div className="flex items-stretch justify-start gap-4 overflow-x-auto scroll-smooth pb-3 select-none scrollbar-none snap-x snap-mandatory">
-                  {recentListings.map((listing: any) => {
-                    const coverImg =
-                      listing.media && listing.media[0]
-                        ? formatImageUrl(listing.media[0].url)
-                        : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
-                    return (
-                      <a
-                        key={`recent-${listing.id}`}
-                        href={`/listings/${listing.id}`}
-                        className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300 w-[230px] sm:w-[280px] lg:w-[205px] flex-shrink-0 snap-start"
+                    <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden">
+                      <img
+                        src={coverImg}
+                        alt={listing.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
+                        }}
+                      />
+                      <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10">
+                        {listing.isUrgent && <UrgentListingBadge size="sm" animated />}
+                        {listing.isShowcaseFeedActive && <ShowcaseBadge size="sm" />}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => toggleFavorite(e, listing.id)}
+                        className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-slate-950/70 hover:bg-slate-950/90 border border-white/10 flex items-center justify-center transition hover:scale-110 shadow-md backdrop-blur-sm cursor-pointer"
+                        title={favorites[listing.id] ? "Favorilerden Kaldır" : "Favorilere Ekle"}
                       >
-                        <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden">
-                          <img
-                            src={coverImg}
-                            alt={listing.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src =
-                                "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
-                            }}
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill={favorites[listing.id] ? "#ef4444" : "none"}
+                          stroke={favorites[listing.id] ? "#ef4444" : "#ffffff"}
+                          strokeWidth="2"
+                          className="w-3.5 h-3.5"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"
                           />
-                          <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10">
-                            {listing.isUrgent && <UrgentListingBadge size="sm" animated />}
-                            {listing.isShowcaseFeedActive && <ShowcaseBadge size="sm" />}
-                            {listing.isAiReady && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 flex items-center gap-1 shadow">
-                                ✨ AI Analizli
-                              </span>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => toggleFavorite(e, listing.id)}
-                            className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-slate-950/70 hover:bg-slate-950/90 border border-white/10 flex items-center justify-center transition hover:scale-110 shadow-md backdrop-blur-sm cursor-pointer"
-                            title={favorites[listing.id] ? "Favorilerden Kaldır" : "Favorilere Ekle"}
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill={favorites[listing.id] ? "#ef4444" : "none"}
-                              stroke={favorites[listing.id] ? "#ef4444" : "#ffffff"}
-                              strokeWidth="2"
-                              className="w-3.5 h-3.5"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"
-                              />
-                            </svg>
-                          </button>
-                        </div>
+                        </svg>
+                      </button>
+                    </div>
 
-                        <div className="p-3 flex flex-col justify-between flex-1 gap-2.5">
-                          <div>
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
-                              {listing.modelYear} • {listing.city}
-                            </span>
-                            <h3 className="font-bold text-slate-200 text-xs line-clamp-1 group-hover:text-orange-400 transition mt-0.5">
-                              {listing.title}
-                            </h3>
-                            <p className="text-slate-400 text-[10px] mt-0.5">
-                              {(listing.kilometers ?? 0).toLocaleString('tr-TR')} km
-                            </p>
-                          </div>
+                    <div className="p-3 flex flex-col justify-between flex-1 gap-2.5">
+                      <div>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                          {listing.modelYear} • {listing.city}
+                        </span>
+                        <h3 className="font-bold text-slate-200 text-xs line-clamp-1 group-hover:text-orange-400 transition mt-0.5">
+                          {listing.title}
+                        </h3>
+                        <p className="text-slate-400 text-[10px] mt-0.5">
+                          {(listing.kilometers ?? 0).toLocaleString('tr-TR')} km
+                        </p>
+                      </div>
 
-                          <div className="border-t border-white/5 pt-2 flex items-center justify-between">
-                            <span className="font-black text-slate-100 text-[13px]">
-                              {formatCurrency(listing.priceAmount, listing.currency)}
-                            </span>
-                            <span className="text-[9px] text-slate-500 font-mono">
-                              {listing.vehicleVariant?.brand?.name || listing.customBrand || ""}
-                            </span>
-                          </div>
-                        </div>
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+                      <div className="border-t border-white/5 pt-2 flex items-center justify-between">
+                        <span className="font-black text-slate-100 text-[13px]">
+                          {formatCurrency(listing.priceAmount, listing.currency)}
+                        </span>
+                        <span className="text-[9px] text-slate-500 font-mono">
+                          {listing.vehicleVariant?.brand?.name || listing.customBrand || ""}
+                        </span>
+                      </div>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="py-14 text-center rounded-2xl bg-slate-950/50 border border-white/5 space-y-2">
+            <span className="text-2xl">{promoTab === 'vitrin' ? '⭐' : '⚡'}</span>
+            <p className="text-xs font-bold text-slate-300">
+              {promoTab === 'vitrin'
+                ? 'Şu anda vitrinde aktif araç ilanı bulunmuyor.'
+                : 'Şu anda acil satılık aktif araç ilanı bulunmuyor.'}
+            </p>
+            <p className="text-[11px] text-slate-500">
+              Tüm satılık araçları incelemek için pazar yerine göz atabilirsiniz.
+            </p>
+            <div className="pt-2">
+              <a
+                href="/listings"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 text-xs font-bold transition"
+              >
+                Tüm Araç İlanları ➔
+              </a>
+            </div>
           </div>
         )}
       </div>

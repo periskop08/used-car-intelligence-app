@@ -302,8 +302,8 @@ export class ListingController {
       const hasShowcaseEnt = item.promotionEntitlements?.some(
         (e: any) => e.promotionType === ListingPromotionType.SHOWCASE_FEED && new Date(e.expiresAt) > now
       );
-      const isUrgent = !!(item.status === ListingStatus.ACTIVE && (!item.expiresAt || new Date(item.expiresAt) > now) && hasUrgentEnt);
-      const isShowcaseFeedActive = !!(item.status === ListingStatus.ACTIVE && (!item.expiresAt || new Date(item.expiresAt) > now) && hasShowcaseEnt);
+      const isUrgent = !!(item.status === ListingStatus.ACTIVE && (!item.expiresAt || new Date(item.expiresAt) > now) && (item.isUrgent || hasUrgentEnt));
+      const isShowcaseFeedActive = !!(item.status === ListingStatus.ACTIVE && (!item.expiresAt || new Date(item.expiresAt) > now) && (item.isShowcaseFeedActive || hasShowcaseEnt));
 
       return {
         ...item,
@@ -809,8 +809,8 @@ export class ListingController {
     const hasShowcaseEnt = listing.promotionEntitlements?.some(
       (e: any) => e.promotionType === ListingPromotionType.SHOWCASE_FEED && new Date(e.expiresAt) > detailNow
     );
-    const isUrgent = !!(listing.status === ListingStatus.ACTIVE && (!listing.expiresAt || new Date(listing.expiresAt) > detailNow) && hasUrgentEnt);
-    const isShowcaseFeedActive = !!(listing.status === ListingStatus.ACTIVE && (!listing.expiresAt || new Date(listing.expiresAt) > detailNow) && hasShowcaseEnt);
+    const isUrgent = !!(listing.status === ListingStatus.ACTIVE && (!listing.expiresAt || new Date(listing.expiresAt) > detailNow) && (listing.isUrgent || hasUrgentEnt));
+    const isShowcaseFeedActive = !!(listing.status === ListingStatus.ACTIVE && (!listing.expiresAt || new Date(listing.expiresAt) > detailNow) && (listing.isShowcaseFeedActive || hasShowcaseEnt));
 
     let technicalFacts: any = null;
     if (listing.vehicleVariantId && this.variantTechnicalFactsService) {

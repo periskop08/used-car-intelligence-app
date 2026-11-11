@@ -1578,12 +1578,6 @@ export default function ListingsScreen() {
                 <Ionicons name="close" size={12} color="#ea580c" />
               </TouchableOpacity>
             )}
-            {isAiReady && (
-              <TouchableOpacity style={styles.filterTagPill} onPress={() => setIsAiReady(false)}>
-                <Text style={styles.filterTagPillText}>AI Analizli</Text>
-                <Ionicons name="close" size={12} color="#ea580c" />
-              </TouchableOpacity>
-            )}
           </ScrollView>
           <TouchableOpacity onPress={handleClearFilters} style={{ marginLeft: 8 }}>
             <Text style={{ fontSize: 11, fontWeight: '800', color: '#ea580c' }}>Temizle</Text>
@@ -2353,40 +2347,6 @@ export default function ListingsScreen() {
                   name={exchangeable ? 'checkbox' : 'square-outline'}
                   size={22}
                   color={exchangeable ? '#2563eb' : '#94a3b8'}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.urgentToggleRow,
-                  isAiReady && { backgroundColor: '#fff7ed', borderColor: '#fed7aa' },
-                ]}
-                onPress={() => setIsAiReady(!isAiReady)}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons
-                    name="sparkles"
-                    size={20}
-                    color={isAiReady ? '#ea580c' : '#64748b'}
-                  />
-                  <View>
-                    <Text
-                      style={[
-                        styles.urgentToggleTitle,
-                        isAiReady && { color: '#c2410c' },
-                      ]}
-                    >
-                      ✨ Yalnızca AI Analizli
-                    </Text>
-                    <Text style={styles.urgentToggleSub}>
-                      TorkScout AI Risk Analizi hazır olan araçlar
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons
-                  name={isAiReady ? 'checkbox' : 'square-outline'}
-                  size={22}
-                  color={isAiReady ? '#ea580c' : '#94a3b8'}
                 />
               </TouchableOpacity>
 
