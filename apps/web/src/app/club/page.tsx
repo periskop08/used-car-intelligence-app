@@ -239,10 +239,11 @@ function ClubPageContent() {
         })
         .catch(() => {});
       fetchMyGarage(savedToken);
+      fetchClubPosts(savedToken);
+      fetchPinnedPosts(savedToken);
+    } else {
+      setLoading(false);
     }
-
-    fetchClubPosts(savedToken);
-    fetchPinnedPosts(savedToken);
   }, []);
 
   useEffect(() => {
@@ -1015,8 +1016,91 @@ function ClubPageContent() {
           )}
         </div>
 
-        {/* Category Filter Tabs Row (Left: 🔥 Tümü & 📊 Anketler — Far Right: 🚗 Garajım) */}
-        <div className="bg-slate-900/80 border border-white/10 px-4 py-3 rounded-2xl flex items-center justify-between gap-3">
+        {!loading && !token ? (
+          <div className="max-w-4xl mx-auto space-y-6 py-2">
+            {/* 1. Üst Başlık (Hero Alanı) */}
+            <div className="bg-slate-900/90 border border-orange-500/30 rounded-3xl p-8 sm:p-10 text-center space-y-4 shadow-2xl">
+              <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+                Tork Scout Club’a Katılın
+              </h2>
+              <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
+                Otomobil ve motosiklet tutkunlarının bir araya geldiği, gerçek kullanıcı deneyimlerinin paylaşıldığı ve araç sahiplerinin nabzının tutulduğu özel kulüp alanı.
+              </p>
+            </div>
+
+            {/* 2. Club’da Sizi Neler Bekliyor? (4 Ana Fayda Kartı) */}
+            <div className="space-y-4">
+              <h3 className="text-base sm:text-lg font-black text-white px-1">
+                Club’da Sizi Neler Bekliyor?
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  {
+                    emoji: "🚗",
+                    title: "Garajım & Araç Vitrini",
+                    desc: "Kendi aracınızın fotoğraflarını ve hikayesini kişisel garajınıza ekleyin, dilerseniz kulüp akışında paylaşarak diğer üyelerin beğenisine ve yorumlarına sunun.",
+                  },
+                  {
+                    emoji: "📊",
+                    title: "Topluluk Anketleri & Piyasa Nabzı",
+                    desc: "Hangi model daha sorunsuz? Hangi motor/şanzıman kombinasyonu tercih edilmeli? Topluluk anketlerine oy verin, binlerce araç sahibinin gerçek tercihlerini anlık görün.",
+                  },
+                  {
+                    emoji: "💬",
+                    title: "Gerçek Kullanıcı Deneyimleri & Yorumlar",
+                    desc: "Kronik sorunlar, bakım maliyetleri, yakıt tüketimi ve ustalık tecrübeleri hakkında doğrudan araç sahipleriyle fikir alışverişi yapın, gönderilere yorum bırakın.",
+                  },
+                  {
+                    emoji: "📌",
+                    title: "Özel Duyurular, İncelemeler & Kulüp Gündemi",
+                    desc: "Tork Scout ekibinin hazırladığı özel piyasa analizlerine, sabitlenmiş rehber içeriklere ve yeni özellik duyurularına ilk siz ulaşın.",
+                  },
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-slate-900/90 border border-white/10 rounded-2xl p-5 flex items-start gap-4 shadow-lg"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-2xl shrink-0">
+                      {item.emoji}
+                    </div>
+                    <div className="space-y-1.5">
+                      <h4 className="text-sm sm:text-base font-extrabold text-white">
+                        {item.title}
+                      </h4>
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                        {item.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Alt Aksiyon Alanı (CTA Butonları) */}
+            <div className="bg-slate-900/90 border border-white/10 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-lg mx-auto">
+                <Link
+                  href="/login?redirect=/club"
+                  className="w-full sm:flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm shadow-lg shadow-orange-500/20 transition flex items-center justify-center gap-2"
+                >
+                  <span>Giriş Yap ve Kulübe Katıl →</span>
+                </Link>
+                <Link
+                  href="/register?redirect=/club"
+                  className="w-full sm:flex-1 py-3.5 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-orange-500/40 text-orange-300 hover:text-white font-extrabold text-sm transition flex items-center justify-center"
+                >
+                  <span>Ücretsiz Hesap Oluştur</span>
+                </Link>
+              </div>
+              <p className="text-xs text-slate-400 max-w-xl mx-auto leading-relaxed">
+                Tork Scout Club üyeliği tamamen ücretsizdir. Hesabınızla giriş yaparak tüm paylaşımlara, anketlere ve Garajım özelliğine anında erişebilirsiniz.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Category Filter Tabs Row (Left: 🔥 Tümü & 📊 Anketler — Far Right: 🚗 Garajım) */}
+            <div className="bg-slate-900/80 border border-white/10 px-4 py-3 rounded-2xl flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             {[
               { key: "ALL", label: "🔥 Tümü" },
@@ -1881,6 +1965,8 @@ function ClubPageContent() {
             </div>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* FULLSCREEN PHOTO LIGHTBOX BANNER MODAL WITH ACTIVE LIKE / COMMENT / SHARE BAR */}

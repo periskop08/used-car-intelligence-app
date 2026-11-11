@@ -287,12 +287,12 @@ export default function TorqueScoutClubScreen() {
           .then((d) => d && setUserProfile(d))
           .catch(() => {});
         fetchMyGarage(storedToken);
+        await fetchClubPosts(storedToken);
       } else {
         setUserProfile(null);
         setGarageItems([]);
+        setLoading(false);
       }
-
-      await fetchClubPosts(storedToken);
     } catch (e) {
       console.error('Error loading club:', e);
       setLoading(false);
@@ -1029,56 +1029,282 @@ export default function TorqueScoutClubScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* CATEGORY FILTER PILLS (LEFT: TÜMÜ & ANKETLER — RIGHT: GARAJIM) */}
-      <View style={styles.filterScrollWrapper}>
-        <View style={styles.filterBarRow}>
-          <View style={styles.filterLeftGroup}>
-            {[
-              { key: 'ALL', label: '🔥 Tümü' },
-              { key: 'POLLS', label: '📊 Anketler' },
-            ].map((cat) => {
-              const isActive = selectedCategory === cat.key;
-              return (
-                <TouchableOpacity
-                  key={cat.key}
-                  style={[styles.filterPill, isActive && styles.filterPillActive]}
-                  onPress={() => setSelectedCategory(cat.key as any)}
-                >
-                  <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.filterPill,
-              styles.garagePill,
-              selectedCategory === 'GARAGE' && styles.filterPillActive,
-            ]}
-            onPress={() => {
-              setSelectedCategory('GARAGE');
-              if (token) {
-                fetchMyGarage(token);
-              }
+      {/* GUEST LANDING SCREEN WHEN NOT LOGGED IN */}
+      {!loading && !token ? (
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 16 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* 1. Üst Başlık (Hero Alanı) */}
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 20,
+              padding: 20,
+              borderWidth: 1,
+              borderColor: '#fed7aa',
+              alignItems: 'center',
+              shadowColor: '#0f172a',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.05,
+              shadowRadius: 10,
+              elevation: 2,
             }}
           >
-            <Text
-              style={[
-                styles.filterPillText,
-                selectedCategory === 'GARAGE' && styles.filterPillTextActive,
-              ]}
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: '#fff7ed',
+                borderWidth: 1,
+                borderColor: '#fdba74',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}
             >
-              🚗 Garajım
+              <Ionicons name="shield-checkmark" size={28} color="#ea580c" />
+            </View>
+            <Text
+              style={{
+                fontSize: 21,
+                fontWeight: '900',
+                color: '#0f172a',
+                textAlign: 'center',
+                letterSpacing: -0.4,
+              }}
+            >
+              Tork Scout Club’a Katılın
             </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+            <Text
+              style={{
+                fontSize: 13,
+                color: '#475569',
+                textAlign: 'center',
+                lineHeight: 20,
+                marginTop: 8,
+                fontWeight: '500',
+              }}
+            >
+              Otomobil ve motosiklet tutkunlarının bir araya geldiği, gerçek kullanıcı deneyimlerinin paylaşıldığı ve araç sahiplerinin nabzının tutulduğu özel kulüp alanı.
+            </Text>
+          </View>
 
-      {/* FEED OR GARAGE CONTENT */}
-      {loading ? (
+          {/* 2. Club'da Sizi Neler Bekliyor? (4 Ana Fayda Kartı) */}
+          <View style={{ gap: 12 }}>
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: '900',
+                color: '#0f172a',
+                paddingHorizontal: 4,
+              }}
+            >
+              Club’da Sizi Neler Bekliyor?
+            </Text>
+
+            {[
+              {
+                emoji: '🚗',
+                title: 'Garajım & Araç Vitrini',
+                desc: 'Kendi aracınızın fotoğraflarını ve hikayesini kişisel garajınıza ekleyin, dilerseniz kulüp akışında paylaşarak diğer üyelerin beğenisine ve yorumlarına sunun.',
+                bg: '#fff7ed',
+                border: '#fed7aa',
+              },
+              {
+                emoji: '📊',
+                title: 'Topluluk Anketleri & Piyasa Nabzı',
+                desc: 'Hangi model daha sorunsuz? Hangi motor/şanzıman kombinasyonu tercih edilmeli? Topluluk anketlerine oy verin, binlerce araç sahibinin gerçek tercihlerini anlık görün.',
+                bg: '#eff6ff',
+                border: '#bfdbfe',
+              },
+              {
+                emoji: '💬',
+                title: 'Gerçek Kullanıcı Deneyimleri & Yorumlar',
+                desc: 'Kronik sorunlar, bakım maliyetleri, yakıt tüketimi ve ustalık tecrübeleri hakkında doğrudan araç sahipleriyle fikir alışverişi yapın, gönderilere yorum bırakın.',
+                bg: '#f0fdf4',
+                border: '#bbf7d0',
+              },
+              {
+                emoji: '📌',
+                title: 'Özel Duyurular, İncelemeler & Kulüp Gündemi',
+                desc: 'Tork Scout ekibinin hazırladığı özel piyasa analizlerine, sabitlenmiş rehber içeriklere ve yeni özellik duyurularına ilk siz ulaşın.',
+                bg: '#faf5ff',
+                border: '#e9d5ff',
+              },
+            ].map((item, idx) => (
+              <View
+                key={idx}
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: 16,
+                  padding: 15,
+                  borderWidth: 1,
+                  borderColor: '#e2e8f0',
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                }}
+              >
+                <View
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 12,
+                    backgroundColor: item.bg,
+                    borderWidth: 1,
+                    borderColor: item.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 20 }}>{item.emoji}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '800',
+                      color: '#0f172a',
+                      marginBottom: 4,
+                    }}
+                  >
+                    {item.title}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: '#64748b',
+                      lineHeight: 18,
+                    }}
+                  >
+                    {item.desc}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* 3. Alt Aksiyon Alanı (CTA Butonları) */}
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 18,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: '#e2e8f0',
+              gap: 10,
+              marginTop: 4,
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#ea580c',
+                borderRadius: 14,
+                paddingVertical: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                shadowColor: '#ea580c',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.25,
+                shadowRadius: 8,
+                elevation: 4,
+              }}
+              activeOpacity={0.85}
+              onPress={() => router.push('/login' as any)}
+            >
+              <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '900' }}>
+                Giriş Yap ve Kulübe Katıl
+              </Text>
+              <Ionicons name="arrow-forward" size={17} color="#ffffff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#fff7ed',
+                borderRadius: 14,
+                paddingVertical: 13,
+                borderWidth: 1,
+                borderColor: '#fdba74',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              activeOpacity={0.85}
+              onPress={() => router.push('/register' as any)}
+            >
+              <Text style={{ color: '#ea580c', fontSize: 13.5, fontWeight: '800' }}>
+                Ücretsiz Hesap Oluştur
+              </Text>
+            </TouchableOpacity>
+
+            <Text
+              style={{
+                fontSize: 11,
+                color: '#64748b',
+                textAlign: 'center',
+                lineHeight: 16,
+                marginTop: 4,
+              }}
+            >
+              Tork Scout Club üyeliği tamamen ücretsizdir. Hesabınızla giriş yaparak tüm paylaşımlara, anketlere ve Garajım özelliğine anında erişebilirsiniz.
+            </Text>
+          </View>
+        </ScrollView>
+      ) : (
+        <>
+          {/* CATEGORY FILTER PILLS (LEFT: TÜMÜ & ANKETLER — RIGHT: GARAJIM) */}
+          <View style={styles.filterScrollWrapper}>
+            <View style={styles.filterBarRow}>
+              <View style={styles.filterLeftGroup}>
+                {[
+                  { key: 'ALL', label: '🔥 Tümü' },
+                  { key: 'POLLS', label: '📊 Anketler' },
+                ].map((cat) => {
+                  const isActive = selectedCategory === cat.key;
+                  return (
+                    <TouchableOpacity
+                      key={cat.key}
+                      style={[styles.filterPill, isActive && styles.filterPillActive]}
+                      onPress={() => setSelectedCategory(cat.key as any)}
+                    >
+                      <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
+                        {cat.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.filterPill,
+                  styles.garagePill,
+                  selectedCategory === 'GARAGE' && styles.filterPillActive,
+                ]}
+                onPress={() => {
+                  setSelectedCategory('GARAGE');
+                  if (token) {
+                    fetchMyGarage(token);
+                  }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.filterPillText,
+                    selectedCategory === 'GARAGE' && styles.filterPillTextActive,
+                  ]}
+                >
+                  🚗 Garajım
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* FEED OR GARAGE CONTENT */}
+          {loading ? (
         <View style={styles.centerLoading}>
           <TorkScoutLoader />
           <Text style={styles.loadingText}>Kulüp akışı yükleniyor...</Text>
@@ -1580,6 +1806,8 @@ export default function TorqueScoutClubScreen() {
             ))
           )}
         </ScrollView>
+          )}
+        </>
       )}
 
       {/* ADMIN CREATE POST MODAL */}
