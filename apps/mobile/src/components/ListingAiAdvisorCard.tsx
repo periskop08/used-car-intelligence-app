@@ -170,10 +170,6 @@ export default function ListingAiAdvisorCard({
     } as any);
   };
 
-  const handleOpenChatbot = () => {
-    setIsOpen(true);
-  };
-
   const handleSendMessage = async (presetText?: string) => {
     const messageText = (presetText || inputMessage).trim();
     if (!messageText || loading) return;
@@ -182,7 +178,7 @@ export default function ListingAiAdvisorCard({
     if (!token) {
       Alert.alert(
         'Giriş Gerekli',
-        'TorqueScout AI Chatbot danışmanını kullanabilmek için lütfen giriş yapın.',
+        'Tork Scout AI Chatbot danışmanını kullanabilmek için lütfen giriş yapın.',
         [
           { text: 'Vazgeç', style: 'cancel' },
           {
@@ -330,29 +326,24 @@ export default function ListingAiAdvisorCard({
 
   return (
     <View style={styles.cardContainer}>
-      {/* Top Header Row: Icon + Title + Subtitle & Quota Badges */}
+      {/* Centered Header Section (No Sparkles Icon) */}
       <View style={styles.headerSection}>
-        <View style={styles.headerLeftRow}>
-          <View style={styles.sparklesIconBox}>
-            <Ionicons name="sparkles-outline" size={20} color="#fb923c" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.titleBadgeRow}>
-              <Text style={styles.cardTitle}>TorqueScout İlan Zekası</Text>
-              <View style={styles.versionPill}>
-                <Text style={styles.versionPillText}>v2.5 AI</Text>
-              </View>
+        <View style={styles.headerCenteredBlock}>
+          <View style={styles.titleBadgeRow}>
+            <Text style={styles.cardTitle}>Tork Scout İlan Zekası</Text>
+            <View style={styles.versionPill}>
+              <Text style={styles.versionPillText}>v2.5 AI</Text>
             </View>
-            <Text style={styles.cardSubtitle}>
-              İlan teknik analizi, ekspertiz çelişkileri ve yapay zeka danışmanı.
-            </Text>
           </View>
+          <Text style={styles.cardSubtitle}>
+            İlan teknik analizi, ekspertiz çelişkileri ve yapay zeka danışmanı.
+          </Text>
         </View>
 
         {/* Quota Indicators Row */}
         <View style={styles.quotaBadgesRow}>
           <View style={[styles.quotaBadgeBox, styles.quotaBadgeReport]}>
-            <Ionicons name="document-text-outline" size={14} color="#fbbf24" />
+            <Ionicons name="document-text-outline" size={14} color="#d97706" />
             <View>
               <Text style={styles.quotaBadgeLabel}>ARAÇ RAPORU HAKKI</Text>
               <Text style={styles.quotaBadgeValueAmber}>
@@ -362,7 +353,7 @@ export default function ListingAiAdvisorCard({
           </View>
 
           <View style={[styles.quotaBadgeBox, styles.quotaBadgeChat]}>
-            <Ionicons name="chatbox-outline" size={14} color="#fb923c" />
+            <Ionicons name="chatbox-outline" size={14} color="#ea580c" />
             <View>
               <Text style={styles.quotaBadgeLabel}>AI CHATBOT HAKKI</Text>
               <Text style={styles.quotaBadgeValueOrange}>
@@ -377,7 +368,7 @@ export default function ListingAiAdvisorCard({
               onPress={() => setIsOpen(false)}
               activeOpacity={0.8}
             >
-              <Ionicons name="chevron-up" size={15} color="#fb923c" />
+              <Ionicons name="chevron-up" size={15} color="#ea580c" />
               <Text style={styles.collapseBtnText}>Daralt</Text>
             </TouchableOpacity>
           )}
@@ -386,7 +377,7 @@ export default function ListingAiAdvisorCard({
 
       <View style={styles.divider} />
 
-      {/* Action Buttons Row (Matches Image 2) */}
+      {/* Action Buttons Row */}
       <View style={styles.actionButtonsRow}>
         <TouchableOpacity
           style={styles.reportPrimaryBtn}
@@ -412,7 +403,7 @@ export default function ListingAiAdvisorCard({
           onPress={() => setIsOpen((prev) => !prev)}
           activeOpacity={0.85}
         >
-          <Ionicons name="chatbox-outline" size={16} color="#fb923c" />
+          <Ionicons name="chatbox-outline" size={16} color="#ea580c" />
           <Text
             style={styles.chatbotSecondaryBtnText}
             numberOfLines={1}
@@ -434,14 +425,14 @@ export default function ListingAiAdvisorCard({
               onPress={() => setShowQuickQuestions((prev) => !prev)}
               activeOpacity={0.8}
             >
-              <Ionicons name="help-circle-outline" size={15} color="#fb923c" />
+              <Ionicons name="help-circle-outline" size={15} color="#ea580c" />
               <Text style={styles.quickQuestionsToggleText}>
                 💡 ÖNERİLEN HIZLI SORULAR ({QUICK_QUESTIONS.length})
               </Text>
               <Ionicons
                 name={showQuickQuestions ? 'chevron-up' : 'chevron-down'}
                 size={14}
-                color="#94a3b8"
+                color="#64748b"
               />
             </TouchableOpacity>
 
@@ -451,7 +442,7 @@ export default function ListingAiAdvisorCard({
                 onPress={handleClearConversation}
                 activeOpacity={0.8}
               >
-                <Ionicons name="trash-outline" size={13} color="#f87171" />
+                <Ionicons name="trash-outline" size={13} color="#dc2626" />
                 <Text style={styles.clearChatBtnText}>Temizle</Text>
               </TouchableOpacity>
             )}
@@ -484,7 +475,7 @@ export default function ListingAiAdvisorCard({
           >
             {chatMessages.length === 0 && !loading && (
               <View style={styles.emptyChatState}>
-                <Ionicons name="chatbox-ellipses-outline" size={26} color="#fb923c" />
+                <Ionicons name="chatbox-ellipses-outline" size={26} color="#ea580c" />
                 <Text style={styles.emptyChatTitle}>AI Chatbot Danışmanına Hoş Geldiniz</Text>
                 <Text style={styles.emptyChatSub}>
                   İlan hakkındaki merak ettiğiniz tüm soruları aşağıya yazabilir veya önerilen hızlı sorulardan seçebilirsiniz.
@@ -508,7 +499,7 @@ export default function ListingAiAdvisorCard({
                 >
                   <View style={styles.messageMetaRow}>
                     <Text style={styles.messageMetaText}>
-                      {isUser ? 'Siz' : '🤖 TorqueScout İlan Danışmanı'} • {timeStr}
+                      {isUser ? 'Siz' : '🤖 Tork Scout İlan Danışmanı'} • {timeStr}
                     </Text>
                   </View>
 
@@ -537,7 +528,7 @@ export default function ListingAiAdvisorCard({
                             <Ionicons
                               name={feedbacks[msg.id] === 'UP' ? 'thumbs-up' : 'thumbs-up-outline'}
                               size={14}
-                              color={feedbacks[msg.id] === 'UP' ? '#34d399' : '#94a3b8'}
+                              color={feedbacks[msg.id] === 'UP' ? '#10b981' : '#94a3b8'}
                             />
                           </TouchableOpacity>
                           <TouchableOpacity
@@ -551,7 +542,7 @@ export default function ListingAiAdvisorCard({
                                 feedbacks[msg.id] === 'DOWN' ? 'thumbs-down' : 'thumbs-down-outline'
                               }
                               size={14}
-                              color={feedbacks[msg.id] === 'DOWN' ? '#fb7185' : '#94a3b8'}
+                              color={feedbacks[msg.id] === 'DOWN' ? '#ef4444' : '#94a3b8'}
                             />
                           </TouchableOpacity>
                         </View>
@@ -564,7 +555,7 @@ export default function ListingAiAdvisorCard({
 
             {loading && (
               <View style={styles.loadingRow}>
-                <ActivityIndicator size="small" color="#f97316" />
+                <ActivityIndicator size="small" color="#ea580c" />
                 <Text style={styles.loadingRowText}>Danışman yanıt hazırlıyor...</Text>
               </View>
             )}
@@ -574,7 +565,7 @@ export default function ListingAiAdvisorCard({
           {isChatbotQuotaExhausted ? (
             <View style={styles.quotaExhaustedBox}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                <Ionicons name="lock-closed-outline" size={16} color="#fb7185" />
+                <Ionicons name="lock-closed-outline" size={16} color="#dc2626" />
                 <Text style={styles.quotaExhaustedText}>
                   AI Chatbot mesaj hakkınız dolmuştur. Devam etmek için paketinizi yükseltebilirsiniz.
                 </Text>
@@ -592,7 +583,7 @@ export default function ListingAiAdvisorCard({
                 value={inputMessage}
                 onChangeText={setInputMessage}
                 placeholder="Bu ilan hakkında bir soru sorun..."
-                placeholderTextColor="#64748b"
+                placeholderTextColor="#94a3b8"
                 style={styles.chatInput}
                 editable={!loading}
                 returnKeyType="send"
@@ -620,52 +611,45 @@ export default function ListingAiAdvisorCard({
 
 const styles = StyleSheet.create({
   cardContainer: {
-    backgroundColor: '#090d1a',
+    backgroundColor: '#ffffff',
     marginHorizontal: 12,
-    borderRadius: 22,
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#1e293b',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 6,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   headerSection: {
-    gap: 12,
-  },
-  headerLeftRow: {
-    flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  sparklesIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    backgroundColor: 'rgba(234, 88, 12, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(234, 88, 12, 0.35)',
+  headerCenteredBlock: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
   },
   titleBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     flexWrap: 'wrap',
     gap: 7,
   },
   cardTitle: {
-    fontSize: 15.5,
+    fontSize: 16,
     fontWeight: '900',
-    color: '#f8fafc',
+    color: '#0f172a',
     letterSpacing: -0.3,
+    textAlign: 'center',
   },
   versionPill: {
-    backgroundColor: 'rgba(234, 88, 12, 0.14)',
+    backgroundColor: '#fff7ed',
     borderWidth: 1,
-    borderColor: 'rgba(234, 88, 12, 0.32)',
+    borderColor: '#fdba74',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 999,
@@ -673,74 +657,78 @@ const styles = StyleSheet.create({
   versionPillText: {
     fontSize: 9.5,
     fontWeight: '800',
-    color: '#fb923c',
+    color: '#ea580c',
   },
   cardSubtitle: {
     fontSize: 11.5,
-    color: '#94a3b8',
-    marginTop: 3,
+    color: '#64748b',
+    marginTop: 4,
     lineHeight: 16,
+    textAlign: 'center',
   },
   quotaBadgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     flexWrap: 'wrap',
     gap: 8,
+    width: '100%',
   },
   quotaBadgeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#fff7ed',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 11,
     borderWidth: 1,
   },
   quotaBadgeReport: {
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderColor: '#fde68a',
+    backgroundColor: '#fffbeb',
   },
   quotaBadgeChat: {
-    borderColor: 'rgba(249, 115, 22, 0.35)',
+    borderColor: '#fed7aa',
+    backgroundColor: '#fff7ed',
   },
   quotaBadgeLabel: {
     fontSize: 8,
     fontWeight: '800',
-    color: '#94a3b8',
+    color: '#64748b',
     letterSpacing: 0.4,
   },
   quotaBadgeValueAmber: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#fbbf24',
+    color: '#d97706',
     marginTop: 1,
   },
   quotaBadgeValueOrange: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#fb923c',
+    color: '#ea580c',
     marginTop: 1,
   },
   collapseBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: '#e2e8f0',
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 10,
-    marginLeft: 'auto',
   },
   collapseBtnText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#e2e8f0',
+    color: '#334155',
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: '#f1f5f9',
     marginVertical: 14,
   },
   actionButtonsRow: {
@@ -759,10 +747,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 14,
     shadowColor: '#f97316',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+    elevation: 3,
   },
   reportPrimaryBtnText: {
     color: '#ffffff',
@@ -775,19 +763,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.45)',
+    backgroundColor: '#fff7ed',
+    borderWidth: 1.5,
+    borderColor: '#fb923c',
     paddingVertical: 13,
     paddingHorizontal: 10,
     borderRadius: 14,
   },
   chatbotSecondaryBtnActive: {
-    backgroundColor: 'rgba(249, 115, 22, 0.14)',
-    borderColor: '#f97316',
+    backgroundColor: '#ffedd5',
+    borderColor: '#ea580c',
   },
   chatbotSecondaryBtnText: {
-    color: '#fb923c',
+    color: '#ea580c',
     fontSize: 12,
     fontWeight: '900',
   },
@@ -796,7 +784,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.07)',
+    borderTopColor: '#f1f5f9',
     gap: 10,
   },
   chatPanelTopRow: {
@@ -812,16 +800,16 @@ const styles = StyleSheet.create({
   quickQuestionsToggleText: {
     fontSize: 10.5,
     fontWeight: '800',
-    color: '#94a3b8',
+    color: '#64748b',
     letterSpacing: 0.3,
   },
   clearChatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(244, 63, 94, 0.12)',
+    backgroundColor: '#fef2f2',
     borderWidth: 1,
-    borderColor: 'rgba(244, 63, 94, 0.3)',
+    borderColor: '#fecaca',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -829,7 +817,7 @@ const styles = StyleSheet.create({
   clearChatBtnText: {
     fontSize: 10.5,
     fontWeight: '700',
-    color: '#f87171',
+    color: '#dc2626',
   },
   quickQuestionsGrid: {
     flexDirection: 'row',
@@ -837,9 +825,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   quickQuestionChip: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#e2e8f0',
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 10,
@@ -847,15 +835,15 @@ const styles = StyleSheet.create({
   quickQuestionChipText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#cbd5e1',
+    color: '#334155',
   },
   chatStreamBox: {
     maxHeight: 320,
     minHeight: 150,
-    backgroundColor: '#050811',
+    backgroundColor: '#f8fafc',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#e2e8f0',
   },
   chatStreamContent: {
     padding: 12,
@@ -871,12 +859,12 @@ const styles = StyleSheet.create({
   emptyChatTitle: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#e2e8f0',
+    color: '#0f172a',
     textAlign: 'center',
   },
   emptyChatSub: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#64748b',
     textAlign: 'center',
     lineHeight: 16,
   },
@@ -908,9 +896,9 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 2,
   },
   messageBubbleAssistant: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#e2e8f0',
     borderBottomLeftRadius: 2,
   },
   userMessageText: {
@@ -922,31 +910,31 @@ const styles = StyleSheet.create({
   mdHeading: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#fb923c',
+    color: '#ea580c',
     marginTop: 4,
     marginBottom: 2,
   },
   mdBullet: {
-    color: '#fb923c',
+    color: '#ea580c',
     fontSize: 12,
     fontWeight: '800',
   },
   mdParagraph: {
-    color: '#e2e8f0',
+    color: '#1e293b',
     fontSize: 12,
     lineHeight: 18,
     flex: 1,
   },
   mdBold: {
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#0f172a',
   },
   feedbackRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopColor: '#f1f5f9',
     marginTop: 8,
     paddingTop: 6,
     gap: 8,
@@ -973,7 +961,7 @@ const styles = StyleSheet.create({
   loadingRowText: {
     fontSize: 11.5,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: '#64748b',
   },
   inputBarRow: {
     flexDirection: 'row',
@@ -982,13 +970,13 @@ const styles = StyleSheet.create({
   },
   chatInput: {
     flex: 1,
-    backgroundColor: '#050811',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: '#cbd5e1',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: '#ffffff',
+    color: '#0f172a',
     fontSize: 12.5,
   },
   sendBtn: {
@@ -1013,19 +1001,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    backgroundColor: 'rgba(244, 63, 94, 0.12)',
+    backgroundColor: '#fef2f2',
     borderWidth: 1,
-    borderColor: 'rgba(244, 63, 94, 0.25)',
+    borderColor: '#fecaca',
     padding: 10,
     borderRadius: 12,
   },
   quotaExhaustedText: {
     fontSize: 11,
-    color: '#fda4af',
+    color: '#991b1b',
     flex: 1,
   },
   upgradePackageBtn: {
-    backgroundColor: '#f43f5e',
+    backgroundColor: '#dc2626',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
