@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Animated,
+  Easing,
   PanResponder,
   Dimensions,
   ScrollView,
@@ -21,6 +22,235 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createEdgeSwipeDismissHandlers } from '../utils/backGesture';
 import TorkScoutLoader from '../components/TorkScoutLoader';
+
+function IntroSwipeCardAnimation() {
+  const swipeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    swipeAnim.setValue(0);
+    const loop = Animated.loop(
+      Animated.sequence([
+        // Başlangıç: Görsel 2 (Merkez)
+        Animated.delay(320),
+        // Sağa Kaydırma: Görsel 3 (Yeşil Tik)
+        Animated.timing(swipeAnim, {
+          toValue: 1,
+          duration: 480,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.delay(280),
+        // Sağdan Sola Geçerken Görsel 2 Haline Gelir (Merkez)
+        Animated.timing(swipeAnim, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(220),
+        // Sola Kaydırma: Görsel 4 (Kırmızı Çarpı)
+        Animated.timing(swipeAnim, {
+          toValue: -1,
+          duration: 480,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.delay(280),
+        // Soldan Sağa Geçerken Görsel 2 Haline Gelir (Merkez)
+        Animated.timing(swipeAnim, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [swipeAnim]);
+
+  const cardTranslateX = swipeAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: [-7, 0, 7],
+  });
+
+  const cardTranslateY = swipeAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: [-1.5, 0, -1.5],
+  });
+
+  const cardRotate = swipeAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ['-14deg', '0deg', '14deg'],
+  });
+
+  const rightGreenOpacity = swipeAnim.interpolate({
+    inputRange: [0, 0.18, 0.55, 1],
+    outputRange: [0, 0, 1, 1],
+    extrapolate: 'clamp',
+  });
+
+  const leftRedOpacity = swipeAnim.interpolate({
+    inputRange: [-1, -0.55, -0.18, 0],
+    outputRange: [1, 1, 0, 0],
+    extrapolate: 'clamp',
+  });
+
+  const leftBtnScale = swipeAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: [1.22, 1, 0.86],
+  });
+
+  const rightBtnScale = swipeAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: [0.86, 1, 1.22],
+  });
+
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      {/* Üstteki Kaydırılan Kart (Görsel 2 -> Görsel 3 -> Görsel 2 -> Görsel 4) */}
+      <Animated.View
+        style={{
+          width: 34,
+          height: 42,
+          borderRadius: 8,
+          backgroundColor: '#fef9ee',
+          borderWidth: 3.5,
+          borderColor: '#f5820b',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          transform: [
+            { translateX: cardTranslateX },
+            { translateY: cardTranslateY },
+            { rotate: cardRotate },
+          ],
+        }}
+      >
+        {/* Görsel 3: Sağa Kaydırma Yeşil Katman */}
+        <Animated.View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: '#00b83a',
+            borderWidth: 3.5,
+            borderColor: '#075e2b',
+            borderRadius: 7,
+            margin: -3.5,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: rightGreenOpacity,
+          }}
+        >
+          <View
+            style={{
+              width: 14,
+              height: 14,
+              borderRadius: 7,
+              backgroundColor: '#f8fafc',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="checkmark" size={10} color="#00b83a" />
+          </View>
+        </Animated.View>
+
+        {/* Görsel 4: Sola Kaydırma Kırmızı Katman */}
+        <Animated.View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: '#ff3b3b',
+            borderWidth: 3.5,
+            borderColor: '#c80000',
+            borderRadius: 7,
+            margin: -3.5,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: leftRedOpacity,
+          }}
+        >
+          <View
+            style={{
+              width: 13,
+              height: 13,
+              borderRadius: 3,
+              backgroundColor: '#f8fafc',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="close" size={10} color="#ff3b3b" />
+          </View>
+        </Animated.View>
+      </Animated.View>
+
+      {/* Alttaki Sol (Kırmızı Çarpı) ve Sağ (Yeşil Tik) Butonları */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          marginTop: 5,
+        }}
+      >
+        <Animated.View
+          style={{
+            width: 15,
+            height: 15,
+            borderRadius: 7.5,
+            backgroundColor: '#ff3b3b',
+            borderWidth: 1.5,
+            borderColor: '#c80000',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transform: [{ scale: leftBtnScale }],
+          }}
+        >
+          <View
+            style={{
+              width: 7.5,
+              height: 7.5,
+              borderRadius: 1.8,
+              backgroundColor: '#ffffff',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="close" size={6.5} color="#ff3b3b" />
+          </View>
+        </Animated.View>
+
+        <Animated.View
+          style={{
+            width: 15,
+            height: 15,
+            borderRadius: 7.5,
+            backgroundColor: '#00b83a',
+            borderWidth: 1.5,
+            borderColor: '#075e2b',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transform: [{ scale: rightBtnScale }],
+          }}
+        >
+          <View
+            style={{
+              width: 7.5,
+              height: 7.5,
+              borderRadius: 3.75,
+              backgroundColor: '#ffffff',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="checkmark" size={6.5} color="#00b83a" />
+          </View>
+        </Animated.View>
+      </View>
+    </View>
+  );
+}
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -933,7 +1163,7 @@ export default function AraciniBulScreen() {
       {gameState === 'intro' && (
         <View style={styles.cardBox}>
           <View style={styles.introIconCircle}>
-            <Ionicons name="car-sport" size={44} color="#ea580c" />
+            <IntroSwipeCardAnimation />
           </View>
           <Text style={styles.introTitle}>Aracini Bul</Text>
           <Text style={styles.introDesc}>
@@ -1430,9 +1660,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   introIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     backgroundColor: '#fff7ed',
     borderWidth: 1.5,
     borderColor: '#fed7aa',
