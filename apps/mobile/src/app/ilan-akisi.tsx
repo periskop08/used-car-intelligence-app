@@ -76,8 +76,9 @@ function SwipeUpHandCoachmark() {
         left: 0,
         right: 0,
         bottom: 0,
-        justifyContent: 'center',
+        justifyContent: 'flex-end',
         alignItems: 'center',
+        paddingBottom: 6,
         backgroundColor: 'transparent',
         zIndex: 999,
         elevation: 20,
@@ -91,6 +92,7 @@ function SwipeUpHandCoachmark() {
           alignItems: 'center',
           position: 'relative',
           backgroundColor: 'transparent',
+          transform: [{ scale: 0.8 }],
         }}
       >
         {/* Vertical Gradient Bar (Matches 2nd Reference Image) */}
