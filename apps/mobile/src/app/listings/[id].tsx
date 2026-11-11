@@ -41,13 +41,13 @@ const BrandLogo = ({ brandName, size = 20 }: { brandName?: string; size?: number
         style={{
           width: size,
           height: size,
-          borderRadius: 5,
+          borderRadius: Math.max(5, Math.round(size * 0.24)),
           backgroundColor: '#ffffff',
           borderWidth: 1,
           borderColor: '#e2e8f0',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 1.5,
+          padding: 2,
         }}
       >
         <ExpoImage
@@ -620,8 +620,8 @@ export default function ListingDetailScreen() {
             <Text style={styles.sellerHighlightName}>{sellerFullName}</Text>
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <BrandLogo brandName={brandName} size={18} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <BrandLogo brandName={brandName} size={36} />
             <Text style={[styles.breadcrumbText, { flex: 1 }]} numberOfLines={1}>
               {['Vasıta', 'Otomobil', brandName, modelFamilyName, engineName, trimName]
                 .filter(Boolean)
