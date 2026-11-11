@@ -271,9 +271,6 @@ const VehicleCardContent = React.memo(({ card }: { card: DiscoveryCard }) => {
             <Ionicons name="car-outline" size={54} color="#64748b" />
           </View>
         )}
-        <View style={styles.cardBadge}>
-          <Text style={styles.cardBadgeText}>{card.brand.toUpperCase()}</Text>
-        </View>
       </View>
 
       {/* Content Scroll */}
@@ -395,14 +392,17 @@ export default function AraciniBulScreen() {
     { key: 'HATCHBACK', label: 'Hatchback' },
     { key: 'SUV', label: 'SUV' },
     { key: 'COUPE', label: 'Coupe' },
-    { key: 'STATION_WAGON', label: 'Station Wagon' },
+    { key: 'WAGON', label: 'Station Wagon' },
+    { key: 'PICKUP', label: 'Pickup' },
+    { key: 'VAN', label: 'Minivan / Panelvan' },
   ];
 
   const fuelOptions = [
-    { key: 'GASOLINE', label: 'Benzin' },
+    { key: 'PETROL', label: 'Benzinli' },
     { key: 'DIESEL', label: 'Dizel' },
     { key: 'HYBRID', label: 'Hibrit' },
-    { key: 'ELECTRIC', label: 'Elektrik' },
+    { key: 'ELECTRIC', label: 'Elektrikli' },
+    { key: 'LPG', label: 'LPG' },
   ];
 
   const transmissionOptions = [

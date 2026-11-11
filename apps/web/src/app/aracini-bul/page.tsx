@@ -171,11 +171,12 @@ export default function FindMyCarPage() {
   const [exitDirection, setExitDirection] = useState<"left" | "right" | null>(null);
   const dragStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Body Styles Options (6 Basic Types)
+  // Body Styles Options (7 Canonical Types)
   const bodyStyles = [
     { key: "SEDAN", label: "Sedan" },
     { key: "HATCHBACK", label: "Hatchback" },
     { key: "SUV", label: "SUV" },
+    { key: "COUPE", label: "Coupe" },
     { key: "WAGON", label: "Station Wagon" },
     { key: "PICKUP", label: "Pickup" },
     { key: "VAN", label: "Minivan / Panelvan" }

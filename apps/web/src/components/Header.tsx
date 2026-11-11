@@ -98,7 +98,7 @@ export default function Header() {
 
   // Active status helpers
   const isSorgulamaActive = pathname === "/" || pathname === "/comparison";
-  const isKesfetActive = pathname === "/vehicle-guide" || pathname === "/aracini-bul";
+  const isKesfetActive = pathname === "/vehicle-guide" || pathname === "/aracini-bul" || pathname.startsWith("/kesfet/");
   const isIlanlarActive = pathname === "/listings" || pathname === "/listings/create" || pathname.startsWith("/listings/");
   const isPaketlerActive = pathname === "/pricing" || pathname === "/#packages";
   const isIsiCepteActive = pathname.startsWith("/isicepte-oneriyor");
@@ -147,17 +147,20 @@ export default function Header() {
             <span>Keşfet</span>
             <span className="text-[8px] opacity-70">▼</span>
           </button>
-          <div className="absolute left-0 top-full pt-3 w-52 hidden group-hover:block z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="absolute left-0 top-full pt-3 w-56 hidden group-hover:block z-50 animate-in fade-in slide-in-from-top-1 duration-150">
             <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl p-2 flex flex-col gap-1 relative">
               <div className="absolute top-0 left-6 -mt-1 w-2.5 h-2.5 bg-[#0b0f19] border-t border-l border-white/10 rotate-45" />
-              <a href="/vehicle-guide" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
-                <span>📖</span> Araç Rehberi
+              <a href="/vehicle-guide" className="px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-3">
+                <img src="/icons/arac-rehberi-icon.png" alt="Araç Rehberi" className="w-6 h-6 rounded-md object-contain shrink-0" />
+                <span>Araç Rehberi</span>
               </a>
-              <a href="/aracini-bul" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
-                <span>🧭</span> Aracını Bul
+              <a href="/aracini-bul" className="px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-3">
+                <img src="/icons/aracini-bul-icon.png" alt="Aracını Bul" className="w-6 h-6 rounded-md object-contain shrink-0" />
+                <span>Aracını Bul</span>
               </a>
-              <a href="/kesfet/ilan-akisi" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
-                <span>🎞️</span> Akış
+              <a href="/kesfet/ilan-akisi" className="px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-3">
+                <img src="/icons/akis-icon.png" alt="Akış" className="w-6 h-6 rounded-md object-contain shrink-0" />
+                <span>Akış</span>
               </a>
             </div>
           </div>
@@ -462,14 +465,17 @@ export default function Header() {
                 </button>
                 {mobileAccordion === "kesfet" && (
                   <div className="flex flex-col gap-3 pl-4 mt-2 animate-in fade-in duration-200">
-                    <a href="/vehicle-guide" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
-                      📖 Araç Rehberi
+                    <a href="/vehicle-guide" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition flex items-center gap-2.5">
+                      <img src="/icons/arac-rehberi-icon.png" alt="Araç Rehberi" className="w-5 h-5 rounded object-contain shrink-0" />
+                      <span>Araç Rehberi</span>
                     </a>
-                    <a href="/aracini-bul" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
-                      🧭 Aracını Bul
+                    <a href="/aracini-bul" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition flex items-center gap-2.5">
+                      <img src="/icons/aracini-bul-icon.png" alt="Aracını Bul" className="w-5 h-5 rounded object-contain shrink-0" />
+                      <span>Aracını Bul</span>
                     </a>
-                    <a href="/kesfet/ilan-akisi" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
-                      🎞️ Akış
+                    <a href="/kesfet/ilan-akisi" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition flex items-center gap-2.5">
+                      <img src="/icons/akis-icon.png" alt="Akış" className="w-5 h-5 rounded object-contain shrink-0" />
+                      <span>Akış</span>
                     </a>
                   </div>
                 )}

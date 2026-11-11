@@ -8,9 +8,11 @@ import {
   ScrollView,
   Image,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
 import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
@@ -175,6 +177,144 @@ export default function VehicleGuideScreen() {
   const cardQueueRef = React.useRef<GuideCard[]>([]);
   const isFetchingBufferRef = React.useRef(false);
   const scrollViewRef = React.useRef<ScrollView>(null);
+
+  // User Comments (Collapsible Accordion) State
+  const [commentsExpanded, setCommentsExpanded] = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsData, setCommentsData] = useState<{
+    comments: any[];
+    approvedCount: number;
+    ratingSummary: any;
+  }>({
+    comments: [],
+    approvedCount: 0,
+    ratingSummary: null,
+  });
+  const [showCommentForm, setShowCommentForm] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [usageMonths, setUsageMonths] = useState('12');
+  const [isOwner, setIsOwner] = useState(true);
+  const [recommends, setRecommends] = useState(true);
+  const [reliabilityRating, setReliabilityRating] = useState(5);
+  const [fuelRating, setFuelRating] = useState(4);
+  const [comfortRating, setComfortRating] = useState(5);
+  const [partsRating, setPartsRating] = useState(4);
+  const [maintenanceRating, setMaintenanceRating] = useState(4);
+  const [resaleRating, setResaleRating] = useState(4);
+  const [overallRating, setOverallRating] = useState(5);
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [commentFeedback, setCommentFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const fetchCardComments = async (guideCardId: string) => {
+    if (!guideCardId) return;
+    setCommentsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/vehicle-guide/cards/${guideCardId}/comments`);
+      if (res.ok) {
+        const data = await res.json();
+        setCommentsData({
+          comments: Array.isArray(data?.comments) ? data.comments : [],
+          approvedCount: Number(data?.approvedCount || 0),
+          ratingSummary: data?.ratingSummary || null,
+        });
+      }
+    } catch (e) {
+      console.error('Failed to load guide comments:', e);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (card?.id) {
+      setCommentsExpanded(false);
+      setShowCommentForm(false);
+      setCommentFeedback(null);
+      fetchCardComments(card.id);
+    }
+  }, [card?.id]);
+
+  const handleSubmitComment = async () => {
+    if (!card?.id) return;
+    setCommentFeedback(null);
+
+    const token = (await AsyncStorage.getItem('accessToken')) || (await AsyncStorage.getItem('token'));
+    if (!token) {
+      setCommentFeedback({ type: 'error', text: 'Yorum yazabilmek için lütfen hesabınıza giriş yapın.' });
+      return;
+    }
+
+    const trimmed = commentText.trim();
+    if (trimmed.length < 20) {
+      setCommentFeedback({ type: 'error', text: 'Yorumunuz en az 20 karakter olmalıdır.' });
+      return;
+    }
+    if (trimmed.length > 1000) {
+      setCommentFeedback({ type: 'error', text: 'Yorumunuz en fazla 1000 karakter olabilir.' });
+      return;
+    }
+
+    const parsedMonths = parseInt(usageMonths, 10);
+    if (isNaN(parsedMonths) || parsedMonths < 0) {
+      setCommentFeedback({ type: 'error', text: 'Lütfen geçerli bir kullanım süresi (ay) girin.' });
+      return;
+    }
+
+    setSubmittingComment(true);
+    try {
+      const res = await fetch(`${API_URL}/vehicle-guide/cards/${card.id}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          comment: trimmed,
+          usageMonths: parsedMonths,
+          isOwner,
+          recommends,
+          reliabilityRating,
+          fuelRating,
+          comfortRating,
+          partsRating,
+          maintenanceRating,
+          resaleRating,
+          overallRating,
+        }),
+      });
+
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(resData?.message || 'Yorum gönderilemedi.');
+      }
+
+      setCommentFeedback({
+        type: 'success',
+        text: resData?.message || 'Yorumunuz alındı ve yayınlanmadan önce incelenecektir.',
+      });
+      setCommentText('');
+      setShowCommentForm(false);
+      fetchCardComments(card.id);
+    } catch (err: any) {
+      setCommentFeedback({ type: 'error', text: err?.message || 'Yorum gönderilirken bir hata oluştu.' });
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const renderStarRatingRow = (label: string, val: number, onSelect: (v: number) => void) => (
+    <View style={styles.starRowItem} key={label}>
+      <Text style={styles.starRowLabel}>{label}</Text>
+      <View style={styles.starIconsWrap}>
+        {[1, 2, 3, 4, 5].map((s) => (
+          <TouchableOpacity key={s} onPress={() => onSelect(s)} style={styles.starTouchBtn} activeOpacity={0.7}>
+            <Ionicons name={s <= val ? 'star' : 'star-outline'} size={18} color={s <= val ? '#f59e0b' : '#cbd5e1'} />
+          </TouchableOpacity>
+        ))}
+        <Text style={styles.starValueBadge}>{val} ⭐</Text>
+      </View>
+    </View>
+  );
 
   useEffect(() => {
     initGuideCards();
@@ -411,6 +551,277 @@ export default function VehicleGuideScreen() {
                 </View>
               );
             })}
+
+            {/* Collapsible User Comments Accordion Card */}
+            <View style={styles.commentsAccordionCard}>
+              <TouchableOpacity
+                style={styles.commentsAccordionHeader}
+                activeOpacity={0.8}
+                onPress={() => setCommentsExpanded(!commentsExpanded)}
+              >
+                <View style={styles.commentsAccordionHeaderLeft}>
+                  <View style={styles.commentsIconCircle}>
+                    <Ionicons name="chatbubbles-outline" size={19} color="#ea580c" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.commentsAccordionTitle}>
+                      Kullanıcı Yorumları ({commentsData.approvedCount})
+                    </Text>
+                    <Text style={styles.commentsAccordionSub}>
+                      {card.brand} {card.model} kullanıcı deneyimleri ve puanları
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.commentsChevronBox}>
+                  <Ionicons
+                    name={commentsExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={20}
+                    color="#0f172a"
+                  />
+                </View>
+              </TouchableOpacity>
+
+              {commentsExpanded && (
+                <View style={styles.commentsBodyContainer}>
+                  {/* Write Comment Toggle Button */}
+                  <View style={styles.commentsActionRow}>
+                    <TouchableOpacity
+                      style={styles.writeCommentBtn}
+                      activeOpacity={0.85}
+                      onPress={() => setShowCommentForm(!showCommentForm)}
+                    >
+                      <Ionicons
+                        name={showCommentForm ? 'close-circle-outline' : 'create-outline'}
+                        size={16}
+                        color="#ffffff"
+                      />
+                      <Text style={styles.writeCommentBtnText}>
+                        {showCommentForm ? 'Formu Kapat' : 'Araç Hakkında Yorum Yaz'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Rating Summary Grid */}
+                  {commentsData.ratingSummary && (
+                    <View style={styles.ratingSummaryGrid}>
+                      <View style={styles.ratingSummaryBox}>
+                        <Text style={styles.ratingSummaryLabel}>GENEL PUAN</Text>
+                        <Text style={styles.ratingSummaryPrimaryVal}>
+                          {commentsData.ratingSummary.overallRating} / 5 ⭐
+                        </Text>
+                      </View>
+                      <View style={styles.ratingSummaryBox}>
+                        <Text style={styles.ratingSummaryLabel}>GÜVENİLİRLİK</Text>
+                        <Text style={styles.ratingSummaryVal}>
+                          {commentsData.ratingSummary.reliabilityRating} ⭐
+                        </Text>
+                      </View>
+                      <View style={styles.ratingSummaryBox}>
+                        <Text style={styles.ratingSummaryLabel}>YAKIT TÜKETİMİ</Text>
+                        <Text style={styles.ratingSummaryVal}>
+                          {commentsData.ratingSummary.fuelRating} ⭐
+                        </Text>
+                      </View>
+                      <View style={styles.ratingSummaryBox}>
+                        <Text style={styles.ratingSummaryLabel}>KONFOR</Text>
+                        <Text style={styles.ratingSummaryVal}>
+                          {commentsData.ratingSummary.comfortRating} ⭐
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Feedback Banner */}
+                  {commentFeedback && (
+                    <View
+                      style={[
+                        styles.feedbackBanner,
+                        commentFeedback.type === 'success'
+                          ? styles.feedbackBannerSuccess
+                          : styles.feedbackBannerError,
+                      ]}
+                    >
+                      <Ionicons
+                        name={
+                          commentFeedback.type === 'success'
+                            ? 'checkmark-circle'
+                            : 'alert-circle'
+                        }
+                        size={18}
+                        color={commentFeedback.type === 'success' ? '#15803d' : '#b91c1c'}
+                      />
+                      <Text
+                        style={[
+                          styles.feedbackBannerText,
+                          {
+                            color:
+                              commentFeedback.type === 'success' ? '#15803d' : '#b91c1c',
+                          },
+                        ]}
+                      >
+                        {commentFeedback.text}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Toggleable Comment Form */}
+                  {showCommentForm && (
+                    <View style={styles.commentFormBox}>
+                      <Text style={styles.commentFormHeading}>
+                        ✍️ {card.brand} {card.model} İçin Yorumunu Yaz
+                      </Text>
+
+                      <View style={styles.starRatingsList}>
+                        {renderStarRatingRow('Güvenilirlik', reliabilityRating, setReliabilityRating)}
+                        {renderStarRatingRow('Yakıt Tüketimi', fuelRating, setFuelRating)}
+                        {renderStarRatingRow('Konfor', comfortRating, setComfortRating)}
+                        {renderStarRatingRow('Parça Bulunabilirliği', partsRating, setPartsRating)}
+                        {renderStarRatingRow('Bakım ve Servis', maintenanceRating, setMaintenanceRating)}
+                        {renderStarRatingRow('İkinci El Satış', resaleRating, setResaleRating)}
+                        {renderStarRatingRow('Genel Memnuniyet', overallRating, setOverallRating)}
+                      </View>
+
+                      <View style={{ gap: 6 }}>
+                        <Text style={styles.formFieldLabel}>
+                          Yorumunuz (En az 20 karakter)
+                        </Text>
+                        <TextInput
+                          style={styles.commentTextInput}
+                          multiline
+                          numberOfLines={4}
+                          placeholder="Aracın konforu, yakıt tüketimi, kronik sorunları ve kullanıcı deneyimleriniz hakkında ayrıntılı bilgi yazın..."
+                          placeholderTextColor="#94a3b8"
+                          value={commentText}
+                          onChangeText={setCommentText}
+                        />
+                        <Text style={styles.charCountText}>
+                          {commentText.length} / 1000 Karakter
+                        </Text>
+                      </View>
+
+                      <View style={styles.usageAndChecksWrap}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.formFieldLabel}>Kullanım Süresi (Ay)</Text>
+                          <TextInput
+                            style={styles.usageMonthsInput}
+                            keyboardType="numeric"
+                            value={usageMonths}
+                            onChangeText={setUsageMonths}
+                            placeholder="Örn: 12"
+                            placeholderTextColor="#94a3b8"
+                          />
+                        </View>
+
+                        <View style={styles.checkPillsColumn}>
+                          <TouchableOpacity
+                            style={[styles.checkPillBtn, isOwner && styles.checkPillBtnActive]}
+                            onPress={() => setIsOwner(!isOwner)}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons
+                              name={isOwner ? 'checkbox' : 'square-outline'}
+                              size={18}
+                              color={isOwner ? '#ea580c' : '#64748b'}
+                            />
+                            <Text style={styles.checkPillText}>Araç Sahibiyim</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[styles.checkPillBtn, recommends && styles.checkPillBtnActive]}
+                            onPress={() => setRecommends(!recommends)}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons
+                              name={recommends ? 'checkbox' : 'square-outline'}
+                              size={18}
+                              color={recommends ? '#ea580c' : '#64748b'}
+                            />
+                            <Text style={styles.checkPillText}>Tavsiye Ediyorum</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      <TouchableOpacity
+                        style={[styles.submitCommentBtn, submittingComment && { opacity: 0.6 }]}
+                        onPress={handleSubmitComment}
+                        disabled={submittingComment}
+                        activeOpacity={0.85}
+                      >
+                        {submittingComment ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <>
+                            <Ionicons name="send" size={15} color="#ffffff" />
+                            <Text style={styles.submitCommentBtnText}>Yorumu Gönder</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Approved Comments List */}
+                  {commentsLoading ? (
+                    <View style={styles.commentsEmptyBox}>
+                      <ActivityIndicator size="small" color="#ea580c" />
+                      <Text style={styles.commentsEmptyText}>Yorumlar yükleniyor...</Text>
+                    </View>
+                  ) : commentsData.comments.length === 0 ? (
+                    <View style={styles.commentsEmptyBox}>
+                      <Ionicons name="chatbubble-ellipses-outline" size={26} color="#94a3b8" />
+                      <Text style={styles.commentsEmptyText}>
+                        Bu araç rehberi için henüz onaylanmış bir kullanıcı yorumu bulunmuyor. İlk yorumu sen yaz!
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={{ gap: 10 }}>
+                      {commentsData.comments.map((c: any) => (
+                        <View key={c.id} style={styles.singleCommentCard}>
+                          <View style={styles.singleCommentHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={styles.singleCommentAuthor}>{c.displayName}</Text>
+                              {c.customerNo && (
+                                <View style={styles.customerNoBadge}>
+                                  <Text style={styles.customerNoText}>{c.customerNo}</Text>
+                                </View>
+                              )}
+                            </View>
+
+                            <View style={styles.commentBadgesRow}>
+                              {c.usageMonths > 0 && (
+                                <View style={styles.usageBadge}>
+                                  <Text style={styles.usageBadgeText}>{c.usageMonths} Ay Kullanım</Text>
+                                </View>
+                              )}
+                              {c.isOwner && (
+                                <View style={styles.ownerBadge}>
+                                  <Text style={styles.ownerBadgeText}>✓ Araç Sahibi</Text>
+                                </View>
+                              )}
+                              {c.recommends && (
+                                <View style={styles.recommendBadge}>
+                                  <Text style={styles.recommendBadgeText}>👍 Tavsiye Ediyor</Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+
+                          <Text style={styles.singleCommentBody}>{c.comment}</Text>
+
+                          <View style={styles.singleCommentRatingsFooter}>
+                            <Text style={styles.singleCommentOverallScore}>
+                              Genel: {c.overallRating} ⭐
+                            </Text>
+                            <Text style={styles.singleCommentSubScore}>
+                              • Güvenilirlik: {c.reliabilityRating} • Yakıt: {c.fuelRating} • Konfor: {c.comfortRating} • Parça: {c.partsRating} • Bakım: {c.maintenanceRating} • Satış: {c.resaleRating}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
           </View>
 
           {/* Next Card Button */}
@@ -641,5 +1052,376 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '800',
+  },
+  commentsAccordionCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  commentsAccordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#ffffff',
+  },
+  commentsAccordionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  commentsIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#ffedd5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commentsAccordionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  commentsAccordionSub: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  commentsChevronBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  commentsBodyContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    padding: 16,
+    gap: 14,
+    backgroundColor: '#f8fafc',
+  },
+  commentsActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  writeCommentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ea580c',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  writeCommentBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  ratingSummaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    backgroundColor: '#ffffff',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  ratingSummaryBox: {
+    width: '47%',
+    gap: 2,
+  },
+  ratingSummaryLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+  ratingSummaryPrimaryVal: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#d97706',
+  },
+  ratingSummaryVal: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  feedbackBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  feedbackBannerSuccess: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
+  },
+  feedbackBannerError: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  feedbackBannerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
+  },
+  commentFormBox: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    gap: 12,
+  },
+  commentFormHeading: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  starRatingsList: {
+    gap: 6,
+  },
+  starRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  starRowLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  starIconsWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  starTouchBtn: {
+    padding: 2,
+  },
+  starValueBadge: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#d97706',
+    marginLeft: 4,
+    minWidth: 32,
+    textAlign: 'right',
+  },
+  formFieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  commentTextInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 13,
+    color: '#0f172a',
+    minHeight: 88,
+    textAlignVertical: 'top',
+  },
+  charCountText: {
+    fontSize: 10,
+    color: '#64748b',
+    textAlign: 'right',
+    fontWeight: '600',
+  },
+  usageAndChecksWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 12,
+  },
+  usageMonthsInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginTop: 4,
+  },
+  checkPillsColumn: {
+    gap: 6,
+  },
+  checkPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  checkPillBtnActive: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fdba74',
+  },
+  checkPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  submitCommentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#ea580c',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  submitCommentBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  commentsEmptyBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 8,
+  },
+  commentsEmptyText: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  singleCommentCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 8,
+  },
+  singleCommentHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 8,
+  },
+  singleCommentAuthor: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  customerNoBadge: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  customerNoText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  commentBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  usageBadge: {
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  usageBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#ea580c',
+  },
+  ownerBadge: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  ownerBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#15803d',
+  },
+  recommendBadge: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  recommendBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#b45309',
+  },
+  singleCommentBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#334155',
+  },
+  singleCommentRatingsFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 8,
+    gap: 2,
+  },
+  singleCommentOverallScore: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#d97706',
+  },
+  singleCommentSubScore: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748b',
+    lineHeight: 15,
   },
 });

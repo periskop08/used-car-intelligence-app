@@ -171,8 +171,28 @@ interface TechnicalSummary {
   fuelConsumption: string | null;
 }
 
+interface IsiCepteProviderPostData {
+  id: string;
+  businessName: string;
+  cityName: string;
+  districtName?: string | null;
+  profileImageUrl?: string | null;
+  postTitle: string;
+  postDescription: string;
+  postImageUrl?: string | null;
+  rating?: number | null;
+  phone?: string | null;
+  address?: string | null;
+  profileUrl?: string | null;
+  isShowcaseActive?: boolean;
+  supportedBrands?: string[];
+  serviceCategories?: string[];
+}
+
 interface ListingFeedItem {
   id: string;
+  itemType?: 'VEHICLE_LISTING' | 'ISICEPTE_PROVIDER_POST';
+  providerPost?: IsiCepteProviderPostData;
   title: string;
   price: number;
   currency: string;
@@ -211,6 +231,8 @@ export default function ListingFeedScreen() {
   const [activePhotoIndices, setActivePhotoIndices] = useState<Record<string, number>>({});
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [selectedExpertiseItem, setSelectedExpertiseItem] = useState<ListingFeedItem | null>(null);
+  const [selectedDescriptionItem, setSelectedDescriptionItem] = useState<ListingFeedItem | null>(null);
+  const [selectedProviderPost, setSelectedProviderPost] = useState<IsiCepteProviderPostData | null>(null);
 
   const [seenIds, setSeenIds] = useState<string[]>([]);
   const loadingMoreRef = useRef(false);
@@ -253,12 +275,38 @@ export default function ListingFeedScreen() {
 
       const data = await response.json();
       const rawItems = data.items || [];
-      const newItems: ListingFeedItem[] = rawItems.map((item: any) => ({
-        ...item,
-        localPaintedParts: item.localPaintedParts || [],
-        paintedParts: item.paintedParts || [],
-        changedParts: item.changedParts || [],
-      }));
+      const newItems: ListingFeedItem[] = rawItems.map((item: any) => {
+        if (item.type === 'ISICEPTE_PROVIDER_POST') {
+          const pData = item.data || item;
+          return {
+            id: item.id || pData.id || String(Math.random()),
+            itemType: 'ISICEPTE_PROVIDER_POST',
+            providerPost: pData,
+            title: pData.postTitle || pData.businessName || 'İşiCepte Usta Paylaşımı',
+            price: 0,
+            currency: 'TRY',
+            listingDate: '',
+            listingNo: '',
+            location: { city: pData.cityName || '', district: pData.districtName || '' },
+            seller: { id: '', displayName: pData.businessName || '', memberSince: '', avatarUrl: pData.profileImageUrl || null },
+            vehicle: {} as any,
+            photos: [],
+            technicalSummary: {} as any,
+            breadcrumb: [],
+            isFavorite: false,
+            detailUrl: '',
+          };
+        }
+        const vData = item.data || item;
+        return {
+          ...vData,
+          id: item.id || vData.id,
+          itemType: 'VEHICLE_LISTING',
+          localPaintedParts: vData.localPaintedParts || [],
+          paintedParts: vData.paintedParts || [],
+          changedParts: vData.changedParts || [],
+        };
+      });
 
       if (replace) {
         setListings(newItems);
@@ -393,45 +441,49 @@ export default function ListingFeedScreen() {
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     viewableItems.forEach((viewable: any) => {
       if (viewable.isViewable && viewable.item) {
-        const item = viewable.item;
+        const item: ListingFeedItem = viewable.item;
         if (!viewedLogged.current[item.id]) {
           viewedLogged.current[item.id] = true;
-          logAnalyticsEvent('listing_feed_item_viewed', {
-            listingId: item.id,
-            sellerId: item.seller.id,
-            brand: item.vehicle.brand,
-            modelFamily: item.vehicle.modelFamily,
-            year: item.vehicle.year,
-            position: viewable.index,
-          });
+          if (item.itemType !== 'ISICEPTE_PROVIDER_POST') {
+            logAnalyticsEvent('listing_feed_item_viewed', {
+              listingId: item.id,
+              sellerId: item.seller?.id,
+              brand: item.vehicle?.brand,
+              modelFamily: item.vehicle?.modelFamily,
+              year: item.vehicle?.year,
+              position: viewable.index,
+            });
+          }
 
           setSeenIds((prev) => {
             if (prev.includes(item.id)) return prev;
             return [...prev, item.id];
           });
 
-          // Live Condition Synchronizer: Guarantees 1:1 match with real vehicle listing
-          fetch(`${API_URL}/listings/${item.id}`)
-            .then((res) => (res.ok ? res.json() : null))
-            .then((detail) => {
-              if (detail) {
-                setListings((prev) =>
-                  prev.map((l) =>
-                    l.id === item.id
-                      ? {
-                          ...l,
-                          localPaintedParts: detail.localPaintedParts || [],
-                          paintedParts: detail.paintedParts || [],
-                          changedParts: detail.changedParts || [],
-                          damageRecord: detail.damageRecord || null,
-                          tramerAmount: detail.tramerAmount || 0,
-                        }
-                      : l
-                  )
-                );
-              }
-            })
-            .catch(() => {});
+          if (item.itemType !== 'ISICEPTE_PROVIDER_POST') {
+            // Live Condition Synchronizer: Guarantees 1:1 match with real vehicle listing
+            fetch(`${API_URL}/listings/${item.id}`)
+              .then((res) => (res.ok ? res.json() : null))
+              .then((detail) => {
+                if (detail) {
+                  setListings((prev) =>
+                    prev.map((l) =>
+                      l.id === item.id
+                        ? {
+                            ...l,
+                            localPaintedParts: detail.localPaintedParts || [],
+                            paintedParts: detail.paintedParts || [],
+                            changedParts: detail.changedParts || [],
+                            damageRecord: detail.damageRecord || null,
+                            tramerAmount: detail.tramerAmount || 0,
+                          }
+                        : l
+                    )
+                  );
+                }
+              })
+              .catch(() => {});
+          }
         }
 
         // Prefetch next page
@@ -444,15 +496,162 @@ export default function ListingFeedScreen() {
   }).current;
 
   const renderFeedItem = ({ item, index }: { item: ListingFeedItem; index: number }) => {
+    if (item.itemType === 'ISICEPTE_PROVIDER_POST' && item.providerPost) {
+      const post = item.providerPost;
+      return (
+        <View style={[styles.cardContainer, { height: feedHeight }]}>
+          {/* Top Header Actions */}
+          <View style={styles.topActions}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.gearCircle}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="settings-sharp" size={20} color="#ffffff" />
+            </TouchableOpacity>
+
+            <Text style={styles.feedTitle}>🔧 İŞİCEPTE USTA</Text>
+
+            <View style={styles.row}>
+              <TouchableOpacity
+                onPress={() => router.push('/isicepte' as any)}
+                style={styles.darkCircularBtn}
+              >
+                <Ionicons name="compass-outline" size={19} color="#0f172a" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.cardFrame, styles.providerCardFrame]}
+            activeOpacity={0.92}
+            onPress={() => setSelectedProviderPost(post)}
+          >
+            {/* Provider Header */}
+            <View style={styles.providerHeaderRow}>
+              <View style={styles.providerAvatarBox}>
+                {post.profileImageUrl ? (
+                  <ExpoImage
+                    source={{ uri: formatCloudflareImageUrl(post.profileImageUrl) }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Text style={styles.providerAvatarInitials}>
+                    {(post.businessName || 'İS').slice(0, 2).toUpperCase()}
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <Text style={styles.providerBusinessName} numberOfLines={1}>
+                    {post.businessName}
+                  </Text>
+                  {post.isShowcaseActive && (
+                    <View style={styles.providerShowcaseBadge}>
+                      <Text style={styles.providerShowcaseBadgeText}>ÖNE ÇIKAN</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.providerLocationText} numberOfLines={1}>
+                  📍 {post.cityName}
+                  {post.districtName ? ` • ${post.districtName}` : ''}
+                </Text>
+              </View>
+
+              <View style={styles.providerTypeBadge}>
+                <Text style={styles.providerTypeBadgeText}>İŞİCEPTE USTA</Text>
+              </View>
+            </View>
+
+            {/* Post Image */}
+            <View style={styles.providerMediaContainer}>
+              {post.postImageUrl ? (
+                <ExpoImage
+                  source={{ uri: formatCloudflareImageUrl(post.postImageUrl) }}
+                  style={styles.photoImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+              ) : (
+                <View style={styles.providerMediaPlaceholder}>
+                  <Ionicons name="construct-outline" size={44} color="#64748b" />
+                  <Text style={{ color: '#94a3b8', fontSize: 12, fontWeight: '700', marginTop: 6 }}>
+                    Servis ve Bakım Paylaşımı
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.providerMediaOverlayBottom}>
+                <View style={styles.providerMediaPill}>
+                  <Text style={styles.providerMediaPillText}>🔧 Gerçek Servis Kaydı</Text>
+                </View>
+                {post.rating ? (
+                  <View style={styles.providerMediaPill}>
+                    <Text style={[styles.providerMediaPillText, { color: '#fbbf24' }]}>
+                      ⭐ {Number(post.rating).toFixed(1)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Post Title & Description */}
+            <View style={styles.providerBodyBox}>
+              <Text style={styles.providerPostTitle} numberOfLines={2}>
+                {post.postTitle}
+              </Text>
+              <Text style={styles.providerPostDesc} numberOfLines={4}>
+                {post.postDescription}
+              </Text>
+
+              {post.serviceCategories && post.serviceCategories.length > 0 && (
+                <View style={styles.providerTagsWrap}>
+                  {post.serviceCategories.slice(0, 4).map((cat, idx) => (
+                    <View key={idx} style={styles.providerTagChip}>
+                      <Text style={styles.providerTagChipText}>{cat}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Bottom CTAs */}
+            <View style={styles.cardContentBottom}>
+              <View style={styles.ctaContainer}>
+                <TouchableOpacity
+                  onPress={() => router.push('/isicepte' as any)}
+                  style={styles.ctaBtnOutline}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="shield-checkmark-outline" size={17} color="#0f172a" style={{ marginRight: 6 }} />
+                  <Text style={styles.ctaTextOutline}>Tüm Servisler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setSelectedProviderPost(post)}
+                  style={styles.ctaBtnSolid}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="eye-outline" size={17} color="#ffffff" style={{ marginRight: 6 }} />
+                  <Text style={styles.ctaTextSolid}>Detayları İncele ➔</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
     const activeTab = activeTabs[item.id] || 'info';
     const activePhoto = activePhotoIndices[item.id] || 0;
     const isFav = favorites[item.id] || false;
 
-    const rawPhotoUrl = item.photos[activePhoto]?.url;
+    const rawPhotoUrl = item.photos?.[activePhoto]?.url;
     const resolvedPhotoUrl = resolveVehicleImageUrl(
       rawPhotoUrl,
-      item.vehicle.brand,
-      item.vehicle.modelFamily
+      item.vehicle?.brand,
+      item.vehicle?.modelFamily
     );
 
     return (
@@ -711,17 +910,21 @@ export default function ListingFeedScreen() {
             </View>
 
             {/* 6. Dedicated Açıklamalar Kartı */}
-            <View style={styles.descriptionCard}>
+            <TouchableOpacity
+              style={styles.descriptionCard}
+              activeOpacity={0.85}
+              onPress={() => setSelectedDescriptionItem(item)}
+            >
               <View style={styles.descriptionCardHeader}>
                 <Text style={styles.descriptionCardTitle}>📝 İlan Açıklaması</Text>
-                <TouchableOpacity onPress={() => router.push(`/listings/${item.id}` as any)}>
-                  <Text style={styles.descriptionDetailLink}>Tümünü Gör ➔</Text>
+                <TouchableOpacity onPress={() => setSelectedDescriptionItem(item)}>
+                  <Text style={styles.descriptionDetailLink}>Devamını Oku ➔</Text>
                 </TouchableOpacity>
               </View>
               <Text style={styles.descriptionCardBody} numberOfLines={3}>
                 {item.description ? item.description.replace(/\n+/g, ' ').trim() : 'Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir.'}
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* BOTTOM SECTION: CTA Action Buttons */}
@@ -851,6 +1054,247 @@ export default function ListingFeedScreen() {
               >
                 <Text style={styles.modalDoneText}>Kapat</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Full Listing Description Modal (Same as Web Devamını Oku Modal) */}
+      {selectedDescriptionItem && (
+        <Modal
+          visible={!!selectedDescriptionItem}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setSelectedDescriptionItem(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setSelectedDescriptionItem(null)}
+            />
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <Ionicons name="document-text" size={20} color="#ea580c" />
+                  <Text style={styles.modalTitle} numberOfLines={1}>
+                    İlan Açıklaması
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSelectedDescriptionItem(null)}
+                  style={styles.modalCloseBtn}
+                >
+                  <Ionicons name="close" size={22} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.descModalMetaRow}>
+                <Text style={styles.descModalVehicleTitle} numberOfLines={2}>
+                  {selectedDescriptionItem.title}
+                </Text>
+                {selectedDescriptionItem.listingNo ? (
+                  <Text style={styles.descModalListingNo}>
+                    İlan No: {selectedDescriptionItem.listingNo}
+                  </Text>
+                ) : null}
+              </View>
+
+              <ScrollView
+                style={{ maxHeight: windowHeight * 0.55 }}
+                contentContainerStyle={{ paddingVertical: 8 }}
+                showsVerticalScrollIndicator={true}
+              >
+                <Text style={styles.descModalBodyText}>
+                  {selectedDescriptionItem.description && selectedDescriptionItem.description.trim()
+                    ? selectedDescriptionItem.description.trim()
+                    : 'Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir.'}
+                </Text>
+              </ScrollView>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setSelectedDescriptionItem(null)}
+                  style={[styles.modalDoneBtn, { flex: 1, marginTop: 0, backgroundColor: '#f1f5f9' }]}
+                >
+                  <Text style={[styles.modalDoneText, { color: '#334155' }]}>Kapat</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    const item = selectedDescriptionItem;
+                    setSelectedDescriptionItem(null);
+                    handleGoToListing(item);
+                  }}
+                  style={[styles.modalDoneBtn, { flex: 1, marginTop: 0 }]}
+                >
+                  <Text style={styles.modalDoneText}>İlana Git ➔</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* İşiCepte Provider Post Detail Modal (Same as Web IsiCeptePostDetailModal) */}
+      {selectedProviderPost && (
+        <Modal
+          visible={!!selectedProviderPost}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setSelectedProviderPost(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setSelectedProviderPost(null)}
+            />
+            <View style={[styles.modalCard, { maxWidth: 400 }]}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                  <View style={styles.providerAvatarBox}>
+                    {selectedProviderPost.profileImageUrl ? (
+                      <ExpoImage
+                        source={{ uri: formatCloudflareImageUrl(selectedProviderPost.profileImageUrl) }}
+                        style={{ width: '100%', height: '100%' }}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <Text style={styles.providerAvatarInitials}>
+                        {(selectedProviderPost.businessName || 'İS').slice(0, 2).toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalTitle} numberOfLines={1}>
+                      {selectedProviderPost.businessName}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600' }}>
+                      📍 {selectedProviderPost.cityName}
+                      {selectedProviderPost.districtName ? ` • ${selectedProviderPost.districtName}` : ''}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSelectedProviderPost(null)}
+                  style={styles.modalCloseBtn}
+                >
+                  <Ionicons name="close" size={22} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                style={{ maxHeight: windowHeight * 0.65 }}
+                contentContainerStyle={{ paddingVertical: 12, gap: 12 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {selectedProviderPost.postImageUrl ? (
+                  <View style={styles.providerModalImageWrap}>
+                    <ExpoImage
+                      source={{ uri: formatCloudflareImageUrl(selectedProviderPost.postImageUrl) }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                    />
+                  </View>
+                ) : null}
+
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#0f172a' }}>
+                    {selectedProviderPost.postTitle}
+                  </Text>
+                  <Text style={{ fontSize: 13, lineHeight: 20, color: '#334155' }}>
+                    {selectedProviderPost.postDescription}
+                  </Text>
+                </View>
+
+                <View style={styles.providerModalInfoCard}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#64748b' }}>
+                    SERVİS & USTA BİLGİLERİ
+                  </Text>
+
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {selectedProviderPost.rating ? (
+                      <View style={styles.providerModalMetricBox}>
+                        <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>Müşteri Puanı</Text>
+                        <Text style={{ fontSize: 13, color: '#d97706', fontWeight: '900', marginTop: 2 }}>
+                          ⭐ {Number(selectedProviderPost.rating).toFixed(1)} / 5.0
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {selectedProviderPost.phone ? (
+                      <TouchableOpacity
+                        style={styles.providerModalMetricBox}
+                        onPress={() => Linking.openURL(`tel:${selectedProviderPost.phone}`)}
+                      >
+                        <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>İletişim Hattı</Text>
+                        <Text style={{ fontSize: 13, color: '#16a34a', fontWeight: '900', marginTop: 2 }}>
+                          📞 {selectedProviderPost.phone}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+
+                  {selectedProviderPost.address ? (
+                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17 }}>
+                      📍 {selectedProviderPost.address}
+                    </Text>
+                  ) : null}
+
+                  {selectedProviderPost.supportedBrands && selectedProviderPost.supportedBrands.length > 0 ? (
+                    <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b' }}>
+                        Hizmet Verilen Markalar:
+                      </Text>
+                      <View style={styles.providerTagsWrap}>
+                        {selectedProviderPost.supportedBrands.map((b, i) => (
+                          <View key={i} style={styles.providerTagChip}>
+                            <Text style={styles.providerTagChipText}>{b}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {selectedProviderPost.serviceCategories && selectedProviderPost.serviceCategories.length > 0 ? (
+                    <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b' }}>
+                        Uzmanlık & Hizmet Alanları:
+                      </Text>
+                      <View style={styles.providerTagsWrap}>
+                        {selectedProviderPost.serviceCategories.map((c, i) => (
+                          <View key={i} style={styles.providerTagChip}>
+                            <Text style={styles.providerTagChipText}>{c}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              </ScrollView>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                <TouchableOpacity
+                  onPress={() => setSelectedProviderPost(null)}
+                  style={[styles.modalDoneBtn, { flex: 1, marginTop: 0, backgroundColor: '#f1f5f9' }]}
+                >
+                  <Text style={[styles.modalDoneText, { color: '#334155' }]}>Kapat</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    const post = selectedProviderPost;
+                    setSelectedProviderPost(null);
+                    if (post.profileUrl) {
+                      Linking.openURL(post.profileUrl).catch(() => {});
+                    } else {
+                      router.push('/isicepte' as any);
+                    }
+                  }}
+                  style={[styles.modalDoneBtn, { flex: 1.4, marginTop: 0 }]}
+                >
+                  <Text style={styles.modalDoneText}>
+                    {selectedProviderPost.profileUrl ? "İşiCepte'de Profili Aç ➔" : 'Tüm Servisleri Gör ➔'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
@@ -1390,5 +1834,184 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 13,
     fontWeight: '800',
+  },
+  descModalMetaRow: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    gap: 4,
+  },
+  descModalVehicleTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  descModalListingNo: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ea580c',
+  },
+  descModalBodyText: {
+    fontSize: 13.5,
+    lineHeight: 22,
+    color: '#334155',
+    fontWeight: '400',
+  },
+  providerCardFrame: {
+    padding: 14,
+    justifyContent: 'space-between',
+  },
+  providerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  providerAvatarBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  providerAvatarInitials: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#2563eb',
+  },
+  providerBusinessName: {
+    fontSize: 14.5,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  providerShowcaseBadge: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  providerShowcaseBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#b45309',
+  },
+  providerLocationText: {
+    fontSize: 11.5,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  providerTypeBadge: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  providerTypeBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#1d4ed8',
+  },
+  providerMediaContainer: {
+    width: '100%',
+    height: Math.min(windowHeight * 0.34, 260),
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#0f172a',
+    position: 'relative',
+  },
+  providerMediaPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  providerMediaOverlayBottom: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    right: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  providerMediaPill: {
+    backgroundColor: 'rgba(15, 23, 42, 0.78)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  providerMediaPillText: {
+    color: '#f8fafc',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  providerBodyBox: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+  },
+  providerPostTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  providerPostDesc: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#475569',
+  },
+  providerTagsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  providerTagChip: {
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  providerTagChipText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  providerModalImageWrap: {
+    width: '100%',
+    height: 210,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#0f172a',
+  },
+  providerModalInfoCard: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+  },
+  providerModalMetricBox: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    padding: 10,
   },
 });
