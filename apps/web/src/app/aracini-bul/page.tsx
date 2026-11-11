@@ -141,6 +141,235 @@ const translateTransmission = (trans: string) => {
   return trans;
 };
 
+function IntroSwipeCardAnimation() {
+  return (
+    <div className="flex flex-col items-center justify-center select-none pointer-events-none">
+      <style>{`
+        @keyframes tsSwipeCardMove {
+          0%, 11.2% {
+            transform: translateX(0px) translateY(0px) rotate(0deg);
+          }
+          28%, 37.8% {
+            transform: translateX(7px) translateY(-1.5px) rotate(14deg);
+          }
+          51.7%, 59.4% {
+            transform: translateX(0px) translateY(0px) rotate(0deg);
+          }
+          76.2%, 86% {
+            transform: translateX(-7px) translateY(-1.5px) rotate(-14deg);
+          }
+          100% {
+            transform: translateX(0px) translateY(0px) rotate(0deg);
+          }
+        }
+        @keyframes tsSwipeGreenOverlay {
+          0%, 14% {
+            opacity: 0;
+          }
+          22%, 37.8% {
+            opacity: 1;
+          }
+          48%, 100% {
+            opacity: 0;
+          }
+        }
+        @keyframes tsSwipeRedOverlay {
+          0%, 62% {
+            opacity: 0;
+          }
+          70%, 86% {
+            opacity: 1;
+          }
+          96%, 100% {
+            opacity: 0;
+          }
+        }
+        @keyframes tsSwipeLeftBtnScale {
+          0%, 11.2% {
+            transform: scale(1);
+          }
+          28%, 37.8% {
+            transform: scale(0.86);
+          }
+          51.7%, 59.4% {
+            transform: scale(1);
+          }
+          76.2%, 86% {
+            transform: scale(1.22);
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+        @keyframes tsSwipeRightBtnScale {
+          0%, 11.2% {
+            transform: scale(1);
+          }
+          28%, 37.8% {
+            transform: scale(1.22);
+          }
+          51.7%, 59.4% {
+            transform: scale(1);
+          }
+          76.2%, 86% {
+            transform: scale(0.86);
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+      `}</style>
+
+      {/* Üstteki Kaydırılan Kart (Görsel 2 -> Görsel 3 -> Görsel 2 -> Görsel 4) */}
+      <div
+        style={{
+          width: 34,
+          height: 42,
+          borderRadius: 8,
+          backgroundColor: "#fef9ee",
+          border: "3.5px solid #f5820b",
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxSizing: "border-box",
+          animation: "tsSwipeCardMove 2.86s infinite ease-in-out",
+        }}
+      >
+        {/* Görsel 3: Sağa Kaydırma Yeşil Katman */}
+        <div
+          style={{
+            position: "absolute",
+            inset: -3.5,
+            backgroundColor: "#00b83a",
+            border: "3.5px solid #075e2b",
+            borderRadius: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxSizing: "border-box",
+            animation: "tsSwipeGreenOverlay 2.86s infinite ease-in-out",
+          }}
+        >
+          <div
+            style={{
+              width: 14,
+              height: 14,
+              borderRadius: 7,
+              backgroundColor: "#f8fafc",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Check style={{ width: 10, height: 10, color: "#00b83a", strokeWidth: 3.5 }} />
+          </div>
+        </div>
+
+        {/* Görsel 4: Sola Kaydırma Kırmızı Katman */}
+        <div
+          style={{
+            position: "absolute",
+            inset: -3.5,
+            backgroundColor: "#ff3b3b",
+            border: "3.5px solid #c80000",
+            borderRadius: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxSizing: "border-box",
+            animation: "tsSwipeRedOverlay 2.86s infinite ease-in-out",
+          }}
+        >
+          <div
+            style={{
+              width: 13,
+              height: 13,
+              borderRadius: 3,
+              backgroundColor: "#f8fafc",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <X style={{ width: 10, height: 10, color: "#ff3b3b", strokeWidth: 3.5 }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Alttaki Sol (Kırmızı Çarpı) ve Sağ (Yeşil Tik) Butonları */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+          marginTop: 5,
+        }}
+      >
+        <div
+          style={{
+            width: 15,
+            height: 15,
+            borderRadius: 7.5,
+            backgroundColor: "#ff3b3b",
+            border: "1.5px solid #c80000",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxSizing: "border-box",
+            animation: "tsSwipeLeftBtnScale 2.86s infinite ease-in-out",
+          }}
+        >
+          <div
+            style={{
+              width: 7.5,
+              height: 7.5,
+              borderRadius: 1.8,
+              backgroundColor: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <X style={{ width: 6.5, height: 6.5, color: "#ff3b3b", strokeWidth: 3.5 }} />
+          </div>
+        </div>
+
+        <div
+          style={{
+            width: 15,
+            height: 15,
+            borderRadius: 7.5,
+            backgroundColor: "#00b83a",
+            border: "1.5px solid #075e2b",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxSizing: "border-box",
+            animation: "tsSwipeRightBtnScale 2.86s infinite ease-in-out",
+          }}
+        >
+          <div
+            style={{
+              width: 7.5,
+              height: 7.5,
+              borderRadius: 3.75,
+              backgroundColor: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Check style={{ width: 6.5, height: 6.5, color: "#00b83a", strokeWidth: 3.5 }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FindMyCarPage() {
   const [sessionId, setSessionId] = useState<string>("");
   const [token, setToken] = useState<string | null>(null);
@@ -628,8 +857,8 @@ export default function FindMyCarPage() {
         {/* INTRO STATE */}
         {gameState === "intro" && (
           <div className="text-center max-w-md bg-slate-900/40 border border-white/5 p-8 rounded-[32px] backdrop-blur-md shadow-2xl relative">
-            <div className="bg-gradient-to-tr from-orange-500/20 to-amber-500/10 border border-orange-500/20 text-orange-400 p-5 rounded-3xl w-fit mx-auto mb-6">
-              <Car className="w-10 h-10" />
+            <div className="bg-gradient-to-tr from-orange-500/20 to-amber-500/10 border border-orange-500/20 w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <IntroSwipeCardAnimation />
             </div>
 
             <h1 className="text-3xl font-black bg-gradient-to-r from-orange-400 to-amber-200 bg-clip-text text-transparent mb-3 tracking-tight">
