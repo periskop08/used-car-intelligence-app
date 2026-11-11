@@ -1135,7 +1135,10 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
                 { label: "Hatchback", val: "HATCHBACK" },
                 { label: "SUV", val: "SUV" },
                 { label: "Coupe", val: "COUPE" },
-                { label: "Station Wagon", val: "WAGON" }
+                { label: "Cabrio", val: "CABRIO" },
+                { label: "Station Wagon", val: "WAGON" },
+                { label: "Pickup", val: "PICKUP" },
+                { label: "Minivan / Panelvan", val: "MINIVAN" }
               ].map((item) => (
                 <label key={item.val} className="flex items-center gap-2 cursor-pointer select-none">
                   <input
@@ -1524,7 +1527,65 @@ export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: {
               {loading || isUrlHydrating ? "İlanlar hazırlanıyor..." : `${total} İlan Bulundu`}
             </span>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Paylaş & Aramayı Kaydet */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+                  try {
+                    if (navigator.share) {
+                      await navigator.share({
+                        title: "TorkScout İlan Araması",
+                        text: "TorkScout üzerindeki filtrelenmiş araç ilanlarına göz atın:",
+                        url: shareUrl,
+                      });
+                    } else if (navigator.clipboard) {
+                      await navigator.clipboard.writeText(shareUrl);
+                      alert("Arama bağlantısı panoya kopyalandı!");
+                    }
+                  } catch {
+                    // User cancelled share
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-white/10 hover:border-white/20 text-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold transition"
+                title="Arama Bağlantısını Paylaş"
+              >
+                <svg className="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="18" cy="5" r="3" />
+                  <circle cx="6" cy="12" r="3" />
+                  <circle cx="18" cy="19" r="3" />
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                </svg>
+                <span>Paylaş</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+                    const savedRaw = localStorage.getItem("ts_saved_searches");
+                    const savedList: { url: string; savedAt: string }[] = savedRaw ? JSON.parse(savedRaw) : [];
+                    if (!savedList.some((s) => s.url === currentUrl)) {
+                      savedList.unshift({ url: currentUrl, savedAt: new Date().toISOString() });
+                      localStorage.setItem("ts_saved_searches", JSON.stringify(savedList.slice(0, 20)));
+                    }
+                  } catch {
+                    // Ignore storage error
+                  }
+                  alert("Arama kriterleriniz kaydedildi! Yeni uygun ilanlar eklendiğinde bildirim alacaksınız.");
+                }}
+                className="inline-flex items-center gap-1.5 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 px-3 py-1.5 rounded-xl text-xs font-bold transition"
+                title="Mevcut Arama Kriterlerini Kaydet"
+              >
+                <svg className="w-3.5 h-3.5 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+                <span>Aramayı Kaydet</span>
+              </button>
+
               {/* View Switcher: Liste | Galeri */}
               <div className="inline-flex items-center bg-slate-900 border border-white/10 rounded-xl p-0.5 shadow-inner">
                 {/* Liste */}

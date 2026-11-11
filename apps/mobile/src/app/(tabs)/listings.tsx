@@ -116,7 +116,10 @@ const BODY_TYPES = [
   { label: 'Hatchback', val: 'HATCHBACK' },
   { label: 'SUV', val: 'SUV' },
   { label: 'Coupe', val: 'COUPE' },
+  { label: 'Cabrio', val: 'CABRIO' },
   { label: 'Station Wagon', val: 'WAGON' },
+  { label: 'Pickup', val: 'PICKUP' },
+  { label: 'Minivan / Panelvan', val: 'MINIVAN' },
 ];
 
 const VEHICLE_STATUSES = [
@@ -324,7 +327,18 @@ interface VehicleModel {
   name: string;
 }
 
-type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'km_asc';
+interface VehicleEngine {
+  id: string;
+  code?: string;
+  displayName?: string;
+}
+
+interface VehicleTrim {
+  id: string;
+  name: string;
+}
+
+type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'km_asc' | 'featured';
 
 export default function ListingsScreen() {
   const router = useRouter();
@@ -334,6 +348,7 @@ export default function ListingsScreen() {
     promptCategory?: string;
     category?: string;
     sellerId?: string;
+    sellerName?: string;
     brand?: string;
   }>();
 
@@ -363,8 +378,15 @@ export default function ListingsScreen() {
   // Filter States
   const [brands, setBrands] = useState<Brand[]>([]);
   const [models, setModels] = useState<VehicleModel[]>([]);
+  const [engines, setEngines] = useState<VehicleEngine[]>([]);
+  const [trims, setTrims] = useState<VehicleTrim[]>([]);
+  const [loadingEngines, setLoadingEngines] = useState(false);
+  const [loadingTrims, setLoadingTrims] = useState(false);
+
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
   const [selectedModel, setSelectedModel] = useState<VehicleModel | null>(null);
+  const [selectedEngine, setSelectedEngine] = useState<VehicleEngine | null>(null);
+  const [selectedTrim, setSelectedTrim] = useState<VehicleTrim | null>(null);
 
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
@@ -393,6 +415,12 @@ export default function ListingsScreen() {
   const [hasWarranty, setHasWarranty] = useState(false);
   const [noHeavyDamage, setNoHeavyDamage] = useState(false);
   const [urgentOnly, setUrgentOnly] = useState(false);
+  const [showcaseOnly, setShowcaseOnly] = useState(false);
+  const [exchangeable, setExchangeable] = useState(false);
+  const [isAiReady, setIsAiReady] = useState(false);
+  const [includeDescription, setIncludeDescription] = useState(false);
+  const [sellerIdFilter, setSellerIdFilter] = useState<string>(params.sellerId || '');
+  const [sellerNameFilter, setSellerNameFilter] = useState<string>(params.sellerName || '');
 
   useEffect(() => {
     if (params.urgentOnly === 'true') {
@@ -403,6 +431,25 @@ export default function ListingsScreen() {
       setUrgentOnly(false);
     }
   }, [params.urgentOnly]);
+
+  useEffect(() => {
+    if (params.showcaseOnly === 'true') {
+      setShowcaseOnly(true);
+      enteredViaCategoryGateRef.current = false;
+      setCategoryGateVisible(false);
+    } else if (params.showcaseOnly === 'false') {
+      setShowcaseOnly(false);
+    }
+  }, [params.showcaseOnly]);
+
+  useEffect(() => {
+    if (params.sellerId) {
+      setSellerIdFilter(params.sellerId);
+      setSellerNameFilter(params.sellerName || '');
+      enteredViaCategoryGateRef.current = false;
+      setCategoryGateVisible(false);
+    }
+  }, [params.sellerId, params.sellerName]);
 
   useEffect(() => {
     if (params.promptCategory) {
@@ -434,6 +481,8 @@ export default function ListingsScreen() {
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [brandPickerVisible, setBrandPickerVisible] = useState(false);
   const [modelPickerVisible, setModelPickerVisible] = useState(false);
+  const [enginePickerVisible, setEnginePickerVisible] = useState(false);
+  const [trimPickerVisible, setTrimPickerVisible] = useState(false);
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
   const [districtPickerVisible, setDistrictPickerVisible] = useState(false);
   const [citySearchQuery, setCitySearchQuery] = useState('');
@@ -481,8 +530,32 @@ export default function ListingsScreen() {
     } else {
       setModels([]);
       setSelectedModel(null);
+      setEngines([]);
+      setSelectedEngine(null);
+      setTrims([]);
+      setSelectedTrim(null);
     }
   }, [selectedBrand, selectedCategory]);
+
+  useEffect(() => {
+    if (selectedModel) {
+      fetchEngines(selectedModel.id);
+    } else {
+      setEngines([]);
+      setSelectedEngine(null);
+      setTrims([]);
+      setSelectedTrim(null);
+    }
+  }, [selectedModel, minYear, maxYear]);
+
+  useEffect(() => {
+    if (selectedModel) {
+      fetchTrims(selectedModel.id, selectedEngine?.id);
+    } else {
+      setTrims([]);
+      setSelectedTrim(null);
+    }
+  }, [selectedModel, selectedEngine, minYear, maxYear]);
 
   useEffect(() => {
     fetchListings();
@@ -490,6 +563,8 @@ export default function ListingsScreen() {
     selectedCategory,
     selectedBrand,
     selectedModel,
+    selectedEngine,
+    selectedTrim,
     city,
     district,
     minPrice,
@@ -513,6 +588,11 @@ export default function ListingsScreen() {
     hasWarranty,
     noHeavyDamage,
     urgentOnly,
+    showcaseOnly,
+    exchangeable,
+    isAiReady,
+    includeDescription,
+    sellerIdFilter,
     sortOption,
   ]);
 
@@ -568,10 +648,55 @@ export default function ListingsScreen() {
     }
   };
 
+  const fetchEngines = async (modelId: string) => {
+    setLoadingEngines(true);
+    try {
+      let url = `${API_URL}/vehicles/engines?modelId=${modelId}`;
+      if (minYear.trim()) url += `&minYear=${encodeURIComponent(minYear.trim())}`;
+      if (maxYear.trim()) url += `&maxYear=${encodeURIComponent(maxYear.trim())}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setEngines(Array.isArray(data) ? data : []);
+      } else {
+        setEngines([]);
+      }
+    } catch (e) {
+      console.error('Error fetching engines:', e);
+      setEngines([]);
+    } finally {
+      setLoadingEngines(false);
+    }
+  };
+
+  const fetchTrims = async (modelId: string, engineId?: string) => {
+    setLoadingTrims(true);
+    try {
+      let url = `${API_URL}/vehicles/trims?modelId=${modelId}`;
+      if (engineId) url += `&engineId=${engineId}`;
+      if (minYear.trim()) url += `&minYear=${encodeURIComponent(minYear.trim())}`;
+      if (maxYear.trim()) url += `&maxYear=${encodeURIComponent(maxYear.trim())}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setTrims(Array.isArray(data) ? data : []);
+      } else {
+        setTrims([]);
+      }
+    } catch (e) {
+      console.error('Error fetching trims:', e);
+      setTrims([]);
+    } finally {
+      setLoadingTrims(false);
+    }
+  };
+
   const handleSelectCategory = (cat: ListingVehicleCategory) => {
     if (cat !== selectedCategory) {
       setSelectedBrand(null);
       setSelectedModel(null);
+      setSelectedEngine(null);
+      setSelectedTrim(null);
     }
     setSelectedCategory(cat);
     enteredViaCategoryGateRef.current = true;
@@ -587,7 +712,11 @@ export default function ListingsScreen() {
       }
       if (selectedBrand) url += `brandId=${selectedBrand.id}&`;
       if (selectedModel) url += `modelId=${selectedModel.id}&`;
+      if (selectedEngine) url += `engineId=${selectedEngine.id}&`;
+      if (selectedTrim) url += `trimId=${selectedTrim.id}&`;
+      if (sellerIdFilter.trim()) url += `sellerId=${encodeURIComponent(sellerIdFilter.trim())}&`;
       if (search.trim()) url += `keyword=${encodeURIComponent(search.trim())}&`;
+      if (includeDescription) url += `includeDescription=true&`;
       if (city.trim() && city !== 'Tümü') url += `city=${encodeURIComponent(city.trim())}&`;
       if (district.trim()) url += `district=${encodeURIComponent(district.trim())}&`;
       if (minPrice.trim()) url += `minPrice=${minPrice.trim()}&`;
@@ -603,6 +732,9 @@ export default function ListingsScreen() {
       if (maxCc.trim()) url += `maxEngineDisplacement=${maxCc.trim()}&`;
 
       if (urgentOnly) url += `urgentOnly=true&`;
+      if (showcaseOnly) url += `showcaseOnly=true&`;
+      if (exchangeable) url += `exchangeable=true&`;
+      if (isAiReady) url += `isAiReady=true&`;
       if (hasWarranty) url += `hasWarranty=true&`;
       if (noHeavyDamage) url += `heavyDamage=false&`;
 
@@ -618,6 +750,7 @@ export default function ListingsScreen() {
       if (sortOption === 'price_asc') url += `sort=price_asc&`;
       else if (sortOption === 'price_desc') url += `sort=price_desc&`;
       else if (sortOption === 'km_asc') url += `sort=km_asc&`;
+      else if (sortOption === 'featured') url += `sort=featured&`;
       else url += `sort=newest&`;
 
       const res = await fetch(url);
@@ -676,6 +809,8 @@ export default function ListingsScreen() {
     setSelectedCategory('ALL');
     setSelectedBrand(null);
     setSelectedModel(null);
+    setSelectedEngine(null);
+    setSelectedTrim(null);
     setCity('');
     setDistrict('');
     setMinPrice('');
@@ -699,6 +834,12 @@ export default function ListingsScreen() {
     setHasWarranty(false);
     setNoHeavyDamage(false);
     setUrgentOnly(false);
+    setShowcaseOnly(false);
+    setExchangeable(false);
+    setIsAiReady(false);
+    setIncludeDescription(false);
+    setSellerIdFilter('');
+    setSellerNameFilter('');
     setSearch('');
   };
 
@@ -707,6 +848,9 @@ export default function ListingsScreen() {
     if (selectedCategory && selectedCategory !== 'ALL') count++;
     if (selectedBrand) count++;
     if (selectedModel) count++;
+    if (selectedEngine) count++;
+    if (selectedTrim) count++;
+    if (sellerIdFilter) count++;
     if (city && city !== 'Tümü') count++;
     if (district) count++;
     if (minPrice || maxPrice) count++;
@@ -725,6 +869,10 @@ export default function ListingsScreen() {
     if (hasWarranty) count++;
     if (noHeavyDamage) count++;
     if (urgentOnly) count++;
+    if (showcaseOnly) count++;
+    if (exchangeable) count++;
+    if (isAiReady) count++;
+    if (includeDescription) count++;
     return count;
   };
 
@@ -812,6 +960,7 @@ export default function ListingsScreen() {
     const year = item.year || item.vehicleVariant?.year || '';
     const priceVal = item.priceAmount ?? item.price ?? 0;
     const kmVal = item.kilometers ?? item.mileage ?? 0;
+    const isFav = favoriteIds.has(item.id);
 
     const firstImage =
       item.media?.[0]?.url ||
@@ -834,11 +983,34 @@ export default function ListingsScreen() {
             contentFit="cover"
             cachePolicy="memory-disk"
           />
-          {item.isUrgent && (
-            <View style={styles.shUrgentPillWrap}>
-              <UrgentBadge size="small" />
+          {(item.isUrgent || item.isShowcaseFeedActive) && (
+            <View style={[styles.shUrgentPillWrap, { flexDirection: 'row', gap: 3 }]}>
+              {item.isUrgent && <UrgentBadge size="small" />}
+              {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
             </View>
           )}
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              backgroundColor: 'rgba(15, 23, 42, 0.72)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 5,
+            }}
+            onPress={() => toggleFavorite(item.id)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons
+              name={isFav ? 'heart' : 'heart-outline'}
+              size={14}
+              color={isFav ? '#ef4444' : '#ffffff'}
+            />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.shInfoContainer}>
@@ -1286,9 +1458,47 @@ export default function ListingsScreen() {
             {selectedModel && (
               <TouchableOpacity
                 style={styles.filterTagPill}
-                onPress={() => setSelectedModel(null)}
+                onPress={() => {
+                  setSelectedModel(null);
+                  setSelectedEngine(null);
+                  setSelectedTrim(null);
+                }}
               >
                 <Text style={styles.filterTagPillText}>{selectedModel.name}</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {selectedEngine && (
+              <TouchableOpacity
+                style={styles.filterTagPill}
+                onPress={() => {
+                  setSelectedEngine(null);
+                  setSelectedTrim(null);
+                }}
+              >
+                <Text style={styles.filterTagPillText}>{selectedEngine.displayName || selectedEngine.code}</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {selectedTrim && (
+              <TouchableOpacity
+                style={styles.filterTagPill}
+                onPress={() => setSelectedTrim(null)}
+              >
+                <Text style={styles.filterTagPillText}>{selectedTrim.name}</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {!!sellerIdFilter && (
+              <TouchableOpacity
+                style={styles.filterTagPill}
+                onPress={() => {
+                  setSellerIdFilter('');
+                  setSellerNameFilter('');
+                }}
+              >
+                <Ionicons name="person-outline" size={12} color="#ea580c" />
+                <Text style={styles.filterTagPillText}>{sellerNameFilter || 'Seçili Satıcı'}</Text>
                 <Ionicons name="close" size={12} color="#ea580c" />
               </TouchableOpacity>
             )}
@@ -1353,6 +1563,24 @@ export default function ListingsScreen() {
             {urgentOnly && (
               <TouchableOpacity style={styles.filterTagPill} onPress={() => setUrgentOnly(false)}>
                 <Text style={styles.filterTagPillText}>Acil İlanlar</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {showcaseOnly && (
+              <TouchableOpacity style={styles.filterTagPill} onPress={() => setShowcaseOnly(false)}>
+                <Text style={styles.filterTagPillText}>Vitrin İlanlar</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {exchangeable && (
+              <TouchableOpacity style={styles.filterTagPill} onPress={() => setExchangeable(false)}>
+                <Text style={styles.filterTagPillText}>Takaslı</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {isAiReady && (
+              <TouchableOpacity style={styles.filterTagPill} onPress={() => setIsAiReady(false)}>
+                <Text style={styles.filterTagPillText}>AI Analizli</Text>
                 <Ionicons name="close" size={12} color="#ea580c" />
               </TouchableOpacity>
             )}
@@ -1574,6 +1802,38 @@ export default function ListingsScreen() {
                   ]}
                 >
                   {selectedModel ? selectedModel.name : 'Model Seçin'}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.dropdownSelector, !selectedModel && { opacity: 0.5 }]}
+                disabled={!selectedModel}
+                onPress={() => setEnginePickerVisible(true)}
+              >
+                <Text
+                  style={[
+                    styles.dropdownSelectorText,
+                    !!selectedEngine && styles.dropdownSelectedText,
+                  ]}
+                >
+                  {selectedEngine ? selectedEngine.name : 'Motor / Versiyon Seçin'}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.dropdownSelector, !selectedModel && { opacity: 0.5 }]}
+                disabled={!selectedModel}
+                onPress={() => setTrimPickerVisible(true)}
+              >
+                <Text
+                  style={[
+                    styles.dropdownSelectorText,
+                    !!selectedTrim && styles.dropdownSelectedText,
+                  ]}
+                >
+                  {selectedTrim ? selectedTrim.name : 'Donanım Paketi Seçin'}
                 </Text>
                 <Ionicons name="chevron-down" size={16} color="#94a3b8" />
               </TouchableOpacity>
@@ -1995,37 +2255,175 @@ export default function ListingsScreen() {
               </View>
             </View>
 
-            {/* 17. ACİL SATIŞ TOGGLE */}
-            <TouchableOpacity
-              style={[styles.urgentToggleRow, urgentOnly && styles.urgentToggleRowActive]}
-              onPress={() => setUrgentOnly(!urgentOnly)}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons
-                  name="flame"
-                  size={20}
-                  color={urgentOnly ? '#ef4444' : '#64748b'}
-                />
-                <View>
-                  <Text
-                    style={[
-                      styles.urgentToggleTitle,
-                      urgentOnly && { color: '#ef4444' },
-                    ]}
-                  >
-                    Sadece Acil İlanları Göster
-                  </Text>
-                  <Text style={styles.urgentToggleSub}>
-                    Fiyatı düşen acil satışlı araçlar
-                  </Text>
+            {/* 17. ÖZEL İLAN FİLTRELERİ (ACİL, VİTRİN, TAKASLI, AI ANALİZLİ, AÇIKLAMA) */}
+            <View style={{ gap: 10 }}>
+              <TouchableOpacity
+                style={[styles.urgentToggleRow, urgentOnly && styles.urgentToggleRowActive]}
+                onPress={() => setUrgentOnly(!urgentOnly)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons
+                    name="flame"
+                    size={20}
+                    color={urgentOnly ? '#ef4444' : '#64748b'}
+                  />
+                  <View>
+                    <Text
+                      style={[
+                        styles.urgentToggleTitle,
+                        urgentOnly && { color: '#ef4444' },
+                      ]}
+                    >
+                      Sadece Acil İlanları Göster
+                    </Text>
+                    <Text style={styles.urgentToggleSub}>
+                      Fiyatı düşen acil satışlı araçlar
+                    </Text>
+                  </View>
                 </View>
-              </View>
-              <Ionicons
-                name={urgentOnly ? 'checkbox' : 'square-outline'}
-                size={22}
-                color={urgentOnly ? '#ef4444' : '#94a3b8'}
-              />
-            </TouchableOpacity>
+                <Ionicons
+                  name={urgentOnly ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={urgentOnly ? '#ef4444' : '#94a3b8'}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.urgentToggleRow,
+                  showcaseOnly && { backgroundColor: '#fffbeb', borderColor: '#fde68a' },
+                ]}
+                onPress={() => setShowcaseOnly(!showcaseOnly)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons
+                    name="star"
+                    size={20}
+                    color={showcaseOnly ? '#d97706' : '#64748b'}
+                  />
+                  <View>
+                    <Text
+                      style={[
+                        styles.urgentToggleTitle,
+                        showcaseOnly && { color: '#b45309' },
+                      ]}
+                    >
+                      ⭐ Yalnızca Vitrin İlanları
+                    </Text>
+                    <Text style={styles.urgentToggleSub}>
+                      Öne çıkarılmış vitrin araçlarını listele
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name={showcaseOnly ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={showcaseOnly ? '#d97706' : '#94a3b8'}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.urgentToggleRow,
+                  exchangeable && { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
+                ]}
+                onPress={() => setExchangeable(!exchangeable)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons
+                    name="swap-horizontal"
+                    size={20}
+                    color={exchangeable ? '#2563eb' : '#64748b'}
+                  />
+                  <View>
+                    <Text
+                      style={[
+                        styles.urgentToggleTitle,
+                        exchangeable && { color: '#1d4ed8' },
+                      ]}
+                    >
+                      🔄 Takaslı İlanlar
+                    </Text>
+                    <Text style={styles.urgentToggleSub}>
+                      Takasa uygun araç ilanlarını göster
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name={exchangeable ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={exchangeable ? '#2563eb' : '#94a3b8'}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.urgentToggleRow,
+                  isAiReady && { backgroundColor: '#fff7ed', borderColor: '#fed7aa' },
+                ]}
+                onPress={() => setIsAiReady(!isAiReady)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons
+                    name="sparkles"
+                    size={20}
+                    color={isAiReady ? '#ea580c' : '#64748b'}
+                  />
+                  <View>
+                    <Text
+                      style={[
+                        styles.urgentToggleTitle,
+                        isAiReady && { color: '#c2410c' },
+                      ]}
+                    >
+                      ✨ Yalnızca AI Analizli
+                    </Text>
+                    <Text style={styles.urgentToggleSub}>
+                      TorkScout AI Risk Analizi hazır olan araçlar
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name={isAiReady ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={isAiReady ? '#ea580c' : '#94a3b8'}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.urgentToggleRow,
+                  includeDescription && { backgroundColor: '#f8fafc', borderColor: '#cbd5e1' },
+                ]}
+                onPress={() => setIncludeDescription(!includeDescription)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons
+                    name="document-text-outline"
+                    size={20}
+                    color={includeDescription ? '#0f172a' : '#64748b'}
+                  />
+                  <View>
+                    <Text
+                      style={[
+                        styles.urgentToggleTitle,
+                        includeDescription && { color: '#0f172a' },
+                      ]}
+                    >
+                      Açıklamaları Dahil Et
+                    </Text>
+                    <Text style={styles.urgentToggleSub}>
+                      Kelime aramasında ilan açıklamalarını da tara
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name={includeDescription ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={includeDescription ? '#ea580c' : '#94a3b8'}
+                />
+              </TouchableOpacity>
+            </View>
           </ScrollView>
 
           {/* Sticky Bottom Apply Button */}
@@ -2250,6 +2648,166 @@ export default function ListingsScreen() {
                       </TouchableOpacity>
                     );
                   })}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+
+          {/* ========================================================================= */}
+          {/* IN-MODAL ENGINE / VERSION SELECTION OVERLAY */}
+          {/* ========================================================================= */}
+          {enginePickerVisible && (
+            <View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}>
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={() => setEnginePickerVisible(false)}
+              />
+              <View style={[styles.pickerSheet, { height: '65%', maxHeight: '80%' }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle} numberOfLines={1}>
+                    {selectedModel ? `${selectedModel.name} Motor / Versiyon` : 'Motor / Versiyon Seçin'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.modalCloseCircle}
+                    onPress={() => setEnginePickerVisible(false)}
+                  >
+                    <Ionicons name="close" size={18} color="#64748b" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ padding: 14, gap: 8 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <TouchableOpacity
+                    style={[styles.pickerItem, !selectedEngine && styles.pickerItemSelected]}
+                    onPress={() => {
+                      setSelectedEngine(null);
+                      setEnginePickerVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerItemText,
+                        !selectedEngine && styles.pickerItemTextSelected,
+                      ]}
+                    >
+                      Tüm Motor / Versiyonlar
+                    </Text>
+                    {!selectedEngine && (
+                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                    )}
+                  </TouchableOpacity>
+                  {engines.map((eng) => {
+                    const isSelected = selectedEngine?.id === eng.id;
+                    return (
+                      <TouchableOpacity
+                        key={eng.id}
+                        style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                        onPress={() => {
+                          setSelectedEngine(eng);
+                          setEnginePickerVisible(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.pickerItemText,
+                            isSelected && styles.pickerItemTextSelected,
+                          ]}
+                        >
+                          {eng.name}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {engines.length === 0 && (
+                    <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#94a3b8' }}>Bu model için kayıtlı motor/versiyon bulunamadı.</Text>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+
+          {/* ========================================================================= */}
+          {/* IN-MODAL TRIM / PACKAGE SELECTION OVERLAY */}
+          {/* ========================================================================= */}
+          {trimPickerVisible && (
+            <View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}>
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={() => setTrimPickerVisible(false)}
+              />
+              <View style={[styles.pickerSheet, { height: '65%', maxHeight: '80%' }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle} numberOfLines={1}>
+                    {selectedModel ? `${selectedModel.name} Donanım Paketi` : 'Donanım Paketi Seçin'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.modalCloseCircle}
+                    onPress={() => setTrimPickerVisible(false)}
+                  >
+                    <Ionicons name="close" size={18} color="#64748b" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ padding: 14, gap: 8 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <TouchableOpacity
+                    style={[styles.pickerItem, !selectedTrim && styles.pickerItemSelected]}
+                    onPress={() => {
+                      setSelectedTrim(null);
+                      setTrimPickerVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerItemText,
+                        !selectedTrim && styles.pickerItemTextSelected,
+                      ]}
+                    >
+                      Tüm Donanım Paketleri
+                    </Text>
+                    {!selectedTrim && (
+                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                    )}
+                  </TouchableOpacity>
+                  {trims.map((tr) => {
+                    const isSelected = selectedTrim?.id === tr.id;
+                    return (
+                      <TouchableOpacity
+                        key={tr.id}
+                        style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                        onPress={() => {
+                          setSelectedTrim(tr);
+                          setTrimPickerVisible(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.pickerItemText,
+                            isSelected && styles.pickerItemTextSelected,
+                          ]}
+                        >
+                          {tr.name}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {trims.length === 0 && (
+                    <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#94a3b8' }}>Bu model için kayıtlı donanım paketi bulunamadı.</Text>
+                    </View>
+                  )}
                 </ScrollView>
               </View>
             </View>
@@ -2506,6 +3064,7 @@ export default function ListingsScreen() {
             <View style={{ padding: 14, gap: 8 }}>
               {[
                 { key: 'newest', label: 'Tarihe Göre (Önce en yeni)' },
+                { key: 'featured', label: 'Öne Çıkanlar (Vitrin & Acil)' },
                 { key: 'price_asc', label: 'Fiyata Göre (Önce en düşük)' },
                 { key: 'price_desc', label: 'Fiyata Göre (Önce en yüksek)' },
                 { key: 'km_asc', label: 'Kilometreye Göre (Önce en düşük)' },

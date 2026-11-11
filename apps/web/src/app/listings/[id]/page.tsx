@@ -38,6 +38,33 @@ export default function ListingDetail() {
   // Description Full View Modal State
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
 
+  // Fullscreen Lightbox Gallery State
+  const [showLightbox, setShowLightbox] = useState(false);
+
+  const mediaList: { id?: string; url: string }[] = useMemo(() => {
+    if (listing?.media && Array.isArray(listing.media) && listing.media.length > 0) {
+      return listing.media;
+    }
+    return [{ id: "default", url: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800&auto=format&fit=crop&q=80" }];
+  }, [listing?.media]);
+
+  const activePhotoIndex = useMemo(() => {
+    const idx = mediaList.findIndex((m) => m.url === activePhoto);
+    return idx >= 0 ? idx : 0;
+  }, [mediaList, activePhoto]);
+
+  const handlePrevPhoto = () => {
+    if (mediaList.length <= 1) return;
+    const prevIdx = (activePhotoIndex - 1 + mediaList.length) % mediaList.length;
+    setActivePhoto(mediaList[prevIdx].url);
+  };
+
+  const handleNextPhoto = () => {
+    if (mediaList.length <= 1) return;
+    const nextIdx = (activePhotoIndex + 1) % mediaList.length;
+    setActivePhoto(mediaList[nextIdx].url);
+  };
+
   // Determine if description exceeds 5 lines or length threshold
   const hasMoreDescription = useMemo(() => {
     if (!listing?.description) return false;
@@ -50,17 +77,22 @@ export default function ListingDetail() {
 
   const [token, setToken] = useState("");
 
-  // Close modals on Escape key
+  // Close modals on Escape key & navigate Lightbox with Arrow keys
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setShowDescriptionModal(false);
         setShowMessageModal(false);
+        setShowLightbox(false);
+      } else if (showLightbox && e.key === "ArrowLeft") {
+        handlePrevPhoto();
+      } else if (showLightbox && e.key === "ArrowRight") {
+        handleNextPhoto();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [showLightbox, activePhotoIndex, mediaList]);
 
   useEffect(() => {
     if (!id) return;
@@ -281,10 +313,16 @@ export default function ListingDetail() {
           <div className="lg:col-span-6 flex flex-col gap-4">
             {/* Photo Gallery Grid */}
             <div className="flex flex-col gap-2">
-              <div className="relative aspect-[16/10] max-h-[290px] w-full rounded-xl overflow-hidden bg-slate-950 border border-white/10 shadow-xl">
+              <div
+                onClick={() => setShowLightbox(true)}
+                className="relative aspect-[16/10] max-h-[290px] w-full rounded-xl overflow-hidden bg-slate-950 border border-white/10 shadow-xl cursor-zoom-in group"
+              >
               {/* Favorite Toggle Button */}
               <button
-                onClick={handleToggleFavorite}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleFavorite();
+                }}
                 className={`absolute top-2.5 right-2.5 z-10 px-2.5 py-1 rounded-full border flex items-center gap-1.5 transition shadow-lg backdrop-blur-sm cursor-pointer select-none hover:scale-105 text-xs font-bold ${
                   listing.isFavorited
                     ? "bg-red-500/20 text-red-400 border-red-500/40"
@@ -301,7 +339,7 @@ export default function ListingDetail() {
               <img
                 src={formatImageUrl(activePhoto) || defaultImage}
                 alt={listing.title}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                 onError={(e) => {
                   (e.target as HTMLElement).style.opacity = '0.5';
                 }}
@@ -311,6 +349,12 @@ export default function ListingDetail() {
                   ✨ AI Analizli İlan
                 </span>
               )}
+
+              {/* Tam Ekran / Lightbox Rozeti */}
+              <div className="absolute bottom-2.5 right-2.5 z-10 bg-slate-950/80 border border-white/15 text-slate-200 px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5 backdrop-blur-sm group-hover:bg-orange-600 group-hover:border-orange-500 group-hover:text-white transition">
+                <Maximize2 className="w-3 h-3" />
+                <span>Tam Ekran ({activePhotoIndex + 1}/{mediaList.length})</span>
+              </div>
             </div>
 
             {/* Thumbnails list */}
@@ -1096,6 +1140,98 @@ export default function ListingDetail() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Fullscreen Photo Lightbox Modal */}
+      {showLightbox && (
+        <div
+          onClick={() => setShowLightbox(false)}
+          className="fixed inset-0 z-[70] bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 select-none animate-fade-in"
+        >
+          {/* Top Bar */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center justify-between w-full max-w-6xl mx-auto z-10"
+          >
+            <div className="flex items-center gap-3">
+              <span className="bg-white/10 border border-white/15 text-white text-xs font-extrabold px-3.5 py-1.5 rounded-full">
+                {activePhotoIndex + 1} / {mediaList.length}
+              </span>
+              <span className="text-slate-300 text-xs sm:text-sm font-bold truncate max-w-[240px] sm:max-w-md">
+                {listing.title}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowLightbox(false)}
+              className="bg-white/10 hover:bg-white/20 border border-white/15 text-white px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+              <span>Kapat</span>
+            </button>
+          </div>
+
+          {/* Center Image & Prev/Next Controls */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative flex-1 flex items-center justify-center w-full max-w-6xl mx-auto my-4 overflow-hidden"
+          >
+            {mediaList.length > 1 && (
+              <button
+                type="button"
+                onClick={handlePrevPhoto}
+                className="absolute left-2 sm:left-4 z-20 w-11 h-11 rounded-full bg-black/70 hover:bg-orange-600 border border-white/20 text-white flex items-center justify-center transition cursor-pointer shadow-xl"
+                aria-label="Önceki Fotoğraf"
+              >
+                <span className="text-xl font-black">‹</span>
+              </button>
+            )}
+
+            <img
+              src={formatImageUrl(mediaList[activePhotoIndex]?.url || activePhoto) || defaultImage}
+              alt={`${listing.title} - Fotoğraf ${activePhotoIndex + 1}`}
+              className="max-h-[72vh] max-w-full object-contain rounded-xl shadow-2xl"
+            />
+
+            {mediaList.length > 1 && (
+              <button
+                type="button"
+                onClick={handleNextPhoto}
+                className="absolute right-2 sm:right-4 z-20 w-11 h-11 rounded-full bg-black/70 hover:bg-orange-600 border border-white/20 text-white flex items-center justify-center transition cursor-pointer shadow-xl"
+                aria-label="Sonraki Fotoğraf"
+              >
+                <span className="text-xl font-black">›</span>
+              </button>
+            )}
+          </div>
+
+          {/* Bottom Thumbnail Strip */}
+          {mediaList.length > 1 && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center justify-center gap-2 overflow-x-auto py-2 max-w-4xl mx-auto w-full scrollbar-none"
+            >
+              {mediaList.map((img, idx) => (
+                <button
+                  key={img.id || idx}
+                  type="button"
+                  onClick={() => setActivePhoto(img.url)}
+                  className={`relative w-16 h-12 sm:w-20 sm:h-14 rounded-lg overflow-hidden shrink-0 border-2 transition cursor-pointer ${
+                    idx === activePhotoIndex
+                      ? "border-orange-500 scale-105 shadow-lg shadow-orange-500/30"
+                      : "border-white/15 opacity-50 hover:opacity-90"
+                  }`}
+                >
+                  <img
+                    src={formatImageUrl(img.url)}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

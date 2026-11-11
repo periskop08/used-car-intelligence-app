@@ -402,9 +402,39 @@ export default function CreateListingScreen() {
   >(null);
   const [pickerSearch, setPickerSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [quota, setQuota] = useState<{
+    tier: string;
+    activeCount: number;
+    limit: number;
+    remaining: number;
+  } | null>(null);
+
+  const fetchListingQuota = async () => {
+    try {
+      const token =
+        (await AsyncStorage.getItem('accessToken')) || (await AsyncStorage.getItem('token'));
+      if (!token) return;
+      const res = await fetch(`${API_URL}/me/listing-quota`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setQuota(data);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    fetchListingQuota();
+  }, []);
 
   const goToStep = (nextStep: number) => {
     setStep(nextStep);
+    if (nextStep === 6) {
+      fetchListingQuota();
+    }
     setTimeout(() => {
       mainScrollRef.current?.scrollTo({ y: 0, animated: true });
     }, 60);
@@ -2643,6 +2673,62 @@ export default function CreateListingScreen() {
           {/* =================================================================== */}
           {step === 6 && (
             <View style={{ gap: 16 }}>
+              {/* QUOTA INFO CARD */}
+              {quota && (
+                <View
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    borderWidth: 1,
+                    borderColor: '#e2e8f0',
+                    borderRadius: 16,
+                    padding: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>
+                      Mevcut Paketiniz:{' '}
+                      <Text style={{ color: '#ea580c', fontWeight: '900' }}>
+                        {quota.tier === 'UNLIMITED_DEALER'
+                          ? 'Sınırsız Kurumsal (Galeri)'
+                          : quota.tier === 'DEALER'
+                          ? 'Kurumsal (Galeri)'
+                          : quota.tier === 'PRO'
+                          ? 'Bireysel Pro'
+                          : quota.tier === 'BASIC'
+                          ? 'Bireysel Başlangıç'
+                          : 'Ücretsiz Bireysel'}
+                      </Text>
+                    </Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginTop: 4 }}>
+                      Aktif İlan Kullanımınız:{' '}
+                      <Text style={{ color: '#0f172a', fontWeight: '900' }}>
+                        {quota.activeCount} / {quota.limit >= 999999 ? 'Sınırsız' : quota.limit}
+                      </Text>
+                    </Text>
+                  </View>
+
+                  {quota.remaining <= 0 && quota.limit < 999999 && (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: '#ea580c',
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 10,
+                      }}
+                      onPress={() => router.push('/(tabs)/packages' as any)}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#ffffff' }}>
+                        Paket Yükselt
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
               {/* FINAL SUMMARY CARD WITH BRAND LOGO */}
               <View style={styles.summaryReviewCard}>
                 <View style={styles.summaryReviewHeader}>

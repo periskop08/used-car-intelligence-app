@@ -162,6 +162,10 @@ export default function ListingDetailScreen() {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<ActiveTabType>('SPECS');
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isSellerFavorited, setIsSellerFavorited] = useState(false);
+  const [togglingSellerFav, setTogglingSellerFav] = useState(false);
+  const [similarListings, setSimilarListings] = useState<any[]>([]);
+  const [similarExpanded, setSimilarExpanded] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
@@ -175,6 +179,7 @@ export default function ListingDetailScreen() {
     }
     if (id) {
       fetchListingDetail();
+      fetchSimilarListings();
       loadUser();
       checkFavoriteStatus();
     }
@@ -231,10 +236,15 @@ export default function ListingDetailScreen() {
   const fetchListingDetail = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/listings/${id}`);
+      const token = await AsyncStorage.getItem('accessToken');
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const res = await fetch(`${API_URL}/listings/${id}`, { headers });
       if (res.ok) {
         const data = await res.json();
         setListing(data);
+        setIsSellerFavorited(!!data.isSellerFavorited);
       } else {
         Alert.alert('Hata', 'İlan detayları yüklenemedi.');
       }
@@ -243,6 +253,51 @@ export default function ListingDetailScreen() {
       Alert.alert('Bağlantı Hatası', 'İlan verileri çekilemedi.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSimilarListings = async () => {
+    try {
+      const res = await fetch(`${API_URL}/listings/${id}/similar`);
+      if (res.ok) {
+        const data = await res.json();
+        setSimilarListings(Array.isArray(data?.items) ? data.items : []);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleToggleFavoriteSeller = async () => {
+    const token = await AsyncStorage.getItem('accessToken');
+    if (!token) {
+      Alert.alert('Giriş Gerekli', 'Satıcıyı favorilerinize eklemek için lütfen giriş yapın.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Giriş Yap', onPress: () => router.push('/login' as any) },
+      ]);
+      return;
+    }
+    const sellerId = listing?.sellerId || listing?.seller?.id;
+    if (!sellerId || togglingSellerFav) return;
+
+    setTogglingSellerFav(true);
+    try {
+      const res = await fetch(`${API_URL}/favorites/sellers/toggle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ sellerId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsSellerFavorited(!!data.favorited);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTogglingSellerFav(false);
     }
   };
 
@@ -341,12 +396,31 @@ export default function ListingDetailScreen() {
   };
 
   const handleCallSeller = () => {
-    const phone = listing?.seller?.phone;
-    if (!phone) {
+    const phones = [
+      listing?.seller?.phone ? { label: '1. Telefon', num: listing.seller.phone } : null,
+      listing?.seller?.phone2 ? { label: '2. Telefon', num: listing.seller.phone2 } : null,
+      listing?.seller?.phone3 ? { label: '3. Telefon', num: listing.seller.phone3 } : null,
+    ].filter(Boolean) as { label: string; num: string }[];
+
+    if (phones.length === 0) {
       Alert.alert('Bilgi', 'Satıcı telefon numarası belirtmemiş. Lütfen mesaj ile iletişime geçin.');
       return;
     }
-    Linking.openURL(`tel:${phone}`);
+    if (phones.length === 1) {
+      Linking.openURL(`tel:${phones[0].num}`);
+      return;
+    }
+    Alert.alert(
+      'Satıcıyı Ara',
+      'Aramak istediğiniz telefon numarasını seçin:',
+      [
+        ...phones.map((p) => ({
+          text: `${p.label}: ${p.num}`,
+          onPress: () => Linking.openURL(`tel:${p.num}`),
+        })),
+        { text: 'Vazgeç', style: 'cancel' as const },
+      ]
+    );
   };
 
   const touchStartY = useRef<number>(0);
@@ -789,6 +863,142 @@ export default function ListingDetailScreen() {
               title={`${brandName || 'Bu Araç'} İçin İşi Cepte Öneriyor`}
               subtitle={`${brandName || 'Bu araç'} için ${listing.city ? `${listing.city} ve çevresindeki` : 'bölgenizdeki'} onaylı özel/yetkili servisler ve ustalar`}
             />
+
+            {/* İLANI BİLDİR BUTONU */}
+            <View style={{ alignItems: 'center', marginTop: 14, marginBottom: 4 }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 10,
+                  backgroundColor: '#fef2f2',
+                  borderWidth: 1,
+                  borderColor: '#fecaca',
+                }}
+                onPress={() =>
+                  Alert.alert(
+                    '⚑ İlanı Bildir',
+                    'Bu ilanda hatalı bilgi, yanıltıcı fiyat veya kurallara aykırı bir durum mu tespit ettiniz?',
+                    [
+                      { text: 'Vazgeç', style: 'cancel' },
+                      {
+                        text: 'Destek / Geri Bildirime Git',
+                        onPress: () => router.push('/support' as any),
+                      },
+                    ]
+                  )
+                }
+                activeOpacity={0.8}
+              >
+                <Ionicons name="flag-outline" size={14} color="#dc2626" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#dc2626' }}>
+                  İlanı Bildir
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* BENZER İLANLAR BÖLÜMÜ */}
+            {similarListings.length > 0 && (
+              <View style={[styles.sectionCard, { marginTop: 12 }]}>
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                  onPress={() => setSimilarExpanded(!similarExpanded)}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        backgroundColor: '#fff7ed',
+                        borderWidth: 1,
+                        borderColor: '#ffedd5',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Ionicons name="sparkles" size={14} color="#ea580c" />
+                    </View>
+                    <View>
+                      <Text style={styles.sectionCardTitle}>Benzer İlanlar</Text>
+                      <Text style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
+                        Bu araca yakın {similarListings.length} alternatif ilan
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons
+                    name={similarExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color="#64748b"
+                  />
+                </TouchableOpacity>
+
+                {similarExpanded && (
+                  <View style={{ marginTop: 12, gap: 10 }}>
+                    {similarListings.slice(0, 6).map((sim: any) => {
+                      const simBrand = sim.vehicleVariant?.model?.brand?.name || '';
+                      const simModel = sim.vehicleVariant?.model?.name || '';
+                      const simPhoto = resolveVehicleImageUrl(
+                        sim.media?.[0]?.url,
+                        simBrand,
+                        simModel
+                      );
+                      return (
+                        <TouchableOpacity
+                          key={sim.id}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: 8,
+                            borderRadius: 12,
+                            backgroundColor: '#f8fafc',
+                            borderWidth: 1,
+                            borderColor: '#e2e8f0',
+                          }}
+                          onPress={() => router.push(`/listings/${sim.listingNo || sim.id}` as any)}
+                          activeOpacity={0.85}
+                        >
+                          <ExpoImage
+                            source={{ uri: simPhoto }}
+                            style={{ width: 68, height: 52, borderRadius: 8, backgroundColor: '#e2e8f0' }}
+                            contentFit="cover"
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{ fontSize: 12, fontWeight: '800', color: '#0f172a' }}
+                              numberOfLines={1}
+                            >
+                              {sim.title}
+                            </Text>
+                            <Text
+                              style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}
+                              numberOfLines={1}
+                            >
+                              {sim.modelYear} • {(sim.kilometers || 0).toLocaleString('tr-TR')} km • {sim.city}
+                            </Text>
+                            <Text
+                              style={{ fontSize: 13, fontWeight: '900', color: '#ea580c', marginTop: 2 }}
+                            >
+                              {Number(sim.priceAmount || 0).toLocaleString('tr-TR')} {sim.currency || 'TL'}
+                            </Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
           </View>
         )}
 
@@ -844,6 +1054,125 @@ export default function ListingDetailScreen() {
                   </Text>
                 </View>
               </View>
+
+              {/* Çoklu Telefon Numaraları (1., 2., 3. Telefon) */}
+              {(sellerObj.phone || sellerObj.phone2 || sellerObj.phone3) && (
+                <View style={{ marginTop: 14, gap: 8 }}>
+                  {[
+                    sellerObj.phone ? { label: '1. Telefon Numarası', num: sellerObj.phone } : null,
+                    sellerObj.phone2 ? { label: '2. Telefon Numarası', num: sellerObj.phone2 } : null,
+                    sellerObj.phone3 ? { label: '3. Telefon Numarası', num: sellerObj.phone3 } : null,
+                  ]
+                    .filter(Boolean)
+                    .map((p: any, idx: number) => (
+                      <TouchableOpacity
+                        key={idx}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          backgroundColor: '#f8fafc',
+                          borderWidth: 1,
+                          borderColor: '#e2e8f0',
+                          borderRadius: 12,
+                          paddingHorizontal: 12,
+                          paddingVertical: 10,
+                        }}
+                        onPress={() => Linking.openURL(`tel:${p.num}`)}
+                        activeOpacity={0.8}
+                      >
+                        <View>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748b' }}>
+                            {p.label}
+                          </Text>
+                          <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a', marginTop: 2 }}>
+                            {p.num}
+                          </Text>
+                        </View>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            backgroundColor: '#16a34a',
+                            paddingHorizontal: 10,
+                            paddingVertical: 6,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Ionicons name="call" size={14} color="#ffffff" />
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#ffffff' }}>Ara</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                </View>
+              )}
+
+              {/* Satıcının Tüm İlanları & Favori Satıcılarıma Ekle */}
+              {(listing.sellerId || sellerObj.id) && (
+                <View style={{ marginTop: 14, gap: 8 }}>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      backgroundColor: '#f1f5f9',
+                      borderWidth: 1,
+                      borderColor: '#cbd5e1',
+                      borderRadius: 12,
+                      paddingVertical: 11,
+                    }}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(tabs)/listings',
+                        params: {
+                          sellerId: listing.sellerId || sellerObj.id,
+                          sellerName: sellerFullName,
+                        },
+                      } as any)
+                    }
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="list-outline" size={16} color="#ea580c" />
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>
+                      Satıcının Tüm İlanları
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      backgroundColor: isSellerFavorited ? '#fff1f2' : '#f8fafc',
+                      borderWidth: 1,
+                      borderColor: isSellerFavorited ? '#fecdd3' : '#e2e8f0',
+                      borderRadius: 12,
+                      paddingVertical: 11,
+                    }}
+                    disabled={togglingSellerFav}
+                    onPress={handleToggleFavoriteSeller}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons
+                      name={isSellerFavorited ? 'heart' : 'heart-outline'}
+                      size={16}
+                      color={isSellerFavorited ? '#e11d48' : '#64748b'}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '800',
+                        color: isSellerFavorited ? '#e11d48' : '#475569',
+                      }}
+                    >
+                      {isSellerFavorited ? 'Favori Satıcılarımda' : 'Favori Satıcılarıma Ekle'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         )}
