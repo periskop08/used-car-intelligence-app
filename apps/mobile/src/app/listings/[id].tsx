@@ -26,6 +26,7 @@ import TorkScoutLoader from '../../components/TorkScoutLoader';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
 import VehicleConditionVisualizer from '../../components/VehicleConditionVisualizer';
 import IsiCepteRecommendationWidget from '../../components/IsiCepteRecommendationWidget';
+import ListingAiAdvisorCard from '../../components/ListingAiAdvisorCard';
 import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
 import { getBrandLogoUrl as resolveBrandLogo } from '../../constants/brandLogos';
 
@@ -807,44 +808,18 @@ export default function ListingDetailScreen() {
               </View>
             </View>
 
-            {/* TorqueScout AI Kronik Arıza & Risk Raporu Banner */}
-            {(listing.vehicleVariantId || (brandName && modelFamilyName)) && (
-              <TouchableOpacity
-                style={styles.aiReportCard}
-                onPress={() =>
-                  router.push({
-                    pathname: '/vehicle-report',
-                    params: {
-                      variantId: listing.vehicleVariantId || undefined,
-                      brand: brandName,
-                      model: modelFamilyName,
-                      year: String(yearVal),
-                      engine: engineName || undefined,
-                      fuelType: listing.fuelType || undefined,
-                      transmission: listing.transmission || undefined,
-                      trim: trimName || undefined,
-                    },
-                  } as any)
-                }
-                activeOpacity={0.85}
-              >
-                <View style={styles.aiIconBox}>
-                  <Ionicons name="sparkles" size={24} color="#ea580c" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.aiBadgeRow}>
-                    <Text style={styles.aiTitle}>AI Kronik Arıza &amp; Risk Analizi</Text>
-                    <View style={styles.aiProBadge}>
-                      <Text style={styles.aiProBadgeText}>AI PRO</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.aiDesc}>
-                    Bu modelin fabrika kronikleri, geri çağırmaları ve ekspertiz kontrol listesini inceleyin.
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#ea580c" />
-              </TouchableOpacity>
-            )}
+            {/* TorqueScout İlan Zekası (AI Raporu & Chatbot) */}
+            <ListingAiAdvisorCard
+              listingId={listing.id}
+              vehicleVariantId={listing.vehicleVariantId || undefined}
+              brandName={brandName}
+              modelFamilyName={modelFamilyName}
+              yearVal={yearVal}
+              engineName={engineName || undefined}
+              fuelType={listing.fuelType || undefined}
+              transmission={listing.transmission || undefined}
+              trimName={trimName || undefined}
+            />
 
             {/* 2D Ekspertiz, Boya & Değişen Şeması */}
             <VehicleConditionVisualizer
