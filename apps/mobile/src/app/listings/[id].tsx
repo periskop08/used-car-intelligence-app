@@ -167,6 +167,7 @@ export default function ListingDetailScreen() {
   const [togglingSellerFav, setTogglingSellerFav] = useState(false);
   const [similarListings, setSimilarListings] = useState<any[]>([]);
   const [similarExpanded, setSimilarExpanded] = useState(true);
+  const [outerScrollEnabled, setOuterScrollEnabled] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
@@ -550,6 +551,8 @@ export default function ListingDetailScreen() {
       </View>
 
       <ScrollView
+        scrollEnabled={outerScrollEnabled}
+        nestedScrollEnabled={true}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -923,8 +926,23 @@ export default function ListingDetailScreen() {
                 </TouchableOpacity>
 
                 {similarExpanded && (
-                  <View style={{ marginTop: 12, gap: 10 }}>
-                    {similarListings.slice(0, 6).map((sim: any) => {
+                  <ScrollView
+                    style={{
+                      marginTop: 12,
+                      maxHeight: 390,
+                    }}
+                    contentContainerStyle={{ gap: 10 }}
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={true}
+                    onTouchStart={() => {
+                      if (similarListings.length > 5) setOuterScrollEnabled(false);
+                    }}
+                    onTouchEnd={() => setOuterScrollEnabled(true)}
+                    onTouchCancel={() => setOuterScrollEnabled(true)}
+                    onScrollEndDrag={() => setOuterScrollEnabled(true)}
+                    onMomentumScrollEnd={() => setOuterScrollEnabled(true)}
+                  >
+                    {similarListings.map((sim: any) => {
                       const simBrand = sim.vehicleVariant?.model?.brand?.name || '';
                       const simModel = sim.vehicleVariant?.model?.name || '';
                       const simPhoto = resolveVehicleImageUrl(
@@ -945,7 +963,10 @@ export default function ListingDetailScreen() {
                             borderWidth: 1,
                             borderColor: '#e2e8f0',
                           }}
-                          onPress={() => router.push(`/listings/${sim.listingNo || sim.id}` as any)}
+                          onPress={() => {
+                            setOuterScrollEnabled(true);
+                            router.push(`/listings/${sim.listingNo || sim.id}` as any);
+                          }}
                           activeOpacity={0.85}
                         >
                           <ExpoImage
@@ -976,7 +997,7 @@ export default function ListingDetailScreen() {
                         </TouchableOpacity>
                       );
                     })}
-                  </View>
+                  </ScrollView>
                 )}
               </View>
             )}
