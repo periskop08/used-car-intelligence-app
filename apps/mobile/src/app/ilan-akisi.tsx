@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -17,18 +17,98 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Svg, { Defs, LinearGradient, Stop, Rect, Path, G } from 'react-native-svg';
 import { TURKEY_81_PROVINCES } from '@used-car-intelligence/shared';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
 import UrgentBadge from '../components/UrgentBadge';
 import TorkScoutLoader from '../components/TorkScoutLoader';
 import ShowcaseBadge from '../components/ShowcaseBadge';
 import VehicleConditionVisualizer, { PART_LABELS, CompactMobileVehicleBodySvg } from '../components/VehicleConditionVisualizer';
+
+function SwipeUpHandCoachmark() {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    progress.setValue(0);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(progress, {
+          toValue: 1,
+          duration: 1350,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(progress, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [progress]);
+
+  const translateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [78, -42],
+  });
+
+  const opacity = progress.interpolate({
+    inputRange: [0, 0.15, 0.82, 1],
+    outputRange: [0, 1, 1, 0],
+  });
+
+  return (
+    <View style={styles.swipeCoachOverlay} pointerEvents="none">
+      <View style={styles.swipeCoachBox}>
+        {/* Vertical Gradient Bar (Matches 2nd Reference Image) */}
+        <Svg width={150} height={240} viewBox="0 0 150 240">
+          <Defs>
+            <LinearGradient id="swipeTrackGrad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor="#818cf8" stopOpacity="0.82" />
+              <Stop offset="55%" stopColor="#93a3f8" stopOpacity="0.45" />
+              <Stop offset="100%" stopColor="#93a3f8" stopOpacity="0" />
+            </LinearGradient>
+          </Defs>
+          <Rect x="32" y="12" width="24" height="205" rx="12" fill="url(#swipeTrackGrad)" />
+        </Svg>
+
+        {/* Animated Tilted Pointing Hand Gliding Bottom -> Top */}
+        <Animated.View
+          style={[
+            styles.swipeHandAnimatedWrap,
+            {
+              opacity,
+              transform: [{ translateY }],
+            },
+          ]}
+        >
+          <Svg width={125} height={125} viewBox="0 0 130 130">
+            <G transform="rotate(-45 55 55)">
+              <Path
+                d="M 38 66 L 38 18 A 9.5 9.5 0 0 1 57 18 L 57 44 A 8.5 8.5 0 0 1 74 42 L 74 48 A 8.5 8.5 0 0 1 91 48 L 91 55 A 8 8 0 0 1 107 56 L 107 82 C 107 104 90 116 68 116 L 45 116 L 16 87 A 10 10 0 0 1 30 73 L 38 81 Z"
+                fill="rgba(139, 152, 246, 0.84)"
+                stroke="#ffffff"
+                strokeWidth="2.5"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            </G>
+          </Svg>
+        </Animated.View>
+      </View>
+    </View>
+  );
+}
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 
@@ -325,10 +405,17 @@ export default function ListingFeedScreen() {
   const [selectedExpertiseItem, setSelectedExpertiseItem] = useState<ListingFeedItem | null>(null);
   const [selectedDescriptionItem, setSelectedDescriptionItem] = useState<ListingFeedItem | null>(null);
   const [selectedProviderPost, setSelectedProviderPost] = useState<IsiCepteProviderPostData | null>(null);
+  const [showSwipeHint, setShowSwipeHint] = useState<boolean>(true);
 
   const [seenIds, setSeenIds] = useState<string[]>([]);
   const loadingMoreRef = useRef(false);
   const viewedLogged = useRef<Record<string, boolean>>({});
+
+  useFocusEffect(
+    useCallback(() => {
+      setShowSwipeHint(true);
+    }, [])
+  );
 
   useEffect(() => {
     const initialSeed = Math.random().toString(36).substring(2, 15);
@@ -933,13 +1020,6 @@ export default function ListingFeedScreen() {
 
             {/* 5. Tab Content Box (Özellikler or Ekspertiz Durumu) */}
             <View style={styles.tabContentContainer}>
-              {/* Right Floating Vertical Swipe Guide Indicator inside the table */}
-              <View style={styles.scrollGuidePill} pointerEvents="none">
-                <Ionicons name="chevron-up" size={10} color="#64748b" />
-                <Ionicons name="swap-vertical" size={12} color="#ea580c" />
-                <Ionicons name="chevron-down" size={10} color="#64748b" />
-              </View>
-
               {activeTab === 'info' ? (
                 <View style={styles.scrollInfo}>
                   <View style={styles.infoRow}>
@@ -1206,10 +1286,17 @@ export default function ListingFeedScreen() {
               offset: feedHeight * index,
               index,
             })}
+            scrollEventThrottle={16}
+            onScroll={(e) => {
+              if (showSwipeHint && e.nativeEvent.contentOffset.y > 15) {
+                setShowSwipeHint(false);
+              }
+            }}
             viewabilityConfig={viewabilityConfig}
             onViewableItemsChanged={onViewableItemsChanged}
             style={styles.feedList}
           />
+          {showSwipeHint && <SwipeUpHandCoachmark />}
         </View>
       )}
 
@@ -1896,26 +1983,23 @@ const styles = StyleSheet.create({
   cardContentBottom: {
     gap: 6,
   },
-  scrollGuidePill: {
-    position: 'absolute',
-    right: 8,
-    top: '50%',
-    transform: [{ translateY: -20 }],
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
-    paddingHorizontal: 3.5,
-    paddingVertical: 5,
-    alignItems: 'center',
+  swipeCoachOverlay: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
-    gap: 1,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 30,
+    alignItems: 'center',
+    zIndex: 60,
+  },
+  swipeCoachBox: {
+    width: 150,
+    height: 240,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  swipeHandAnimatedWrap: {
+    position: 'absolute',
+    left: 22,
+    top: 42,
   },
   photoContainer: {
     width: '100%',
@@ -2088,7 +2172,6 @@ const styles = StyleSheet.create({
   scrollInfo: {
     flex: 1,
     justifyContent: 'space-evenly',
-    paddingRight: 28,
   },
   infoRow: {
     flexDirection: 'row',
@@ -2206,7 +2289,6 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: 28,
     gap: 8,
   },
   compactSvgBox: {
