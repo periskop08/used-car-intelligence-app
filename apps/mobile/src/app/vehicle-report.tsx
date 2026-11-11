@@ -502,7 +502,19 @@ export default function VehicleReportScreen() {
   useEffect(() => {
     initReportLoad();
     fetchUserRights();
-  }, [rawVariantId]);
+  }, [
+    rawVariantId,
+    params.brand,
+    params.model,
+    params.year,
+    params.bodyType,
+    params.engine,
+    params.fuel,
+    params.fuelType,
+    params.transmission,
+    params.trim,
+    params.category,
+  ]);
 
   // Pulse animation for skeleton
   useEffect(() => {
@@ -707,7 +719,7 @@ export default function VehicleReportScreen() {
       const yearClean = cleanVal(params.year);
       const bodyClean = cleanVal(params.bodyType);
       const engineClean = cleanVal(params.engine);
-      const fuelClean = cleanVal(params.fuel);
+      const fuelClean = cleanVal(params.fuel || params.fuelType);
       const transClean = cleanVal(params.transmission);
       const trimClean = cleanVal(params.trim);
 
@@ -778,6 +790,8 @@ export default function VehicleReportScreen() {
   };
 
   const initReportLoad = async () => {
+    setReport(null);
+    setPipelineStep(1);
     let targetId = rawVariantId;
     if (!targetId && params.brand && params.model) {
       setLoading(true);
@@ -939,7 +953,7 @@ export default function VehicleReportScreen() {
         year: isMoto ? undefined : params.year,
         bodyType: isMoto ? undefined : params.bodyType,
         engine: isMoto ? undefined : params.engine,
-        fuel: params.fuel,
+        fuel: params.fuel || params.fuelType,
         transmission: params.transmission,
         trim: params.trim,
       };

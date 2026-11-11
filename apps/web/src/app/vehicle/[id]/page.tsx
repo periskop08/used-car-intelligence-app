@@ -264,6 +264,32 @@ export default function VehicleDetail() {
   // Structured Vehicle Report State (New Engine)
   const [structuredReport, setStructuredReport] = useState<ComprehensiveVehicleReport | null>(null);
   const [loadingStructuredReport, setLoadingStructuredReport] = useState<boolean>(false);
+  const isFetchingReportRef = useRef<boolean>(false);
+
+  const getReportSessionCacheKey = (vid: string): string => {
+    if (typeof window === "undefined") return `ts_rep_${vid}`;
+    try {
+      const rawScope = sessionStorage.getItem("ts_search_scope");
+      if (rawScope) {
+        const s = JSON.parse(rawScope);
+        const scopeParts = [
+          s.brand,
+          s.model,
+          s.year,
+          s.bodyType,
+          s.engine,
+          s.fuel,
+          s.transmission,
+          s.trim,
+          s.vehicleType,
+        ]
+          .map((v) => String(v || "").trim().toLowerCase())
+          .join("|");
+        return `ts_rep_${vid}_${scopeParts}`;
+      }
+    } catch {}
+    return `ts_rep_${vid}`;
+  };
 
   const getAuthHeaders = (): any => {
     const token = localStorage.getItem("accessToken") || localStorage.getItem("token");
@@ -309,10 +335,14 @@ export default function VehicleDetail() {
 
   const fetchStructuredReport = async (force = false) => {
     if (!variantId) return;
+    if (!force && isFetchingReportRef.current) return;
+
+    const sessionCacheKey = getReportSessionCacheKey(variantId);
 
     if (force) {
       if (typeof window !== "undefined") {
         try {
+          sessionStorage.removeItem(sessionCacheKey);
           sessionStorage.removeItem(`ts_rep_${variantId}`);
         } catch {}
       }
@@ -320,7 +350,7 @@ export default function VehicleDetail() {
       setPipelineStep(1);
     } else if (typeof window !== "undefined") {
       try {
-        const cachedRep = sessionStorage.getItem(`ts_rep_${variantId}`);
+        const cachedRep = sessionStorage.getItem(sessionCacheKey);
         if (cachedRep) {
           const parsedCached = JSON.parse(cachedRep);
           if (parsedCached) {
@@ -330,6 +360,7 @@ export default function VehicleDetail() {
       } catch {}
     }
 
+    isFetchingReportRef.current = true;
     setLoadingStructuredReport(true);
 
     try {
@@ -394,13 +425,14 @@ export default function VehicleDetail() {
               const hasSynthesis = Boolean(parsedDetail.expertDecisionSynthesis);
               const isModern = hasSynthesis && ((parsedDetail as any).schemaVersion || 1) >= 2;
               if (!isModern && !force) {
+                isFetchingReportRef.current = false;
                 // Silently auto-refresh in background without user click/button
                 return fetchStructuredReport(true);
               }
               setStructuredReport(parsedDetail);
               if (typeof window !== "undefined") {
                 try {
-                  sessionStorage.setItem(`ts_rep_${variantId}`, JSON.stringify(parsedDetail));
+                  sessionStorage.setItem(sessionCacheKey, JSON.stringify(parsedDetail));
                 } catch {}
               }
               setLoadingStructuredReport(false);
@@ -420,12 +452,15 @@ export default function VehicleDetail() {
     } catch (e: any) {
       console.error("Fetch structured vehicle report error", e);
     } finally {
+      isFetchingReportRef.current = false;
       setLoadingStructuredReport(false);
     }
   };
 
   useEffect(() => {
     if (variantId) {
+      setStructuredReport(null);
+      setPipelineStep(1);
       fetchVehicleDetails(variantId);
       fetchStructuredReport(false);
     }
@@ -433,7 +468,7 @@ export default function VehicleDetail() {
 
   // Poll report status silently in the background
   const checkReportStatusSilently = async () => {
-    if (!variantId || structuredReport) return;
+    if (!variantId || structuredReport || isFetchingReportRef.current) return;
     try {
       fetchStructuredReport(false);
     } catch (e) {}
