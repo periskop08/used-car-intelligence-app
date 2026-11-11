@@ -75,6 +75,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -105,6 +106,17 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         localStorage.removeItem("accessToken");
         router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
       });
+
+    fetch(`${API_URL}/conversations/unread-count`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.unreadCount === "number") {
+          setUnreadMessagesCount(d.unreadCount);
+        }
+      })
+      .catch(() => {});
   }, [pathname, router]);
 
   const handleLogout = () => {
@@ -127,25 +139,39 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const currentTab = searchParams.get("tab");
   const fullPath = pathname + (currentTab ? `?tab=${currentTab}` : "");
 
+  const getTierBadgeText = () => {
+    const tier = profile?.subscriptionTier || "FREE";
+    if (tier === "PROFESYONEL" || tier === "PRO" || tier === "PREMIUM") return "PROFESYONEL";
+    if (tier === "YETKIN" || tier === "STANDARD" || tier === "BASIC") return "YETKİN";
+    return "TANIŞMA";
+  };
+
   const renderSidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Profile summary */}
       {profile && (
-        <div className="p-4 border-b border-white/5 flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl overflow-hidden bg-orange-600/20 border border-orange-500/30 flex items-center justify-center font-bold text-orange-400">
-            {profile.profilePhotoUrl ? (
-              <img src={formatImageUrl(profile.profilePhotoUrl)} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              (profile.firstName || profile.email).slice(0, 2).toUpperCase()
-            )}
+        <div className="p-4 border-b border-white/5 flex flex-col gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl overflow-hidden bg-orange-600/20 border border-orange-500/30 flex items-center justify-center font-bold text-orange-400 shrink-0">
+              {profile.profilePhotoUrl ? (
+                <img src={formatImageUrl(profile.profilePhotoUrl)} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                (profile.firstName || profile.email).slice(0, 2).toUpperCase()
+              )}
+            </div>
+            <div className="flex flex-col overflow-hidden">
+              <span className="text-xs font-bold text-slate-200 truncate">
+                {profile.firstName && profile.lastName 
+                  ? `${profile.firstName} ${profile.lastName}` 
+                  : profile.username || profile.email.split("@")[0]}
+              </span>
+              <span className="text-[10px] text-slate-500 truncate">{profile.email}</span>
+            </div>
           </div>
-          <div className="flex flex-col overflow-hidden">
-            <span className="text-xs font-bold text-slate-200 truncate">
-              {profile.firstName && profile.lastName 
-                ? `${profile.firstName} ${profile.lastName}` 
-                : profile.username || profile.email.split("@")[0]}
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-black tracking-wider">
+              ✨ {getTierBadgeText()}
             </span>
-            <span className="text-[10px] text-slate-500 truncate">{profile.email}</span>
           </div>
         </div>
       )}
@@ -168,13 +194,18 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     key={iIdx}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center px-3 py-2 rounded-xl text-xs font-bold transition ${
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition ${
                       isActive
                         ? "bg-orange-500/10 text-orange-400 border border-orange-500/20 font-black"
                         : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                     }`}
                   >
-                    {item.name}
+                    <span>{item.name}</span>
+                    {item.href === "/dashboard/messages" && unreadMessagesCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-rose-600 text-white text-[10px] font-black shadow">
+                        {unreadMessagesCount}
+                      </span>
+                    )}
                   </a>
                 );
               })}

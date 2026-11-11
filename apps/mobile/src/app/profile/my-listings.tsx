@@ -61,23 +61,46 @@ const formatPrice = (p: any): string => {
 
 interface ListingItem {
   id: string;
+  listingNo?: string;
   title: string;
-  price: number;
+  price?: number;
+  priceAmount?: number;
   currency?: string;
   year?: number;
+  modelYear?: number;
   mileage?: number;
-  status: 'ACTIVE' | 'PENDING_APPROVAL' | 'REJECTED' | 'SOLD' | 'PASSIVE';
+  kilometers?: number;
+  city?: string;
+  district?: string;
+  status: 'ACTIVE' | 'PENDING_APPROVAL' | 'PENDING_REVIEW' | 'REVISION_REQUIRED' | 'REJECTED' | 'SOLD' | 'PASSIVE' | 'DRAFT' | 'EXPIRED';
+  rejectionReason?: string | null;
+  expiresAt?: string;
+  isUrgent?: boolean;
+  isShowcaseFeedActive?: boolean;
   urgentListing?: boolean;
   showcaseListing?: boolean;
   urgentExpiresAt?: string;
   showcaseExpiresAt?: string;
   publishedAt?: string;
   createdAt?: string;
+  favoriteCount?: number;
+  _count?: { favorites?: number };
   brand?: { name: string };
   model?: { name: string };
-  media?: Array<{ mediaUrl: string }>;
+  media?: Array<{ mediaUrl?: string; url?: string }>;
   photos?: Array<{ photoUrl?: string; url?: string }>;
 }
+
+const isCorrectionListing = (l: ListingItem) =>
+  l.status === 'REVISION_REQUIRED' ||
+  (l.status === 'PASSIVE' && !!l.rejectionReason) ||
+  ((l.status === 'PENDING_REVIEW' || l.status === 'PENDING_APPROVAL') && !!l.rejectionReason);
+
+const getRemainingDays = (targetDateString?: string) => {
+  if (!targetDateString) return 0;
+  const diffTime = new Date(targetDateString).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+};
 
 export default function MyListingsScreen() {
   const router = useRouter();
@@ -86,8 +109,9 @@ export default function MyListingsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [quota, setQuota] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'PENDING' | 'PASSIVE'>(() => {
+  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CORRECTION' | 'PENDING' | 'PASSIVE'>(() => {
     if (params.tab === 'PASSIVE' || params.tab === 'past') return 'PASSIVE';
+    if (params.tab === 'CORRECTION' || params.tab === 'correction') return 'CORRECTION';
     if (params.tab === 'PENDING') return 'PENDING';
     return 'ACTIVE';
   });
@@ -95,6 +119,8 @@ export default function MyListingsScreen() {
   useEffect(() => {
     if (params.tab === 'PASSIVE' || params.tab === 'past') {
       setActiveTab('PASSIVE');
+    } else if (params.tab === 'CORRECTION' || params.tab === 'correction') {
+      setActiveTab('CORRECTION');
     } else if (params.tab === 'PENDING') {
       setActiveTab('PENDING');
     } else if (params.tab === 'ACTIVE') {
@@ -161,21 +187,38 @@ export default function MyListingsScreen() {
   };
 
   const filteredListings = listings.filter((l) => {
-    if (activeTab === 'ACTIVE') return l.status === 'ACTIVE';
-    if (activeTab === 'PENDING') return l.status === 'PENDING_APPROVAL';
-    return l.status === 'PASSIVE' || l.status === 'SOLD' || l.status === 'REJECTED';
+    if (activeTab === 'CORRECTION') return isCorrectionListing(l);
+    if (activeTab === 'ACTIVE') return l.status === 'ACTIVE' || l.status === 'DRAFT';
+    if (activeTab === 'PENDING')
+      return (l.status === 'PENDING_APPROVAL' || l.status === 'PENDING_REVIEW') && !l.rejectionReason;
+    return (
+      !isCorrectionListing(l) &&
+      (l.status === 'PASSIVE' || l.status === 'SOLD' || l.status === 'REJECTED' || l.status === 'EXPIRED')
+    );
   });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (item: ListingItem) => {
+    if (
+      (item.status === 'PENDING_REVIEW' || item.status === 'PENDING_APPROVAL') &&
+      !!item.rejectionReason
+    ) {
+      return { text: 'TEKRAR İNCELEMEDE', bg: '#dbeafe', color: '#2563eb' };
+    }
+    if (item.status === 'REVISION_REQUIRED' || !!item.rejectionReason) {
+      return { text: 'DÜZELTME İSTENİYOR', bg: '#ffe4e6', color: '#e11d48' };
+    }
+    switch (item.status) {
       case 'ACTIVE':
         return { text: 'YAYINDA', bg: '#dcfce7', color: '#16a34a' };
       case 'PENDING_APPROVAL':
+      case 'PENDING_REVIEW':
         return { text: 'ONAY BEKLİYOR', bg: '#fef3c7', color: '#d97706' };
       case 'REJECTED':
         return { text: 'REDDEDİLDİ', bg: '#fee2e2', color: '#dc2626' };
       case 'SOLD':
-        return { text: 'SATILDI', bg: '#f1f5f9', color: '#64748b' };
+        return { text: 'SATILDI', bg: '#f3e8ff', color: '#7e22ce' };
+      case 'DRAFT':
+        return { text: 'TASLAK', bg: '#f1f5f9', color: '#475569' };
       default:
         return { text: 'PASİF', bg: '#f1f5f9', color: '#64748b' };
     }
@@ -370,6 +413,46 @@ export default function MyListingsScreen() {
     );
   };
 
+  const handleMarkAsSold = (item: ListingItem) => {
+    Alert.alert(
+      '🤝 İlanı Satıldı Olarak İşaretle',
+      `"${item.title}" başlıklı ilanınızı Satıldı olarak işaretlemek istediğinize emin misiniz? İlanınız yayından kaldırılacak ve "Geçmiş" sekmesine aktarılacaktır.`,
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Evet, Satıldı İşaretle',
+          onPress: async () => {
+            try {
+              const token =
+                (await AsyncStorage.getItem('accessToken')) ||
+                (await AsyncStorage.getItem('token'));
+              if (!token) return;
+
+              const res = await fetch(`${API_URL}/listings/${item.id}/status`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ status: 'SOLD' }),
+              });
+
+              if (res.ok) {
+                Alert.alert('Tebrikler! 🤝', 'İlanınız Satıldı olarak işaretlendi.');
+                fetchMyListings();
+              } else {
+                const err = await res.json().catch(() => ({}));
+                Alert.alert('Hata', err.message || 'İlan durumu güncellenemedi.');
+              }
+            } catch {
+              Alert.alert('Hata', 'Bağlantı hatası oluştu.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleDeleteListing = (item: ListingItem) => {
     Alert.alert(
       'İlanı Sil',
@@ -423,32 +506,51 @@ export default function MyListingsScreen() {
       </View>
 
       {/* Quota Summary Banner */}
-      {quota && (
-        <View style={styles.quotaBanner}>
-          <View style={styles.quotaLeft}>
-            <Ionicons name="car-sport" size={20} color="#ea580c" />
-            <View>
-              <Text style={styles.quotaTitle}>İlan Yayınlama Kotası</Text>
-              <Text style={styles.quotaSub}>
-                {quota.usedListings || 0} / {quota.maxListings || 1} İlan Kullanımda
-              </Text>
+      {quota && (() => {
+        const usedCount = quota.usedActiveListings ?? quota.activeCount ?? quota.usedListings ?? 0;
+        const maxCount = quota.maxActiveListings ?? quota.limit ?? quota.maxListings ?? 1;
+        return (
+          <View style={styles.quotaBanner}>
+            <View style={styles.quotaLeft}>
+              <Ionicons name="car-sport" size={20} color="#ea580c" />
+              <View>
+                <Text style={styles.quotaTitle}>
+                  İlan Yayınlama Kotası{quota.tierName ? ` (${quota.tierName})` : ''}
+                </Text>
+                <Text style={styles.quotaSub}>
+                  {usedCount} / {maxCount >= 999999 ? 'Sınırsız' : maxCount} Aktif İlan Kullanımda
+                </Text>
+              </View>
             </View>
+            <TouchableOpacity
+              style={styles.addListingChip}
+              onPress={() => router.push('/create-listing' as any)}
+            >
+              <Text style={styles.addListingChipText}>+ Yeni İlan</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.addListingChip}
-            onPress={() => router.push('/create-listing' as any)}
-          >
-            <Text style={styles.addListingChipText}>+ Yeni İlan</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        );
+      })()}
 
       {/* Tabs */}
       <View style={styles.tabsRow}>
         {[
-          { key: 'ACTIVE', label: `Yayında (${listings.filter((l) => l.status === 'ACTIVE').length})` },
-          { key: 'PENDING', label: `Onayda (${listings.filter((l) => l.status === 'PENDING_APPROVAL').length})` },
-          { key: 'PASSIVE', label: `Geçmiş (${listings.filter((l) => l.status !== 'ACTIVE' && l.status !== 'PENDING_APPROVAL').length})` },
+          {
+            key: 'ACTIVE',
+            label: `Yayında (${listings.filter((l) => l.status === 'ACTIVE' || l.status === 'DRAFT').length})`,
+          },
+          {
+            key: 'CORRECTION',
+            label: `⚠️ Düzeltme (${listings.filter((l) => isCorrectionListing(l)).length})`,
+          },
+          {
+            key: 'PENDING',
+            label: `Onayda (${listings.filter((l) => (l.status === 'PENDING_APPROVAL' || l.status === 'PENDING_REVIEW') && !l.rejectionReason).length})`,
+          },
+          {
+            key: 'PASSIVE',
+            label: `Geçmiş (${listings.filter((l) => !isCorrectionListing(l) && (l.status === 'PASSIVE' || l.status === 'SOLD' || l.status === 'REJECTED' || l.status === 'EXPIRED')).length})`,
+          },
         ].map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -457,7 +559,7 @@ export default function MyListingsScreen() {
               style={[styles.tabButton, isActive && styles.tabButtonActive]}
               onPress={() => setActiveTab(tab.key as any)}
             >
-              <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+              <Text style={[styles.tabText, isActive && styles.tabTextActive]} numberOfLines={1}>
                 {tab.label}
               </Text>
             </TouchableOpacity>
@@ -494,18 +596,24 @@ export default function MyListingsScreen() {
             </View>
           ) : (
             filteredListings.map((item) => {
-              const badge = getStatusBadge(item.status);
+              const badge = getStatusBadge(item);
               const imgUrl =
                 item.media?.[0]?.mediaUrl ||
+                item.media?.[0]?.url ||
                 item.photos?.[0]?.photoUrl ||
                 item.photos?.[0]?.url;
+              const priceVal = item.priceAmount ?? item.price ?? 0;
+              const yearVal = item.modelYear ?? item.year;
+              const kmVal = item.kilometers ?? item.mileage;
+              const favCount = item._count?.favorites ?? item.favoriteCount ?? 0;
+              const remDays = item.expiresAt ? getRemainingDays(item.expiresAt) : 0;
 
               return (
                 <View key={item.id} style={styles.listingCardWrap}>
                   <TouchableOpacity
                     style={styles.listingCard}
                     activeOpacity={0.8}
-                    onPress={() => router.push(`/listings/${item.id}` as any)}
+                    onPress={() => router.push(`/listings/${item.listingNo || item.id}` as any)}
                   >
                     <View style={styles.cardImageWrap}>
                       {imgUrl ? (
@@ -524,10 +632,10 @@ export default function MyListingsScreen() {
                         <Text style={[styles.badgeText, { color: badge.color }]}>{badge.text}</Text>
                       </View>
 
-                      {(item.urgentListing || item.showcaseListing) && (
+                      {(item.isUrgent || item.urgentListing || item.isShowcaseFeedActive || item.showcaseListing) && (
                         <View style={styles.cardPromoBadgesWrap}>
-                          {item.urgentListing && <UrgentBadge size="xs" animated={false} />}
-                          {item.showcaseListing && <ShowcaseBadge size="xs" />}
+                          {(item.isUrgent || item.urgentListing) && <UrgentBadge size="xs" animated={false} />}
+                          {(item.isShowcaseFeedActive || item.showcaseListing) && <ShowcaseBadge size="xs" />}
                         </View>
                       )}
                     </View>
@@ -538,19 +646,90 @@ export default function MyListingsScreen() {
                       </Text>
 
                       <Text style={styles.cardPrice}>
-                        {formatPrice(item.price)} TL
+                        {formatPrice(priceVal)} {item.currency || 'TL'}
                       </Text>
 
                       <View style={styles.cardMetaRow}>
-                        {item.year && <Text style={styles.cardMetaText}>{item.year} Yıl</Text>}
-                        {item.mileage !== undefined && (
-                          <Text style={styles.cardMetaText}>• {new Intl.NumberFormat('tr-TR').format(item.mileage)} KM</Text>
+                        {yearVal && <Text style={styles.cardMetaText}>{yearVal} Yıl</Text>}
+                        {kmVal !== undefined && (
+                          <Text style={styles.cardMetaText}>• {new Intl.NumberFormat('tr-TR').format(kmVal)} KM</Text>
+                        )}
+                      </View>
+
+                      {/* İlan No, Favori Sayısı & Kalan Süre */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                        {item.listingNo && (
+                          <View
+                            style={{
+                              backgroundColor: '#f1f5f9',
+                              borderWidth: 1,
+                              borderColor: '#e2e8f0',
+                              borderRadius: 6,
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                            }}
+                          >
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#475569' }}>
+                              No: <Text style={{ color: '#ea580c' }}>{item.listingNo}</Text>
+                            </Text>
+                          </View>
+                        )}
+
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 3,
+                            backgroundColor: '#fff1f2',
+                            borderWidth: 1,
+                            borderColor: '#fecdd3',
+                            borderRadius: 6,
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                          }}
+                        >
+                          <Ionicons name="heart" size={10} color="#e11d48" />
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#e11d48' }}>
+                            {favCount} Favori
+                          </Text>
+                        </View>
+
+                        {item.status === 'ACTIVE' && item.expiresAt && (
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#16a34a' }}>
+                            🟢 {remDays} gün kaldı
+                          </Text>
                         )}
                       </View>
                     </View>
                   </TouchableOpacity>
 
-                  {/* ACTION TOOLBAR: ÖNE ÇIKAR, DÜZENLE, YAYINDAN KALDIR / AL, SİL */}
+                  {/* DÜZELTME NEDENİ (rejectionReason) KUTUSU */}
+                  {item.rejectionReason ? (
+                    <View
+                      style={{
+                        marginHorizontal: 12,
+                        marginBottom: 8,
+                        padding: 10,
+                        borderRadius: 12,
+                        backgroundColor: '#fff1f2',
+                        borderWidth: 1,
+                        borderColor: '#fecdd3',
+                        gap: 4,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="warning" size={14} color="#e11d48" />
+                        <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#e11d48' }}>
+                          Düzeltme Nedeni:
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 11.5, color: '#881337', lineHeight: 16 }}>
+                        {item.rejectionReason}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {/* ACTION TOOLBAR: ÖNE ÇIKAR, DÜZENLE, SATILDI, YAYINDAN KALDIR / AL, SİL */}
                   <View style={styles.cardActionsBar}>
                     {item.status === 'ACTIVE' && (
                       <TouchableOpacity
@@ -574,6 +753,19 @@ export default function MyListingsScreen() {
                       <Text style={styles.cardActionBtnText} numberOfLines={1}>Düzenle</Text>
                     </TouchableOpacity>
 
+                    {item.status === 'ACTIVE' && (
+                      <TouchableOpacity
+                        style={[styles.cardActionBtn, { backgroundColor: '#dcfce7', borderColor: '#bbf7d0' }]}
+                        activeOpacity={0.7}
+                        onPress={() => handleMarkAsSold(item)}
+                      >
+                        <Ionicons name="checkmark-circle" size={13} color="#16a34a" />
+                        <Text style={[styles.cardActionBtnText, { color: '#15803d', fontWeight: '800' }]} numberOfLines={1}>
+                          Satıldı
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
                     <TouchableOpacity
                       style={styles.cardActionBtn}
                       activeOpacity={0.7}
@@ -585,7 +777,7 @@ export default function MyListingsScreen() {
                         color="#334155"
                       />
                       <Text style={[styles.cardActionBtnText, { color: '#334155' }]} numberOfLines={1}>
-                        {item.status === 'ACTIVE' ? 'Yayından Kaldır' : 'Yayına Al'}
+                        {item.status === 'ACTIVE' ? 'Pasife Al' : 'Yayına Al'}
                       </Text>
                     </TouchableOpacity>
 

@@ -96,10 +96,10 @@ export default function SubscriptionScreen() {
     rawTier === 'FREE'
       ? 'TANISMA'
       : rawTier === 'STANDARD'
-      ? 'YETKIN'
-      : rawTier === 'PREMIUM'
-      ? 'PROFESYONEL'
-      : rawTier;
+        ? 'YETKIN'
+        : rawTier === 'PREMIUM'
+          ? 'PROFESYONEL'
+          : rawTier;
 
   const currentRank = TIER_RANKS[tier] || 1;
 
@@ -110,16 +110,16 @@ export default function SubscriptionScreen() {
       code: 'TANISMA',
       rank: 1,
       price: 0,
-      period: 'Ay',
-      reportCount: 3,
+      period: 'Süresiz',
+      reportCount: 1,
       chatCount: 3,
       listingCount: 1,
       durationDays: 30,
       features: [
-        'Ayda 3 AI Araç Raporu',
-        'Ayda 3 Chatbot Mesajı',
-        'Aynı anda 1 Aktif İlan Yayını',
-        'İlan Başına 30 Gün Yayın Süresi',
+        '1 Aktif İlan Yayınlama Hakkı (30 Gün)',
+        '3 Araç Karşılaştırma Hakkı',
+        '3 AI Chatbot Soru Hakkı',
+        '1 Detaylı AI Araç Analiz Raporu',
         'TorqueScout Club Topluluk Erişimi',
       ],
     },
@@ -130,18 +130,19 @@ export default function SubscriptionScreen() {
       rank: 2,
       price: 499,
       period: 'Ay',
-      reportCount: 10,
-      chatCount: 30,
-      listingCount: 10,
+      reportCount: 5,
+      chatCount: 50,
+      listingCount: 5,
       durationDays: 30,
-      isPopular: false,
+      isPopular: true,
       features: [
-        'Ayda 10 AI Araç Raporu',
-        'Ayda 30 Chatbot Mesajı',
-        'Aynı anda 10 Aktif İlan Yayını',
-        'İlan Başına 30 Gün Yayın Süresi',
-        'Kronik Problem ve Piyasa Fiyat Analizleri',
-        'Öncelikli Satıcı Desteği',
+        '5 Aktif İlan Yayınlama Hakkı (30 Gün)',
+        '20 Araç Karşılaştırma Hakkı',
+        '50 AI Chatbot Soru Hakkı',
+        '5 Detaylı AI Araç Analiz Raporu',
+        '1 Vitrin İlanı (14 Gün Öne Çıkarma)',
+        'Her raporda satıcıya sorulacak sorular',
+        'Her raporda ekspertiz kontrol listesi',
       ],
     },
     {
@@ -151,19 +152,21 @@ export default function SubscriptionScreen() {
       rank: 3,
       price: 1499,
       period: 'Ay',
-      reportCount: 50,
+      reportCount: 20,
       chatCount: 150,
-      listingCount: 50,
+      listingCount: 15,
       durationDays: 45,
-      isPopular: true,
+      isPopular: false,
       features: [
-        'Ayda 50 AI Araç Raporu',
-        'Ayda 150 Chatbot Mesajı',
-        'Aynı anda 50 Aktif İlan Yayını',
-        'İlan Başına 45 Gün Yayın Süresi',
-        'Vitrin İlan ve Acil Satış Rozetleri',
-        'TorqueScout Profesyonel Üyelik Rozeti',
-        'Öncelikli 7/24 Uzman Araç Danışmanı',
+        '15 Aktif İlan Yayınlama Hakkı (45 Gün)',
+        '50 Araç Karşılaştırma Hakkı',
+        '150 AI Chatbot Soru Hakkı',
+        '20 Detaylı AI Araç Analiz Raporu',
+        '3 Vitrin İlanı (14 Gün Öne Çıkarma)',
+        'Her raporda satıcıya sorulacak sorular',
+        'Her raporda ekspertiz kontrol listesi',
+        'Kurumsal satıcı profili & Öncelikli destek',
+        'Çoklu kullanıcı ve ekip erişimi',
       ],
     },
   ];
@@ -214,15 +217,15 @@ export default function SubscriptionScreen() {
               {tier === 'PROFESYONEL'
                 ? 'Profesyonel Paket'
                 : tier === 'YETKIN'
-                ? 'Yetkin Paket'
-                : 'Tanışma Paketi'}
+                  ? 'Yetkin Paket'
+                  : 'Tanışma Paketi'}
             </Text>
             <Text style={styles.activePlanPrice}>
               {tier === 'PROFESYONEL'
                 ? '1.499 TL / ay'
                 : tier === 'YETKIN'
-                ? '499 TL / ay'
-                : 'Ücretsiz (0 TL / ay)'}
+                  ? '499 TL / ay'
+                  : 'Ücretsiz (0 TL / ay)'}
             </Text>
           </View>
 
@@ -231,7 +234,7 @@ export default function SubscriptionScreen() {
             <View style={styles.quotaBox}>
               <Ionicons name="document-text" size={18} color="#ea580c" />
               <Text style={styles.quotaVal}>
-                {tier === 'PROFESYONEL' ? '50' : tier === 'YETKIN' ? '10' : '3'}
+                {tier === 'PROFESYONEL' ? '20' : tier === 'YETKIN' ? '5' : '1'}
               </Text>
               <Text style={styles.quotaBoxLabel}>AI Rapor / Ay</Text>
             </View>
@@ -239,7 +242,7 @@ export default function SubscriptionScreen() {
             <View style={styles.quotaBox}>
               <Ionicons name="chatbubbles" size={18} color="#ea580c" />
               <Text style={styles.quotaVal}>
-                {tier === 'PROFESYONEL' ? '150' : tier === 'YETKIN' ? '30' : '3'}
+                {tier === 'PROFESYONEL' ? '150' : tier === 'YETKIN' ? '50' : '3'}
               </Text>
               <Text style={styles.quotaBoxLabel}>Chatbot Mesaj</Text>
             </View>
@@ -247,7 +250,7 @@ export default function SubscriptionScreen() {
             <View style={styles.quotaBox}>
               <Ionicons name="car-sport" size={18} color="#ea580c" />
               <Text style={styles.quotaVal}>
-                {tier === 'PROFESYONEL' ? '50' : tier === 'YETKIN' ? '10' : '1'}
+                {tier === 'PROFESYONEL' ? '15' : tier === 'YETKIN' ? '5' : '1'}
               </Text>
               <Text style={styles.quotaBoxLabel}>Aktif İlan</Text>
             </View>

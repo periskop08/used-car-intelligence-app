@@ -100,17 +100,25 @@ export default function SubscriptionPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
               <span className="text-sm">🤖</span>
-              <h4 className="text-xs font-bold text-slate-300">Yapay Zekâ Raporu</h4>
+              <h4 className="text-xs font-bold text-slate-300">Yapay Zekâ Raporu &amp; Karşılaştırma</h4>
               <p className="text-[11px] text-slate-400">
-                {tier === "PROFESYONEL" ? "Ayda 50 AI araç raporu ve 150 chatbot mesajı." : tier === "YETKIN" ? "Ayda 10 AI araç raporu ve 30 chatbot mesajı." : "Ayda 3 AI araç raporu ve 3 chatbot mesajı."}
+                {tier === "PROFESYONEL"
+                  ? "Ayda 20 AI araç raporu, 50 karşılaştırma ve 150 chatbot mesajı."
+                  : tier === "YETKIN"
+                  ? "Ayda 5 AI araç raporu, 20 karşılaştırma ve 50 chatbot mesajı."
+                  : "Ayda 1 AI araç raporu, 3 karşılaştırma ve 3 chatbot mesajı."}
               </p>
             </div>
 
             <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
               <span className="text-sm">🚗</span>
-              <h4 className="text-xs font-bold text-slate-300">İlan Hakkı</h4>
+              <h4 className="text-xs font-bold text-slate-300">İlan &amp; Vitrin Hakkı</h4>
               <p className="text-[11px] text-slate-400">
-                {tier === "PROFESYONEL" ? "Aynı anda 50 aktif ilan yayını." : tier === "YETKIN" ? "Aynı anda 10 aktif ilan yayını." : "Aynı anda 1 aktif ilan yayını."}
+                {tier === "PROFESYONEL"
+                  ? "Aynı anda 15 aktif ilan yayını ve 3 Vitrin İlanı."
+                  : tier === "YETKIN"
+                  ? "Aynı anda 5 aktif ilan yayını ve 1 Vitrin İlanı."
+                  : "Aynı anda 1 aktif ilan yayını."}
               </p>
             </div>
 
