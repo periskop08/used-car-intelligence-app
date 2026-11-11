@@ -658,8 +658,14 @@ export default function ListingDetailScreen() {
             onPress={() => setActiveTab('LOCATION')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabBtnText, activeTab === 'LOCATION' && styles.tabBtnTextActive]}>
-              Konumu
+            <Text
+              style={[
+                styles.tabBtnText,
+                { textAlign: 'center', lineHeight: 14, fontSize: 11.5 },
+                activeTab === 'LOCATION' && styles.tabBtnTextActive,
+              ]}
+            >
+              {'Konum /\nSatıcı Profili'}
             </Text>
           </TouchableOpacity>
         </View>
