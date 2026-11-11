@@ -329,12 +329,7 @@ export default function ListingAiAdvisorCard({
       {/* Centered Header Section (No Sparkles Icon) */}
       <View style={styles.headerSection}>
         <View style={styles.headerCenteredBlock}>
-          <View style={styles.titleBadgeRow}>
-            <Text style={styles.cardTitle}>Tork Scout İlan Zekası</Text>
-            <View style={styles.versionPill}>
-              <Text style={styles.versionPillText}>v2.5 AI</Text>
-            </View>
-          </View>
+          <Text style={styles.cardTitle}>Tork Scout İlan Zekası</Text>
           <Text style={styles.cardSubtitle}>
             İlan teknik analizi, ekspertiz çelişkileri ve yapay zeka danışmanı.
           </Text>
@@ -616,7 +611,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#f97316',
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
