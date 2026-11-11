@@ -68,14 +68,37 @@ function SwipeUpHandCoachmark() {
   });
 
   return (
-    <View style={styles.swipeCoachOverlay} pointerEvents="none">
-      <View style={styles.swipeCoachBox}>
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'transparent',
+        zIndex: 999,
+        elevation: 20,
+      }}
+    >
+      <View
+        style={{
+          width: 150,
+          height: 240,
+          justifyContent: 'center',
+          alignItems: 'center',
+          position: 'relative',
+          backgroundColor: 'transparent',
+        }}
+      >
         {/* Vertical Gradient Bar (Matches 2nd Reference Image) */}
         <Svg width={150} height={240} viewBox="0 0 150 240">
           <Defs>
             <LinearGradient id="swipeTrackGrad" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="#818cf8" stopOpacity="0.82" />
-              <Stop offset="55%" stopColor="#93a3f8" stopOpacity="0.45" />
+              <Stop offset="0%" stopColor="#818cf8" stopOpacity="0.85" />
+              <Stop offset="55%" stopColor="#93a3f8" stopOpacity="0.48" />
               <Stop offset="100%" stopColor="#93a3f8" stopOpacity="0" />
             </LinearGradient>
           </Defs>
@@ -84,19 +107,20 @@ function SwipeUpHandCoachmark() {
 
         {/* Animated Tilted Pointing Hand Gliding Bottom -> Top */}
         <Animated.View
-          style={[
-            styles.swipeHandAnimatedWrap,
-            {
-              opacity,
-              transform: [{ translateY }],
-            },
-          ]}
+          style={{
+            position: 'absolute',
+            left: 22,
+            top: 42,
+            backgroundColor: 'transparent',
+            opacity,
+            transform: [{ translateY }],
+          }}
         >
           <Svg width={125} height={125} viewBox="0 0 130 130">
             <G transform="rotate(-45 55 55)">
               <Path
                 d="M 38 66 L 38 18 A 9.5 9.5 0 0 1 57 18 L 57 44 A 8.5 8.5 0 0 1 74 42 L 74 48 A 8.5 8.5 0 0 1 91 48 L 91 55 A 8 8 0 0 1 107 56 L 107 82 C 107 104 90 116 68 116 L 45 116 L 16 87 A 10 10 0 0 1 30 73 L 38 81 Z"
-                fill="rgba(139, 152, 246, 0.84)"
+                fill="rgba(139, 152, 246, 0.88)"
                 stroke="#ffffff"
                 strokeWidth="2.5"
                 strokeLinejoin="round"
@@ -1885,6 +1909,7 @@ const styles = StyleSheet.create({
   feedWrapper: {
     flex: 1,
     backgroundColor: '#f0f4f9',
+    position: 'relative',
   },
   feedList: {
     flex: 1,
