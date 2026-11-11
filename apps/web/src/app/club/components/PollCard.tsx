@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { API_BASE_URL, getAuthToken } from "@/utils/apiConfig";
 
 export interface PollOptionData {
   optionId: string;
@@ -40,11 +41,10 @@ export interface PollData {
 interface PollCardProps {
   poll: PollData;
   onPollUpdated?: (updatedPoll: PollData) => void;
+  onRequireAuth?: (message: string) => void;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-
-export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardProps) {
+export default function PollCard({ poll: initialPoll, onPollUpdated, onRequireAuth }: PollCardProps) {
   const [poll, setPoll] = useState<PollData>(initialPoll);
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>(
     initialPoll.currentUserVote?.optionIds || []
@@ -81,6 +81,14 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
   const handleSelectOption = (optionId: string) => {
     if (!poll.isOpen || loading) return;
 
+    const token = getAuthToken();
+    if (!token) {
+      if (onRequireAuth) {
+        onRequireAuth("Ankete oy vermek için lütfen giriş yapın.");
+      }
+      return;
+    }
+
     if (poll.selectionType === "SINGLE") {
       setSelectedOptionIds([optionId]);
     } else {
@@ -98,14 +106,16 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
   };
 
   const handleCastVote = async () => {
-    if (selectedOptionIds.length === 0) {
-      setErrorMessage("Lütfen en az bir seçenek belirleyin.");
+    const token = getAuthToken();
+    if (!token) {
+      if (onRequireAuth) {
+        onRequireAuth("Ankete oy vermek için lütfen giriş yapın.");
+      }
       return;
     }
 
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      alert("Oy kullanabilmek için lütfen giriş yapın.");
+    if (selectedOptionIds.length === 0) {
+      setErrorMessage("Lütfen en az bir seçenek belirleyin.");
       return;
     }
 
@@ -113,7 +123,7 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
     setErrorMessage(null);
 
     try {
-      const res = await fetch(`${API_URL}/api/club/polls/${poll.pollId}/my-vote`, {
+      const res = await fetch(`${API_BASE_URL}/club/polls/${poll.pollId}/my-vote`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -128,7 +138,7 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
         setIsEditingVote(false);
         if (onPollUpdated) onPollUpdated(updated);
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         setErrorMessage(err.message || "Oy kaydınız alınamadı.");
       }
     } catch (e) {
@@ -139,7 +149,7 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
   };
 
   const handleWithdrawVote = async () => {
-    const token = localStorage.getItem("accessToken");
+    const token = getAuthToken();
     if (!token) return;
 
     if (!confirm("Oyunuzu geri çekmek istediğinizden emin misiniz?")) return;
@@ -148,7 +158,7 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
     setErrorMessage(null);
 
     try {
-      const res = await fetch(`${API_URL}/api/club/polls/${poll.pollId}/my-vote`, {
+      const res = await fetch(`${API_BASE_URL}/club/polls/${poll.pollId}/my-vote`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -160,7 +170,7 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
         setIsEditingVote(false);
         if (onPollUpdated) onPollUpdated(updated);
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         setErrorMessage(err.message || "Oy geri çekilemedi.");
       }
     } catch (e) {
@@ -171,7 +181,7 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
   };
 
   return (
-    <div className="my-3 p-4 rounded-xl border border-white/10 bg-slate-950/90 space-y-3">
+    <div className="my-3 p-4 rounded-2xl border border-white/10 bg-slate-950/90 space-y-3">
       {/* Header Badge & Question */}
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
@@ -212,14 +222,12 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
           const isSelected = selectedOptionIds.includes(option.optionId);
           const pct = option.percentage ?? 0;
 
-          // Render Results Bar Mode
           if (showResults && !isEditingVote) {
             return (
               <div
                 key={option.optionId}
-                className="relative p-3 rounded-lg border border-white/10 bg-slate-900 overflow-hidden"
+                className="relative p-3 rounded-xl border border-white/10 bg-slate-900 overflow-hidden"
               >
-                {/* Background Percentage Fill Bar */}
                 <div
                   className="absolute left-0 top-0 bottom-0 bg-orange-500/20 border-r border-orange-500/40 transition-all duration-500"
                   style={{ width: `${pct}%` }}
@@ -246,17 +254,16 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
             );
           }
 
-          // Render Voting Radio/Checkbox Mode
           return (
             <button
               key={option.optionId}
               type="button"
               disabled={!poll.isOpen || loading}
               onClick={() => handleSelectOption(option.optionId)}
-              className={`w-full p-3 rounded-lg border text-left text-xs transition flex items-center gap-3 ${
+              className={`w-full p-3 rounded-xl border text-left text-xs transition flex items-center gap-3 ${
                 isSelected
                   ? "border-orange-500 bg-orange-500/10 text-white font-bold"
-                  : "border-white/10 bg-slate-900 text-slate-300 hover:border-white/20 hover:bg-slate-850"
+                  : "border-white/10 bg-slate-900 text-slate-300 hover:border-white/20 hover:bg-slate-800"
               } ${!poll.isOpen ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
             >
               <div
@@ -280,14 +287,13 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
       <div className="pt-2 flex items-center justify-between gap-3 border-t border-white/5">
         <div className="text-[11px] font-mono text-slate-400">
           {poll.participantCount !== undefined ? (
-            <span>👥 {poll.participantCount} Katılımcı</span>
+            <span>👥 Toplam {poll.participantCount} oy kullanıldı</span>
           ) : (
             <span>🔒 Oylama Açık</span>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          {/* If user has not voted yet or is editing vote */}
           {(!hasVoted || isEditingVote) && poll.isOpen && (
             <>
               {isEditingVote && (
@@ -298,23 +304,22 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
                     setIsEditingVote(false);
                     setSelectedOptionIds(poll.currentUserVote?.optionIds || []);
                   }}
-                  className="px-3 py-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white text-xs font-semibold transition"
+                  className="px-3 py-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white text-xs font-semibold transition cursor-pointer"
                 >
                   İptal
                 </button>
               )}
               <button
                 type="button"
-                disabled={loading || selectedOptionIds.length === 0}
+                disabled={loading}
                 onClick={handleCastVote}
-                className="px-4 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-black shadow-md shadow-orange-500/20 transition"
+                className="px-4 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-black shadow-md shadow-orange-500/20 transition cursor-pointer"
               >
                 {loading ? "Kaydediliyor..." : hasVoted ? "Değişikliği Kaydet" : "Oy Ver 🗳️"}
               </button>
             </>
           )}
 
-          {/* If user has already voted and poll is open */}
           {hasVoted && !isEditingVote && poll.isOpen && (
             <>
               {poll.canChangeVote && (
@@ -322,7 +327,7 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
                   type="button"
                   disabled={loading}
                   onClick={() => setIsEditingVote(true)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
                 >
                   Oyumu Değiştir
                 </button>
@@ -332,7 +337,7 @@ export default function PollCard({ poll: initialPoll, onPollUpdated }: PollCardP
                   type="button"
                   disabled={loading}
                   onClick={handleWithdrawVote}
-                  className="px-3 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold transition"
+                  className="px-3 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold transition cursor-pointer"
                 >
                   Geri Çek
                 </button>
