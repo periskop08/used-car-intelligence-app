@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -13,12 +13,17 @@ import {
   StatusBar,
   Modal,
   Pressable,
+  TextInput,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TURKEY_81_PROVINCES } from '@used-car-intelligence/shared';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
 import UrgentBadge from '../components/UrgentBadge';
 import TorkScoutLoader from '../components/TorkScoutLoader';
@@ -26,6 +31,21 @@ import ShowcaseBadge from '../components/ShowcaseBadge';
 import VehicleConditionVisualizer, { PART_LABELS, CompactMobileVehicleBodySvg } from '../components/VehicleConditionVisualizer';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
+
+const TURKISH_CITIES = ['Tümü', ...TURKEY_81_PROVINCES];
+
+type ListingVehicleCategory = 'ALL' | 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE';
+
+const LISTING_CATEGORY_ITEMS: {
+  id: Exclude<ListingVehicleCategory, 'ALL'>;
+  name: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+}[] = [
+  { id: 'AUTOMOBILE', name: 'Otomobil', icon: 'car-sports' },
+  { id: 'SUV_PICKUP', name: 'Arazi, SUV & Pickup', icon: 'car-lifted-pickup' },
+  { id: 'MINIVAN_PANELVAN', name: 'Minivan & Panelvan', icon: 'van-utility' },
+  { id: 'MOTORCYCLE', name: 'Motosiklet', icon: 'motorbike' },
+];
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://used-car-api-hzmu.onrender.com';
 
@@ -145,6 +165,7 @@ interface Vehicle {
   brand: string;
   modelFamily: string;
   modelName: string;
+  vehicleType?: string;
   year: number;
   fuelType: string;
   transmissionType: string;
@@ -216,15 +237,86 @@ interface ListingFeedItem {
   tramerAmount?: number;
 }
 
+const matchesFeedCategory = (item: ListingFeedItem, cat: ListingVehicleCategory): boolean => {
+  if (!cat || cat === 'ALL') return true;
+  if (item.itemType === 'ISICEPTE_PROVIDER_POST') return false;
+  const vType = (item.vehicle?.vehicleType || '').toUpperCase();
+  const bType = (item.vehicle?.bodyType || '').toUpperCase();
+
+  if (cat === 'MOTORCYCLE') {
+    return vType === 'MOTORCYCLE' || bType === 'MOTORCYCLE';
+  }
+  if (cat === 'MINIVAN_PANELVAN') {
+    return (
+      vType === 'MINIVAN_PANELVAN' ||
+      bType === 'MINIVAN' ||
+      bType === 'VAN' ||
+      bType === 'PANELVAN'
+    );
+  }
+  if (cat === 'SUV_PICKUP') {
+    return vType === 'SUV_PICKUP' || bType === 'SUV' || bType === 'PICKUP';
+  }
+  if (cat === 'AUTOMOBILE') {
+    if (vType === 'MOTORCYCLE' || vType === 'MINIVAN_PANELVAN' || vType === 'SUV_PICKUP') return false;
+    if (
+      bType === 'SUV' ||
+      bType === 'PICKUP' ||
+      bType === 'MINIVAN' ||
+      bType === 'VAN' ||
+      bType === 'PANELVAN' ||
+      bType === 'MOTORCYCLE'
+    ) {
+      return false;
+    }
+    return true;
+  }
+  return true;
+};
+
+const matchesFeedCity = (item: ListingFeedItem, cityFilter: string): boolean => {
+  if (!cityFilter || cityFilter === 'Tümü') return true;
+  const itemCity = (item.location?.city || '').trim();
+  return itemCity.toLocaleLowerCase('tr-TR') === cityFilter.trim().toLocaleLowerCase('tr-TR');
+};
+
 export default function ListingFeedScreen() {
   const router = useRouter();
   const [feedHeight, setFeedHeight] = useState<number>(windowHeight - 90);
+  const [photoBoxWidth, setPhotoBoxWidth] = useState<number>(windowWidth - 48);
+  const [descBodyLines, setDescBodyLines] = useState<number>(8);
 
   const [listings, setListings] = useState<ListingFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [seed, setSeed] = useState<string>('');
+
+  // Filter States (Sadece Vasıta Türü ve İl)
+  const [selectedCategory, setSelectedCategory] = useState<ListingVehicleCategory>('ALL');
+  const [selectedCity, setSelectedCity] = useState<string>('');
+  const [filterModalVisible, setFilterModalVisible] = useState<boolean>(false);
+  const [cityPickerVisible, setCityPickerVisible] = useState<boolean>(false);
+  const [citySearchQuery, setCitySearchQuery] = useState<string>('');
+
+  const activeFilterCount = (selectedCategory !== 'ALL' ? 1 : 0) + (selectedCity ? 1 : 0);
+
+  const filteredCities = useMemo(() => {
+    const q = citySearchQuery.trim().toLocaleLowerCase('tr-TR');
+    if (!q) return TURKISH_CITIES;
+    return TURKISH_CITIES.filter((c) => c.toLocaleLowerCase('tr-TR').includes(q));
+  }, [citySearchQuery]);
+
+  const filteredListings = useMemo(() => {
+    return listings.filter(
+      (item) => matchesFeedCategory(item, selectedCategory) && matchesFeedCity(item, selectedCity)
+    );
+  }, [listings, selectedCategory, selectedCity]);
+
+  const handleClearFilters = () => {
+    setSelectedCategory('ALL');
+    setSelectedCity('');
+  };
 
   // States per listing id
   const [activeTabs, setActiveTabs] = useState<Record<string, 'info' | 'expertise'>>({});
@@ -265,7 +357,7 @@ export default function ListingFeedScreen() {
       const excludeIdsParam = currentSeen.slice(-100).join(',');
       const headers = await getHeaders();
       const response = await fetch(
-        `${API_URL}/listings/feed?limit=10&seed=${activeSeed}&excludeIds=${excludeIdsParam}`,
+        `${API_URL}/listings/feed?limit=50&seed=${activeSeed}&excludeIds=${excludeIdsParam}`,
         { headers }
       );
 
@@ -503,11 +595,23 @@ export default function ListingFeedScreen() {
           {/* Top Header Actions */}
           <View style={styles.topActions}>
             <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.gearCircle}
-              activeOpacity={0.8}
+              onPress={() => setFilterModalVisible(true)}
+              style={[styles.filterTopBtn, activeFilterCount > 0 && styles.filterTopBtnActive]}
+              activeOpacity={0.85}
             >
-              <Ionicons name="settings-sharp" size={20} color="#ffffff" />
+              <Ionicons
+                name="options-outline"
+                size={17}
+                color={activeFilterCount > 0 ? '#ffffff' : '#0f172a'}
+              />
+              <Text
+                style={[
+                  styles.filterTopBtnText,
+                  activeFilterCount > 0 && styles.filterTopBtnTextActive,
+                ]}
+              >
+                Filtre{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+              </Text>
             </TouchableOpacity>
 
             <Text style={styles.feedTitle}>🔧 İŞİCEPTE USTA</Text>
@@ -659,11 +763,23 @@ export default function ListingFeedScreen() {
         {/* Top Header Actions */}
         <View style={styles.topActions}>
           <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.gearCircle}
-            activeOpacity={0.8}
+            onPress={() => setFilterModalVisible(true)}
+            style={[styles.filterTopBtn, activeFilterCount > 0 && styles.filterTopBtnActive]}
+            activeOpacity={0.85}
           >
-            <Ionicons name="settings-sharp" size={20} color="#ffffff" />
+            <Ionicons
+              name="options-outline"
+              size={17}
+              color={activeFilterCount > 0 ? '#ffffff' : '#0f172a'}
+            />
+            <Text
+              style={[
+                styles.filterTopBtnText,
+                activeFilterCount > 0 && styles.filterTopBtnTextActive,
+              ]}
+            >
+              Filtre{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            </Text>
           </TouchableOpacity>
 
           <Text style={styles.feedTitle}>📦 İLAN AKIŞI</Text>
@@ -686,57 +802,86 @@ export default function ListingFeedScreen() {
 
         {/* DISTINCT FRAMED CARD CONTAINER */}
         <View style={styles.cardFrame}>
-          {/* TOP SECTION: Photo, Title, Breadcrumb, Tabs, Table */}
+          {/* TOP SECTION: Photo, Title, Breadcrumb, Tabs, Table, Expanding Description */}
           <View style={styles.cardContentTop}>
-            {/* 1. Photo Carousel */}
-            <View style={styles.photoContainer}>
-              <ExpoImage
-                source={{ uri: resolvedPhotoUrl }}
-                style={styles.photoImage}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-              />
+            {/* 1. Photo Carousel (Swipeable Left/Right Only on Photo Container, No Arrows) */}
+            <View
+              style={styles.photoContainer}
+              onLayout={(e) => {
+                const w = Math.round(e.nativeEvent.layout.width);
+                if (w > 50 && Math.abs(w - photoBoxWidth) > 1) {
+                  setPhotoBoxWidth(w);
+                }
+              }}
+            >
+              {item.photos && item.photos.length > 1 ? (
+                <ScrollView
+                  horizontal
+                  pagingEnabled
+                  nestedScrollEnabled
+                  directionalLockEnabled
+                  showsHorizontalScrollIndicator={false}
+                  bounces={false}
+                  decelerationRate="fast"
+                  scrollEventThrottle={16}
+                  onScroll={(e) => {
+                    const offsetX = e.nativeEvent.contentOffset.x;
+                    if (photoBoxWidth > 0) {
+                      const idx = Math.round(offsetX / photoBoxWidth);
+                      const clamped = Math.max(0, Math.min(item.photos.length - 1, idx));
+                      if (clamped !== activePhoto) {
+                        setActivePhotoIndices((prev) => ({
+                          ...prev,
+                          [item.id]: clamped,
+                        }));
+                      }
+                    }
+                  }}
+                  style={{ width: photoBoxWidth, height: '100%' }}
+                >
+                  {item.photos.map((photo, pIdx) => {
+                    const pUrl = resolveVehicleImageUrl(
+                      photo?.url,
+                      item.vehicle?.brand,
+                      item.vehicle?.modelFamily
+                    );
+                    return (
+                      <View
+                        key={photo.id || String(pIdx)}
+                        style={{ width: photoBoxWidth, height: '100%' }}
+                      >
+                        <ExpoImage
+                          source={{ uri: pUrl }}
+                          style={styles.photoImage}
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
+                        />
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
+                <ExpoImage
+                  source={{ uri: resolvedPhotoUrl }}
+                  style={styles.photoImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+              )}
 
               {/* Promotional Badges: Urgent & Showcase */}
               {(item.isUrgent || item.isShowcaseFeedActive) && (
-                <View style={styles.promoBadgesWrap}>
+                <View style={styles.promoBadgesWrap} pointerEvents="none">
                   {item.isUrgent && <UrgentBadge size="small" />}
                   {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
                 </View>
               )}
 
-              {item.photos.length > 1 && (
-                <View style={styles.photoCountBadge}>
+              {item.photos && item.photos.length > 1 && (
+                <View style={styles.photoCountBadge} pointerEvents="none">
                   <Text style={styles.photoCountText}>
                     {activePhoto + 1} / {item.photos.length}
                   </Text>
-                </View>
-              )}
-
-              {item.photos.length > 1 && (
-                <View style={styles.carouselBtns}>
-                  <TouchableOpacity
-                    onPress={() =>
-                      setActivePhotoIndices((prev) => ({
-                        ...prev,
-                        [item.id]: Math.max(0, activePhoto - 1),
-                      }))
-                    }
-                    style={styles.carouselArrow}
-                  >
-                    <Ionicons name="chevron-back" size={14} color="white" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() =>
-                      setActivePhotoIndices((prev) => ({
-                        ...prev,
-                        [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
-                      }))
-                    }
-                    style={styles.carouselArrow}
-                  >
-                    <Ionicons name="chevron-forward" size={14} color="white" />
-                  </TouchableOpacity>
                 </View>
               )}
             </View>
@@ -909,7 +1054,7 @@ export default function ListingFeedScreen() {
               )}
             </View>
 
-            {/* 6. Dedicated Açıklamalar Kartı */}
+            {/* 6. Dedicated Açıklamalar Kartı (Alt Butonlara Kadar Tam Boyutlu) */}
             <TouchableOpacity
               style={styles.descriptionCard}
               activeOpacity={0.85}
@@ -921,9 +1066,28 @@ export default function ListingFeedScreen() {
                   <Text style={styles.descriptionDetailLink}>Devamını Oku ➔</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={styles.descriptionCardBody} numberOfLines={3}>
-                {item.description ? item.description.replace(/\n+/g, ' ').trim() : 'Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir.'}
-              </Text>
+              <View
+                style={styles.descriptionBodyContainer}
+                onLayout={(e) => {
+                  const h = e.nativeEvent.layout.height;
+                  if (h > 20) {
+                    const computedLines = Math.max(3, Math.floor(h / 16.5));
+                    if (computedLines !== descBodyLines) {
+                      setDescBodyLines(computedLines);
+                    }
+                  }
+                }}
+              >
+                <Text
+                  style={styles.descriptionCardBody}
+                  numberOfLines={descBodyLines}
+                  ellipsizeMode="tail"
+                >
+                  {item.description
+                    ? item.description.replace(/\n{3,}/g, '\n\n').trim()
+                    : 'Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir.'}
+                </Text>
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -972,11 +1136,51 @@ export default function ListingFeedScreen() {
             <Text style={styles.retryText}>Tekrar Dene</Text>
           </TouchableOpacity>
         </View>
-      ) : listings.length === 0 ? (
-        <View style={styles.centered}>
-          <Ionicons name="film-outline" size={48} color="#64748b" />
-          <Text style={styles.errorText}>Gösterilecek vitrin ve acil ilan bulunmuyor.</Text>
-          <Text style={styles.subText}>Yeni vitrin ve acil paketli ilanlar yayınlandığında burada listelenecektir.</Text>
+      ) : filteredListings.length === 0 ? (
+        <View style={{ flex: 1, paddingHorizontal: 12, paddingTop: 6 }}>
+          <View style={styles.topActions}>
+            <TouchableOpacity
+              onPress={() => setFilterModalVisible(true)}
+              style={[styles.filterTopBtn, activeFilterCount > 0 && styles.filterTopBtnActive]}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name="options-outline"
+                size={17}
+                color={activeFilterCount > 0 ? '#ffffff' : '#0f172a'}
+              />
+              <Text
+                style={[
+                  styles.filterTopBtnText,
+                  activeFilterCount > 0 && styles.filterTopBtnTextActive,
+                ]}
+              >
+                Filtre{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={styles.feedTitle}>📦 İLAN AKIŞI</Text>
+
+            <View style={{ width: 38 }} />
+          </View>
+          <View style={styles.centered}>
+            <Ionicons name="film-outline" size={48} color="#64748b" />
+            <Text style={styles.errorText}>
+              {activeFilterCount > 0
+                ? 'Seçtiğiniz filtreye uygun akış ilanı bulunamadı.'
+                : 'Gösterilecek vitrin ve acil ilan bulunmuyor.'}
+            </Text>
+            <Text style={styles.subText}>
+              {activeFilterCount > 0
+                ? 'Vasıta türü veya il filtresini değiştirerek diğer akış ilanlarını inceleyebilirsiniz.'
+                : 'Yeni vitrin ve acil paketli ilanlar yayınlandığında burada listelenecektir.'}
+            </Text>
+            {activeFilterCount > 0 && (
+              <TouchableOpacity style={styles.retryBtn} onPress={handleClearFilters}>
+                <Text style={styles.retryText}>Filtreleri Temizle</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       ) : (
         <View
@@ -989,7 +1193,7 @@ export default function ListingFeedScreen() {
           }}
         >
           <FlatList
-            data={listings}
+            data={filteredListings}
             renderItem={renderFeedItem}
             keyExtractor={(item) => item.id}
             pagingEnabled={true}
@@ -1008,6 +1212,249 @@ export default function ListingFeedScreen() {
           />
         </View>
       )}
+
+      {/* ========================================================================= */}
+      {/* İLAN AKIŞI FİLTRE MODALI (SADECE VASITA TÜRÜ VE İL) */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={filterModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <SafeAreaView style={styles.filterModalContainer}>
+          {/* Modal Header */}
+          <View style={styles.filterModalHeader}>
+            <TouchableOpacity onPress={handleClearFilters}>
+              <Text style={styles.filterModalResetText}>Temizle</Text>
+            </TouchableOpacity>
+            <Text style={styles.filterModalTitle}>Akış Filtreleme</Text>
+            <TouchableOpacity
+              style={styles.modalCloseCircle}
+              onPress={() => setFilterModalVisible(false)}
+            >
+              <Ionicons name="close" size={20} color="#0f172a" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.filterModalScroll}
+            contentContainerStyle={styles.filterModalScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* 1. VASITA TÜRÜ */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>🚘 VASITA TÜRÜ</Text>
+              <View style={{ gap: 8 }}>
+                {[
+                  {
+                    id: 'ALL' as ListingVehicleCategory,
+                    name: 'Tüm Vasıta Türleri (Karışık)',
+                    icon: 'view-grid-outline' as keyof typeof MaterialCommunityIcons.glyphMap,
+                  },
+                  ...LISTING_CATEGORY_ITEMS,
+                ].map((cat) => {
+                  const isSelected = selectedCategory === cat.id;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingVertical: 11,
+                        paddingHorizontal: 12,
+                        borderRadius: 12,
+                        backgroundColor: isSelected ? '#fff7ed' : '#f8fafc',
+                        borderWidth: 1.5,
+                        borderColor: isSelected ? '#ea580c' : '#e2e8f0',
+                      }}
+                      activeOpacity={0.8}
+                      onPress={() => setSelectedCategory(cat.id)}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <MaterialCommunityIcons
+                          name={cat.icon}
+                          size={20}
+                          color={isSelected ? '#ea580c' : '#475569'}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: isSelected ? '800' : '600',
+                            color: isSelected ? '#c2410c' : '#0f172a',
+                          }}
+                        >
+                          {cat.name}
+                        </Text>
+                      </View>
+                      {isSelected ? (
+                        <Ionicons name="checkmark-circle" size={20} color="#ea580c" />
+                      ) : (
+                        <View
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: 9,
+                            borderWidth: 1.5,
+                            borderColor: '#cbd5e1',
+                          }}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 2. İL SEÇİMİ */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>📍 İL SEÇİMİ</Text>
+              <TouchableOpacity
+                style={styles.dropdownSelector}
+                onPress={() => {
+                  setCitySearchQuery('');
+                  setCityPickerVisible(true);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.dropdownSelectorText,
+                    !!selectedCity && styles.dropdownSelectedText,
+                    { flexShrink: 1 },
+                  ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {selectedCity || 'İl Seçin (81 İl)'}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          {/* Sticky Bottom Apply Button */}
+          <View style={styles.filterModalFooter}>
+            <TouchableOpacity
+              style={styles.applyFilterBtn}
+              onPress={() => setFilterModalVisible(false)}
+            >
+              <Text style={styles.applyFilterBtnText}>
+                Filtreleri Uygula ({filteredListings.length} İlan)
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* IN-MODAL CITY SELECTION OVERLAY (81 İL + INSTANT SEARCH) */}
+          {cityPickerVisible && (
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={[StyleSheet.absoluteFill, styles.modalBackdrop, { zIndex: 999 }]}
+            >
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setCityPickerVisible(false);
+                  setCitySearchQuery('');
+                }}
+              />
+              <View style={[styles.pickerSheet, { height: '72%', maxHeight: '85%' }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>İl Seçin ({TURKEY_81_PROVINCES.length} İl)</Text>
+                  <TouchableOpacity
+                    style={styles.modalCloseCircle}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setCityPickerVisible(false);
+                      setCitySearchQuery('');
+                    }}
+                  >
+                    <Ionicons name="close" size={18} color="#64748b" />
+                  </TouchableOpacity>
+                </View>
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#f1f5f9',
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    marginHorizontal: 14,
+                    marginTop: 6,
+                    marginBottom: 4,
+                    gap: 8,
+                  }}
+                >
+                  <Ionicons name="search" size={16} color="#94a3b8" />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      color: '#0f172a',
+                      paddingVertical: 0,
+                    }}
+                    placeholder="İl ara... (Örn: İstanbul, Ankara, İzmir)"
+                    placeholderTextColor="#94a3b8"
+                    value={citySearchQuery}
+                    onChangeText={setCitySearchQuery}
+                    autoCorrect={false}
+                  />
+                  {citySearchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setCitySearchQuery('')}>
+                      <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <ScrollView
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ padding: 14, gap: 8 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {filteredCities.map((c) => {
+                    const isSelected = selectedCity === c || (!selectedCity && c === 'Tümü');
+                    return (
+                      <TouchableOpacity
+                        key={c}
+                        style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                        onPress={() => {
+                          const nextCity = c === 'Tümü' ? '' : c;
+                          setSelectedCity(nextCity);
+                          setCityPickerVisible(false);
+                          setCitySearchQuery('');
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.pickerItemText,
+                            isSelected && styles.pickerItemTextSelected,
+                            { flexShrink: 1 },
+                          ]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {c}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {filteredCities.length === 0 && (
+                    <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, color: '#94a3b8' }}>Eşleşen il bulunamadı.</Text>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            </KeyboardAvoidingView>
+          )}
+        </SafeAreaView>
+      </Modal>
 
       {/* Full Expertise / Condition Modal */}
       {selectedExpertiseItem && (
@@ -1371,18 +1818,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingBottom: 6,
   },
-  gearCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#2563eb',
-    justifyContent: 'center',
+  filterTopBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 5,
-    elevation: 4,
+    gap: 5,
+    height: 38,
+    paddingHorizontal: 12,
+    borderRadius: 19,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  filterTopBtnActive: {
+    backgroundColor: '#ea580c',
+    borderColor: '#ea580c',
+    shadowColor: '#ea580c',
+    shadowOpacity: 0.3,
+  },
+  filterTopBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  filterTopBtnTextActive: {
+    color: '#ffffff',
   },
   darkCircularBtn: {
     width: 38,
@@ -1425,7 +1889,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cardContentTop: {
+    flex: 1,
     gap: 7,
+    marginBottom: 6,
   },
   cardContentBottom: {
     gap: 6,
@@ -1540,23 +2006,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
   },
-  carouselBtns: {
-    position: 'absolute',
-    top: '50%',
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 6,
-    marginTop: -14,
-  },
-  carouselArrow: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   detailsContainer: {
     marginTop: 4,
     gap: 2,
@@ -1664,6 +2113,7 @@ const styles = StyleSheet.create({
     color: '#ea580c',
   },
   descriptionCard: {
+    flex: 1,
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -1672,6 +2122,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginTop: 4,
     gap: 4,
+    overflow: 'hidden',
   },
   descriptionCardHeader: {
     flexDirection: 'row',
@@ -1688,10 +2139,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ea580c',
   },
+  descriptionBodyContainer: {
+    flex: 1,
+    overflow: 'hidden',
+  },
   descriptionCardBody: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: '#475569',
-    lineHeight: 16,
+    lineHeight: 16.5,
   },
   locBox: {
     flex: 1,
@@ -2013,5 +2468,137 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderRadius: 10,
     padding: 10,
+  },
+  filterModalContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  filterModalResetText: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#ea580c',
+  },
+  filterModalTitle: {
+    fontSize: 15.5,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  modalCloseCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterModalScroll: {
+    flex: 1,
+  },
+  filterModalScrollContent: {
+    padding: 16,
+    gap: 14,
+  },
+  filterCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 14,
+    gap: 10,
+  },
+  filterCardTitle: {
+    fontSize: 11.5,
+    fontWeight: '900',
+    color: '#475569',
+    letterSpacing: 0.5,
+  },
+  dropdownSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  dropdownSelectorText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  dropdownSelectedText: {
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+  filterModalFooter: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  applyFilterBtn: {
+    backgroundColor: '#ea580c',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  applyFilterBtnText: {
+    fontSize: 14.5,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  modalBackdrop: {
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 14,
+    paddingHorizontal: 4,
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  pickerItemSelected: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#ea580c',
+  },
+  pickerItemText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  pickerItemTextSelected: {
+    fontWeight: '800',
+    color: '#c2410c',
   },
 });
