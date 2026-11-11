@@ -44,22 +44,22 @@ interface BuyerPackage {
   questions?: number;
 }
 
-const MONTHLY_PLANS: MonthlyPlan[] = [
+const INITIAL_MONTHLY_PLANS: MonthlyPlan[] = [
   {
     id: 'p-tanisma',
     name: 'Tanışma Paketi',
     code: 'TANISMA',
     price: 0,
-    period: 'Ay',
-    reportCount: 3,
+    period: 'Süresiz',
+    reportCount: 1,
     chatCount: 3,
     listingCount: 1,
     durationDays: 30,
     features: [
-      'Aynı anda 1 Aktif İlan Yayını',
-      'Ayda 3 AI Araç Raporu',
-      'Ayda 3 Chatbot Mesajı',
-      'İlan Başına 30 Gün Yayın Süresi',
+      '1 Aktif İlan Yayınlama Hakkı (30 Gün)',
+      '3 Araç Karşılaştırma Hakkı',
+      '3 AI Chatbot Soru Hakkı',
+      '1 Detaylı AI Araç Analiz Raporu',
       'TorqueScout Club Topluluk Erişimi',
     ],
   },
@@ -69,17 +69,19 @@ const MONTHLY_PLANS: MonthlyPlan[] = [
     code: 'YETKIN',
     price: 499,
     period: 'Ay',
-    reportCount: 10,
-    chatCount: 30,
-    listingCount: 10,
+    reportCount: 5,
+    chatCount: 50,
+    listingCount: 5,
     durationDays: 30,
+    popularTag: 'EN ÇOK TERCİH EDİLEN',
     features: [
-      'Aynı anda 10 Aktif İlan Yayını',
-      'Ayda 10 AI Araç Raporu',
-      'Ayda 30 Chatbot Mesajı',
-      'İlan Başına 30 Gün Yayın Süresi',
-      'Kronik Problem ve Piyasa Fiyat Analizleri',
-      'Öncelikli Satıcı Desteği',
+      '5 Aktif İlan Yayınlama Hakkı (30 Gün)',
+      '20 Araç Karşılaştırma Hakkı',
+      '50 AI Chatbot Soru Hakkı',
+      '5 Detaylı AI Araç Analiz Raporu',
+      '1 Vitrin İlanı (14 Gün Öne Çıkarma)',
+      'Her raporda satıcıya sorulacak sorular',
+      'Her raporda ekspertiz kontrol listesi',
     ],
   },
   {
@@ -88,53 +90,58 @@ const MONTHLY_PLANS: MonthlyPlan[] = [
     code: 'PROFESYONEL',
     price: 1499,
     period: 'Ay',
-    reportCount: 50,
+    reportCount: 20,
     chatCount: 150,
-    listingCount: 50,
+    listingCount: 15,
     durationDays: 45,
-    popularTag: 'EN ÇOK TERCİH EDİLEN',
     features: [
-      'Aynı anda 50 Aktif İlan Yayını',
-      'Ayda 50 AI Araç Raporu',
-      'Ayda 150 Chatbot Mesajı',
-      'İlan Başına 45 Gün Yayın Süresi',
-      'Vitrin İlan ve Acil Satış Rozetleri',
-      'TorqueScout Profesyonel Üyelik Rozeti',
-      'Öncelikli 7/24 Uzman Araç Danışmanı',
+      '15 Aktif İlan Yayınlama Hakkı (45 Gün)',
+      '50 Araç Karşılaştırma Hakkı',
+      '150 AI Chatbot Soru Hakkı',
+      '20 Detaylı AI Araç Analiz Raporu',
+      '3 Vitrin İlanı (14 Gün Öne Çıkarma)',
+      'Her raporda satıcıya sorulacak sorular',
+      'Her raporda ekspertiz kontrol listesi',
+      'Kurumsal satıcı profili & Öncelikli destek',
+      'Çoklu kullanıcı ve ekip erişimi',
     ],
   },
 ];
 
-const BUYER_PACKAGES: BuyerPackage[] = [
+const INITIAL_BUYER_PACKAGES: BuyerPackage[] = [
   {
     code: 'ALICI_MINI',
     name: 'Alıcı Mini',
     badge: 'MİNİ',
     price: 149,
     priceText: '149 TL',
+    reports: 5,
+    questions: 15,
     description: 'Birkaç aracı detaylı incelemek ve karar sürecine devam etmek isteyenler için.',
     features: [
       '5 AI araç raporu',
       '15 chatbot mesajı',
       '30 gün kullanım süresi',
-      'Satıcıya sorulacak özel sorular',
-      'Ekspertiz kontrol listesi',
+      'Her raporda satıcıya sorulacak sorular',
+      'Her raporda ekspertiz kontrol listesi',
     ],
   },
   {
     code: 'ALICI_PLUS',
     name: 'Alıcı Plus',
     badge: 'PLUS',
-    popularTag: 'EN POPÜLER',
+    popularTag: 'EN ÇOK TERCİH EDİLEN',
     price: 249,
     priceText: '249 TL',
+    reports: 10,
+    questions: 30,
     description: 'Daha fazla aracı karşılaştırmak ve satın alma kararını netleştirmek isteyenler için.',
     features: [
       '10 AI araç raporu',
       '30 chatbot mesajı',
       '30 gün kullanım süresi',
-      'Satıcıya sorulacak özel sorular',
-      'Ekspertiz kontrol listesi',
+      'Her raporda satıcıya sorulacak sorular',
+      'Her raporda ekspertiz kontrol listesi',
     ],
   },
   {
@@ -143,13 +150,15 @@ const BUYER_PACKAGES: BuyerPackage[] = [
     badge: 'MAX',
     price: 399,
     priceText: '399 TL',
+    reports: 20,
+    questions: 60,
     description: 'Yoğun araç araştırması yapan ve daha geniş kullanım hakkına ihtiyaç duyanlar için.',
     features: [
       '20 AI araç raporu',
       '60 chatbot mesajı',
       '60 gün kullanım süresi',
-      'Satıcıya sorulacak özel sorular',
-      'Ekspertiz kontrol listesi',
+      'Her raporda satıcıya sorulacak sorular',
+      'Her raporda ekspertiz kontrol listesi',
     ],
   },
 ];
@@ -160,6 +169,8 @@ export default function PackagesScreen() {
   const [selectedSection, setSelectedSection] = useState<'MONTHLY' | 'BUYER'>(
     params.initialTab === 'buyer' ? 'BUYER' : 'MONTHLY'
   );
+  const [monthlyPlans, setMonthlyPlans] = useState<MonthlyPlan[]>(INITIAL_MONTHLY_PLANS);
+  const [buyerPackages, setBuyerPackages] = useState<BuyerPackage[]>(INITIAL_BUYER_PACKAGES);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -171,11 +182,140 @@ export default function PackagesScreen() {
   }, [params.initialTab]);
 
   useEffect(() => {
-    fetchProfile();
+    fetchProfileAndLivePlans();
   }, []);
 
-  const fetchProfile = async () => {
+  const fetchProfileAndLivePlans = async () => {
     try {
+      // 1. Live Monthly Subscription Plans (same as Web /pricing)
+      fetch(`${API_URL}/subscriptions/plans`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && Array.isArray(data.subscriptions)) {
+            const subs = data.subscriptions;
+            const tanisma = subs.find((p: any) => p.tier === 'TANISMA' || p.tier === 'FREE');
+            const yetkin = subs.find((p: any) => p.tier === 'YETKIN' || p.tier === 'STANDARD');
+            const pro = subs.find((p: any) => p.tier === 'PROFESYONEL' || p.tier === 'PREMIUM' || p.tier === 'PRO');
+
+            setMonthlyPlans((prev) =>
+              prev.map((plan) => {
+                if (plan.code === 'TANISMA' && tanisma) {
+                  const lim = tanisma.limits || {};
+                  const activeListings = lim.activeListings ?? 1;
+                  const durationDays = lim.listingDurationDays ?? 30;
+                  const comparisons = lim.comparisons ?? 3;
+                  const aiChat = lim.aiChat ?? 3;
+                  const aiReports = lim.aiReports ?? 1;
+                  return {
+                    ...plan,
+                    price: tanisma.priceTrl !== undefined ? Number(tanisma.priceTrl) : plan.price,
+                    reportCount: aiReports,
+                    chatCount: aiChat,
+                    listingCount: activeListings,
+                    durationDays,
+                    features: [
+                      `${activeListings} Aktif İlan Yayınlama Hakkı (${durationDays} Gün)`,
+                      `${comparisons} Araç Karşılaştırma Hakkı`,
+                      `${aiChat} AI Chatbot Soru Hakkı`,
+                      `${aiReports} Detaylı AI Araç Analiz Raporu`,
+                      'TorqueScout Club Topluluk Erişimi',
+                    ],
+                  };
+                }
+                if (plan.code === 'YETKIN' && yetkin) {
+                  const lim = yetkin.limits || {};
+                  const activeListings = lim.activeListings ?? 5;
+                  const durationDays = lim.listingDurationDays ?? 30;
+                  const comparisons = lim.comparisons ?? 20;
+                  const aiChat = lim.aiChat ?? 50;
+                  const aiReports = lim.aiReports ?? 5;
+                  const vitrin = lim.vitrinListings ?? 1;
+                  return {
+                    ...plan,
+                    price: yetkin.priceTrl !== undefined ? Number(yetkin.priceTrl) : plan.price,
+                    reportCount: aiReports,
+                    chatCount: aiChat,
+                    listingCount: activeListings,
+                    durationDays,
+                    features: [
+                      `${activeListings} Aktif İlan Yayınlama Hakkı (${durationDays} Gün)`,
+                      `${comparisons} Araç Karşılaştırma Hakkı`,
+                      `${aiChat} AI Chatbot Soru Hakkı`,
+                      `${aiReports} Detaylı AI Araç Analiz Raporu`,
+                      `${vitrin} Vitrin İlanı (14 Gün Öne Çıkarma)`,
+                      'Her raporda satıcıya sorulacak sorular',
+                      'Her raporda ekspertiz kontrol listesi',
+                    ],
+                  };
+                }
+                if (plan.code === 'PROFESYONEL' && pro) {
+                  const lim = pro.limits || {};
+                  const activeListings = lim.activeListings ?? 15;
+                  const durationDays = lim.listingDurationDays ?? 45;
+                  const comparisons = lim.comparisons ?? 50;
+                  const aiChat = lim.aiChat ?? 150;
+                  const aiReports = lim.aiReports ?? 20;
+                  const vitrin = lim.vitrinListings ?? 3;
+                  return {
+                    ...plan,
+                    price: pro.priceTrl !== undefined ? Number(pro.priceTrl) : plan.price,
+                    reportCount: aiReports,
+                    chatCount: aiChat,
+                    listingCount: activeListings,
+                    durationDays,
+                    features: [
+                      `${activeListings} Aktif İlan Yayınlama Hakkı (${durationDays} Gün)`,
+                      `${comparisons} Araç Karşılaştırma Hakkı`,
+                      `${aiChat} AI Chatbot Soru Hakkı`,
+                      `${aiReports} Detaylı AI Araç Analiz Raporu`,
+                      `${vitrin} Vitrin İlanı (14 Gün Öne Çıkarma)`,
+                      'Her raporda satıcıya sorulacak sorular',
+                      'Her raporda ekspertiz kontrol listesi',
+                      'Kurumsal satıcı profili & Öncelikli destek',
+                      'Çoklu kullanıcı ve ekip erişimi',
+                    ],
+                  };
+                }
+                return plan;
+              })
+            );
+          }
+        })
+        .catch(() => {});
+
+      // 2. Live Buyer Packages (same as Web BuyerPackagesSection)
+      fetch(`${API_URL}/buyer-packages`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: any[]) => {
+          if (Array.isArray(data)) {
+            setBuyerPackages((prev) =>
+              prev.map((pkg) => {
+                const live = data.find((d) => d.code === pkg.code);
+                if (!live) return pkg;
+                const price = live.price !== undefined ? Number(live.price) : pkg.price;
+                const aiReportLimit = live.aiReportLimit !== undefined ? live.aiReportLimit : pkg.reports ?? 5;
+                const chatbotMessageLimit = live.chatbotMessageLimit !== undefined ? live.chatbotMessageLimit : pkg.questions ?? 15;
+                const validityDays = live.validityDays !== undefined ? live.validityDays : pkg.code === 'ALICI_MAX' ? 60 : 30;
+                return {
+                  ...pkg,
+                  price,
+                  priceText: `${price} TL`,
+                  reports: aiReportLimit,
+                  questions: chatbotMessageLimit,
+                  features: [
+                    `${aiReportLimit} AI araç raporu`,
+                    `${chatbotMessageLimit} chatbot mesajı`,
+                    `${validityDays} gün kullanım süresi`,
+                    'Her raporda satıcıya sorulacak sorular',
+                    'Her raporda ekspertiz kontrol listesi',
+                  ],
+                };
+              })
+            );
+          }
+        })
+        .catch(() => {});
+
       const token =
         (await AsyncStorage.getItem('accessToken')) ||
         (await AsyncStorage.getItem('token'));
@@ -199,7 +339,7 @@ export default function PackagesScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchProfile();
+    fetchProfileAndLivePlans();
   };
 
   const [purchasing, setPurchasing] = useState(false);
@@ -255,7 +395,7 @@ export default function PackagesScreen() {
                   'Tebrikler! 🎉',
                   `${plan.name} paketiniz başarıyla aktif edildi. Yeni haklarınız hesabınıza tanımlandı!`
                 );
-                fetchProfile();
+                fetchProfileAndLivePlans();
               } else {
                 Alert.alert('Hata', data.message || 'Paket yükseltme işlemi tamamlanamadı.');
               }
@@ -320,7 +460,7 @@ export default function PackagesScreen() {
                   'Tebrikler! 🎉',
                   `${pkg.name} haklarınız (${reportsCount} Rapor, ${questionsCount} AI Soru) anında hesabınıza eklendi.`
                 );
-                fetchProfile();
+                fetchProfileAndLivePlans();
               } else {
                 Alert.alert('Hata', data.message || 'Satın alma işlemi tamamlanamadı.');
               }
@@ -404,9 +544,9 @@ export default function PackagesScreen() {
                 </Text>
               </View>
 
-              {MONTHLY_PLANS.map((plan) => {
+              {monthlyPlans.map((plan) => {
                 const isCurrent = currentTier === plan.code;
-                const isPro = plan.code === 'PROFESYONEL';
+                const isPro = plan.code === 'YETKIN';
 
                 return (
                   <View
@@ -485,7 +625,7 @@ export default function PackagesScreen() {
                 </Text>
               </View>
 
-              {BUYER_PACKAGES.map((pkg) => {
+              {buyerPackages.map((pkg) => {
                 const isPlus = pkg.code === 'ALICI_PLUS';
 
                 return (
