@@ -1307,7 +1307,7 @@ export default function TorqueScoutClubScreen() {
           {loading ? (
         <View style={styles.centerLoading}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>Kulüp akışı yükleniyor...</Text>
+          <Text style={styles.loadingText}>Tork Scout Club hazırlanıyor...</Text>
         </View>
       ) : selectedCategory === 'GARAGE' ? (
         <ScrollView

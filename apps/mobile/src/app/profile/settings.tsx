@@ -192,7 +192,7 @@ export default function AccountSettingsScreen() {
     return (
       <SafeAreaView style={styles.center} edges={['top']}>
         <TorkScoutLoader />
-        <Text style={styles.loadingText}>Ayarlar yükleniyor...</Text>
+        <Text style={styles.loadingText}>Hesap Ayarları hazırlanıyor...</Text>
       </SafeAreaView>
     );
   }

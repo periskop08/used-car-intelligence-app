@@ -463,7 +463,7 @@ export default function VehicleGuideScreen() {
       {loading ? (
         <View style={styles.center}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>Cloudflare R2 araç görseli ve veriler yükleniyor...</Text>
+          <Text style={styles.loadingText}>Araç Rehberi hazırlanıyor...</Text>
         </View>
       ) : card ? (
         <ScrollView

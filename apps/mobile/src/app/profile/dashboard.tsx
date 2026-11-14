@@ -100,7 +100,7 @@ export default function UserDashboardScreen() {
       {loading ? (
         <View style={styles.center}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>Dashboard yükleniyor...</Text>
+          <Text style={styles.loadingText}>Kontrol Paneli hazırlanıyor...</Text>
         </View>
       ) : (
         <ScrollView

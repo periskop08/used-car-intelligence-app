@@ -175,7 +175,7 @@ export default function ProfileScreen() {
     return (
       <SafeAreaView style={styles.center} edges={['top']}>
         <TorkScoutLoader />
-        <Text style={styles.loadingText}>Profiliniz yükleniyor...</Text>
+        <Text style={styles.loadingText}>Profil hazırlanıyor...</Text>
       </SafeAreaView>
     );
   }

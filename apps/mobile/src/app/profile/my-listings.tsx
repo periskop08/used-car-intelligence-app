@@ -573,7 +573,7 @@ export default function MyListingsScreen() {
       {loading ? (
         <View style={styles.center}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>İlanlarınız yükleniyor...</Text>
+          <Text style={styles.loadingText}>İlanlarım hazırlanıyor...</Text>
         </View>
       ) : (
         <ScrollView

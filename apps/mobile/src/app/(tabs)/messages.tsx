@@ -182,7 +182,7 @@ export default function MessageInboxScreen() {
       {loading ? (
         <View style={styles.center}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>Sohbetleriniz yükleniyor...</Text>
+          <Text style={styles.loadingText}>Mesajlar hazırlanıyor...</Text>
         </View>
       ) : conversations.length === 0 ? (
         <ScrollView

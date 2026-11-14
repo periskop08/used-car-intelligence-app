@@ -283,7 +283,7 @@ export default function EditListingScreen() {
     return (
       <View style={styles.loadingContainer}>
         <TorkScoutLoader />
-        <Text style={styles.loadingText}>İlan bilgileri yükleniyor...</Text>
+        <Text style={styles.loadingText}>İlan Düzenleme hazırlanıyor...</Text>
       </View>
     );
   }

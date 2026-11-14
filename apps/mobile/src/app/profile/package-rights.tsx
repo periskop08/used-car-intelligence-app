@@ -152,7 +152,7 @@ export default function PackageRightsScreen() {
       {loading ? (
         <View style={styles.center}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>Paket haklarınız yükleniyor...</Text>
+          <Text style={styles.loadingText}>Paket Haklarım hazırlanıyor...</Text>
         </View>
       ) : (
         <ScrollView

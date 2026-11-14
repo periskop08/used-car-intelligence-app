@@ -1689,7 +1689,7 @@ export default function AdminScreen() {
             {listingsLoading ? (
               <View style={styles.loaderBox}>
                 <TorkScoutLoader />
-                <Text style={styles.loaderText}>İlanlar yükleniyor...</Text>
+                <Text style={styles.loaderText}>İlan Yönetimi hazırlanıyor...</Text>
               </View>
             ) : listings.length === 0 ? (
               <View style={styles.emptyCard}>
@@ -1921,7 +1921,7 @@ export default function AdminScreen() {
             {perfLoading ? (
               <View style={styles.loaderBox}>
                 <TorkScoutLoader />
-                <Text style={styles.loaderText}>Performans analitiği hesaplanıyor...</Text>
+                <Text style={styles.loaderText}>İlan Performansı hazırlanıyor...</Text>
               </View>
             ) : (
               <View style={{ gap: 10 }}>
@@ -2019,7 +2019,7 @@ export default function AdminScreen() {
             {qualityLoading ? (
               <View style={styles.loaderBox}>
                 <TorkScoutLoader />
-                <Text style={styles.loaderText}>Veri sağlığı kontrolleri çalıştırılıyor...</Text>
+                <Text style={styles.loaderText}>Veri Sağlığı & Kalite hazırlanıyor...</Text>
               </View>
             ) : (
               <>
@@ -2129,7 +2129,7 @@ export default function AdminScreen() {
             {clubDashboardLoading ? (
               <View style={styles.loaderBox}>
                 <TorkScoutLoader />
-                <Text style={styles.loaderText}>Club özeti yükleniyor...</Text>
+                <Text style={styles.loaderText}>Tork Scout Club hazırlanıyor...</Text>
               </View>
             ) : (
               <>
@@ -2268,7 +2268,7 @@ export default function AdminScreen() {
             {clubPostsLoading ? (
               <View style={styles.loaderBox}>
                 <TorkScoutLoader />
-                <Text style={styles.loaderText}>Gönderiler yükleniyor...</Text>
+                <Text style={styles.loaderText}>Gönderiler & Moderasyon hazırlanıyor...</Text>
               </View>
             ) : clubPosts.length === 0 ? (
               <View style={styles.emptyCard}>
@@ -2510,7 +2510,7 @@ export default function AdminScreen() {
             {clubCommentsLoading ? (
               <View style={styles.loaderBox}>
                 <TorkScoutLoader />
-                <Text style={styles.loaderText}>Yorumlar yükleniyor...</Text>
+                <Text style={styles.loaderText}>Yorumlar hazırlanıyor...</Text>
               </View>
             ) : clubCommentGroups.length === 0 ? (
               <View style={styles.emptyCard}>
@@ -2626,7 +2626,7 @@ export default function AdminScreen() {
                 {clubMembersLoading ? (
                   <View style={styles.loaderBox}>
                     <TorkScoutLoader />
-                    <Text style={styles.loaderText}>Club üyeleri yükleniyor...</Text>
+                    <Text style={styles.loaderText}>Club Üyeleri hazırlanıyor...</Text>
                   </View>
                 ) : clubMembers.length === 0 ? (
                   <View style={styles.emptyCard}>
@@ -2715,7 +2715,7 @@ export default function AdminScreen() {
                 {clubMembersLoading ? (
                   <View style={styles.loaderBox}>
                     <TorkScoutLoader />
-                    <Text style={styles.loaderText}>Moderatörler yükleniyor...</Text>
+                    <Text style={styles.loaderText}>Moderatörler hazırlanıyor...</Text>
                   </View>
                 ) : clubModerators.length === 0 ? (
                   <View style={styles.emptyCard}>
@@ -2783,7 +2783,7 @@ export default function AdminScreen() {
                 {clubRestrictionsLoading ? (
                   <View style={styles.loaderBox}>
                     <TorkScoutLoader />
-                    <Text style={styles.loaderText}>Kısıtlamalar yükleniyor...</Text>
+                    <Text style={styles.loaderText}>Susturma & Ban Listesi hazırlanıyor...</Text>
                   </View>
                 ) : clubRestrictions.length === 0 ? (
                   <View style={styles.emptyCard}>
@@ -2972,7 +2972,7 @@ export default function AdminScreen() {
             {clubReportsLoading ? (
               <View style={styles.loaderBox}>
                 <TorkScoutLoader />
-                <Text style={styles.loaderText}>Club raporları yükleniyor...</Text>
+                <Text style={styles.loaderText}>Şikayet & Raporlar hazırlanıyor...</Text>
               </View>
             ) : (
               <>

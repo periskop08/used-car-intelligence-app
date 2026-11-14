@@ -1231,7 +1231,7 @@ export default function ListingFeedScreen() {
       {loading && listings.length === 0 ? (
         <View style={styles.centered}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>Akış hazırlanıyor...</Text>
+          <Text style={styles.loadingText}>İlan Akışı hazırlanıyor...</Text>
         </View>
       ) : error && listings.length === 0 ? (
         <View style={styles.centered}>

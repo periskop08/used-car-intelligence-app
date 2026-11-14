@@ -178,7 +178,7 @@ export default function SubscriptionScreen() {
     return (
       <SafeAreaView style={styles.center} edges={['top']}>
         <TorkScoutLoader />
-        <Text style={styles.loadingText}>Paket bilgileri yükleniyor...</Text>
+        <Text style={styles.loadingText}>Abonelik & Paketler hazırlanıyor...</Text>
       </SafeAreaView>
     );
   }

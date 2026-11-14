@@ -1246,7 +1246,7 @@ export default function AraciniBulScreen() {
       {gameState === 'loading' && (
         <View style={styles.center}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>Yapay zeka araçları hazırlanıyor...</Text>
+          <Text style={styles.loadingText}>Aracını Bul hazırlanıyor...</Text>
         </View>
       )}
 
@@ -1537,7 +1537,7 @@ export default function AraciniBulScreen() {
       {gameState === 'swiping' && !currentTopCard && (
         <View style={styles.center}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>Sıradaki araç yükleniyor...</Text>
+          <Text style={styles.loadingText}>Aracını Bul hazırlanıyor...</Text>
         </View>
       )}
 

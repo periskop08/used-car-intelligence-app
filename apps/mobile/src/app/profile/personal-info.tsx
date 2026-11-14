@@ -373,9 +373,9 @@ export default function PersonalInfoScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.center}>
+      <SafeAreaView style={styles.center} edges={['top']}>
         <TorkScoutLoader />
-        <Text style={styles.loadingText}>Bilgileriniz yükleniyor...</Text>
+        <Text style={styles.loadingText}>Kişisel Bilgilerim hazırlanıyor...</Text>
       </SafeAreaView>
     );
   }

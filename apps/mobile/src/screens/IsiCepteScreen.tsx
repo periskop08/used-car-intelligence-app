@@ -1160,11 +1160,7 @@ export default function IsiCepteOneriyorScreen() {
       {loading && !refreshing ? (
         <View style={styles.centerLoading}>
           <TorkScoutLoader />
-          <Text style={styles.centerLoadingText}>
-            {scope === 'SHOWCASE_ONLY'
-              ? 'Vitrin üyeleri yükleniyor...'
-              : 'Tüm ustalar ve servisler yükleniyor...'}
-          </Text>
+          <Text style={styles.centerLoadingText}>İşi Cepte Öneriyor hazırlanıyor...</Text>
         </View>
       ) : (
         <FlatList

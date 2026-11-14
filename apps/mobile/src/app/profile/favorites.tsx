@@ -377,7 +377,7 @@ export default function FavoritesScreen() {
       {loading ? (
         <View style={styles.center}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>Favoriler yükleniyor...</Text>
+          <Text style={styles.loadingText}>Favorilerim hazırlanıyor...</Text>
         </View>
       ) : (
         <ScrollView

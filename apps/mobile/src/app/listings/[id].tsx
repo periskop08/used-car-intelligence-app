@@ -469,7 +469,7 @@ export default function ListingDetailScreen() {
     return (
       <View style={styles.center}>
         <TorkScoutLoader />
-        <Text style={styles.loadingText}>İlan detayları yükleniyor...</Text>
+        <Text style={styles.loadingText}>İlan Detayı hazırlanıyor...</Text>
       </View>
     );
   }

@@ -1370,7 +1370,7 @@ export default function ComparisonScreen() {
         {loadingComparison ? (
           <View style={styles.loadingContainer}>
             <TorkScoutLoader />
-            <Text style={styles.loadingTitle}>Web Karşılaştırma Servisi Çalışıyor...</Text>
+            <Text style={styles.loadingTitle}>Araç Karşılaştırma hazırlanıyor...</Text>
             <Text style={styles.loadingSub}>8 kriter matrisi, yıldız değerlendirmeleri ve fabrika teknik verileri analiz ediliyor.</Text>
           </View>
         ) : vehiclesList.length > 0 ? (
@@ -2114,7 +2114,7 @@ export default function ComparisonScreen() {
             {loadingOptions ? (
               <View style={styles.modalLoadingBox}>
                 <TorkScoutLoader />
-                <Text style={styles.modalLoadingText}>Seçenekler Yükleniyor...</Text>
+                <Text style={styles.modalLoadingText}>Araç Karşılaştırma hazırlanıyor...</Text>
               </View>
             ) : (() => {
               const filteredOptions = options.filter((item) =>

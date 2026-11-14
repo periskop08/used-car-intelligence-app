@@ -526,7 +526,7 @@ export default function PackagesScreen() {
       {loading ? (
         <View style={styles.center}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>Paketler yükleniyor...</Text>
+          <Text style={styles.loadingText}>Paketler hazırlanıyor...</Text>
         </View>
       ) : (
         <ScrollView

@@ -1591,7 +1591,7 @@ export default function ListingsScreen() {
       {loading ? (
         <View style={styles.centerLoading}>
           <TorkScoutLoader />
-          <Text style={styles.loadingText}>İlanlar yükleniyor...</Text>
+          <Text style={styles.loadingText}>İlanlar hazırlanıyor...</Text>
         </View>
       ) : listings.length === 0 ? (
         <View style={styles.emptyContainer}>
