@@ -1,7 +1,36 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "@/utils/apiConfig";
+import { getCanonicalBrandLogoUrl, normalizeBrandSlug } from "@used-car-intelligence/shared";
+
+const BrandLogo = ({ brandName, size = 36 }: { brandName?: string; size?: number }) => {
+  const [fallbackStep, setFallbackStep] = useState<0 | 1 | 2>(0);
+  useEffect(() => {
+    setFallbackStep(0);
+  }, [brandName]);
+  const slug = normalizeBrandSlug(brandName);
+  const localUrl = slug ? `/brand-logos/${slug}.png` : "";
+  const canonicalUrl = getCanonicalBrandLogoUrl(brandName);
+  const src = fallbackStep === 0 && localUrl ? localUrl : fallbackStep <= 1 ? canonicalUrl : "";
+
+  if (!brandName || !src || fallbackStep === 2) return null;
+
+  return (
+    <div
+      style={{ width: size, height: size }}
+      className="rounded-xl bg-white/95 border border-white/20 flex items-center justify-center p-1.5 shrink-0 shadow-md"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={brandName}
+        className="w-full h-full object-contain"
+        onError={() => setFallbackStep((prev) => (prev === 0 ? 1 : 2))}
+      />
+    </div>
+  );
+};
 
 export interface CardFactItem {
   id?: string;
@@ -231,24 +260,27 @@ export default function VehicleGuideCardLayout({
             {customIdentitySlot ? (
               customIdentitySlot
             ) : (
-              <>
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <h1 className="text-xl md:text-2xl font-black text-white tracking-tight uppercase">
-                    {brand || "MARKA"} <span className="text-orange-500">{model || "MODEL"}</span>
-                  </h1>
-                  {generationCode && (
-                    <span className="text-[10px] font-mono font-bold bg-white/5 border border-white/10 px-2 py-0.5 rounded text-slate-400">
-                      {generationCode}
-                    </span>
-                  )}
-                </div>
+              <div className="flex items-center gap-3">
+                <BrandLogo brandName={brand} size={38} />
+                <div className="min-w-0 flex-1 flex flex-col gap-1">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <h1 className="text-xl md:text-2xl font-black text-white tracking-tight uppercase">
+                      {brand || "MARKA"} <span className="text-orange-500">{model || "MODEL"}</span>
+                    </h1>
+                    {generationCode && (
+                      <span className="text-[10px] font-mono font-bold bg-white/5 border border-white/10 px-2 py-0.5 rounded text-slate-400">
+                        {generationCode}
+                      </span>
+                    )}
+                  </div>
 
-                <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
-                  <span>📅 {yearStart || "YYYY"} - {yearEnd || "Günümüz"}</span>
-                  <span className="text-slate-600">•</span>
-                  <span>🚗 {translateBodyType(bodyType)}</span>
+                  <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
+                    <span>📅 {yearStart || "YYYY"} - {yearEnd || "Günümüz"}</span>
+                    <span className="text-slate-600">•</span>
+                    <span>🚗 {translateBodyType(bodyType)}</span>
+                  </div>
                 </div>
-              </>
+              </div>
             )}
 
             {customSummarySlot ? (

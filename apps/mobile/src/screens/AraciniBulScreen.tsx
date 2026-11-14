@@ -15,13 +15,51 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCanonicalBrandLogoUrl } from '@used-car-intelligence/shared';
+import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
 import { createEdgeSwipeDismissHandlers } from '../utils/backGesture';
 import TorkScoutLoader from '../components/TorkScoutLoader';
+
+const BrandLogo = ({ brandName, size = 36 }: { brandName?: string; size?: number }) => {
+  const [imgError, setImgError] = useState(false);
+  useEffect(() => {
+    setImgError(false);
+  }, [brandName]);
+  const logoSrc = resolveBrandLogo(brandName) || getCanonicalBrandLogoUrl(brandName);
+
+  if (logoSrc && !imgError) {
+    const source = typeof logoSrc === 'number' ? logoSrc : { uri: String(logoSrc) };
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 10,
+          backgroundColor: '#f8fafc',
+          borderWidth: 1,
+          borderColor: '#e2e8f0',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 4,
+        }}
+      >
+        <Image
+          source={source}
+          style={{ width: size - 8, height: size - 8 }}
+          resizeMode="contain"
+          onError={() => setImgError(true)}
+        />
+      </View>
+    );
+  }
+  return null;
+};
 
 function IntroSwipeCardAnimation() {
   const swipeAnim = useRef(new Animated.Value(0)).current;
@@ -505,13 +543,18 @@ const VehicleCardContent = React.memo(({ card }: { card: DiscoveryCard }) => {
 
       {/* Content Scroll */}
       <ScrollView style={styles.cardScroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.cardTitle}>
-          {card.displayName || `${card.brand} ${card.modelFamily}`}
-        </Text>
-        <Text style={styles.cardSubtitle}>
-          {card.generationName ? `${card.generationName} • ` : ''}
-          {card.productionYears || ''}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <BrandLogo brandName={card.brand} size={36} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>
+              {card.displayName || `${card.brand} ${card.modelFamily}`}
+            </Text>
+            <Text style={styles.cardSubtitle}>
+              {card.generationName ? `${card.generationName} • ` : ''}
+              {card.productionYears || ''}
+            </Text>
+          </View>
+        </View>
 
         {/* Specification Grid (2x3) */}
         <View style={styles.specGrid}>
@@ -1372,12 +1415,15 @@ export default function AraciniBulScreen() {
           {resultsData.recommendation && (
             <View style={styles.aiRecommendationCard}>
               <View style={styles.aiRecHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.aiRecSub}>YAPAY ZEKA DESTEKLİ ARAÇ ÖNERİSİ</Text>
-                  <Text style={styles.aiRecTitle}>
-                    {resultsData.recommendation.brandName} {resultsData.recommendation.modelName}{' '}
-                    {resultsData.recommendation.generationName || ''}
-                  </Text>
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <BrandLogo brandName={resultsData.recommendation.brandName} size={40} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.aiRecSub}>YAPAY ZEKA DESTEKLİ ARAÇ ÖNERİSİ</Text>
+                    <Text style={styles.aiRecTitle}>
+                      {resultsData.recommendation.brandName} {resultsData.recommendation.modelName}{' '}
+                      {resultsData.recommendation.generationName || ''}
+                    </Text>
+                  </View>
                 </View>
                 <View style={styles.aiRecPillsRow}>
                   {resultsData.recommendation.bodyType && (

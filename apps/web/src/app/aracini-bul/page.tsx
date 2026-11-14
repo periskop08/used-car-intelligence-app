@@ -16,6 +16,35 @@ import {
   Info
 } from "lucide-react";
 import { formatImageUrl } from "@/utils/media";
+import { getCanonicalBrandLogoUrl, normalizeBrandSlug } from "@used-car-intelligence/shared";
+
+const BrandLogo = ({ brandName, size = 38 }: { brandName?: string; size?: number }) => {
+  const [fallbackStep, setFallbackStep] = useState<0 | 1 | 2>(0);
+  useEffect(() => {
+    setFallbackStep(0);
+  }, [brandName]);
+  const slug = normalizeBrandSlug(brandName);
+  const localUrl = slug ? `/brand-logos/${slug}.png` : "";
+  const canonicalUrl = getCanonicalBrandLogoUrl(brandName);
+  const src = fallbackStep === 0 && localUrl ? localUrl : fallbackStep <= 1 ? canonicalUrl : "";
+
+  if (!brandName || !src || fallbackStep === 2) return null;
+
+  return (
+    <div
+      style={{ width: size, height: size }}
+      className="rounded-xl bg-white/95 border border-white/20 flex items-center justify-center p-1.5 shrink-0 shadow-md"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={brandName}
+        className="w-full h-full object-contain"
+        onError={() => setFallbackStep((prev) => (prev === 0 ? 1 : 2))}
+      />
+    </div>
+  );
+};
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -1124,13 +1153,16 @@ export default function FindMyCarPage() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0c1224] to-transparent z-20" />
 
-                    <div className="absolute bottom-3 left-5 right-5 z-30">
-                      <span className="text-[10px] font-bold text-orange-400 uppercase tracking-widest block mb-0.5">
-                        {currentCard.brand}
-                      </span>
-                      <h4 className="text-lg md:text-xl font-black text-slate-100 leading-tight">
-                        {currentCard.displayName || currentCard.modelFamily}
-                      </h4>
+                    <div className="absolute bottom-3 left-5 right-5 z-30 flex items-center gap-3">
+                      <BrandLogo brandName={currentCard.brand} size={38} />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[10px] font-bold text-orange-400 uppercase tracking-widest block mb-0.5">
+                          {currentCard.brand}
+                        </span>
+                        <h4 className="text-lg md:text-xl font-black text-slate-100 leading-tight truncate">
+                          {currentCard.displayName || currentCard.modelFamily}
+                        </h4>
+                      </div>
                     </div>
 
                     {/* Drag indicator banners */}
@@ -1292,13 +1324,16 @@ export default function FindMyCarPage() {
             {resultsData.recommendation && (
               <div className="bg-slate-900/60 border border-orange-500/20 rounded-[28px] p-6 backdrop-blur-md shadow-2xl space-y-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
-                  <div>
-                    <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest block mb-1">
-                      Yapay Zeka Destekli Araç Önerisi
-                    </span>
-                    <h3 className="text-2xl font-black text-white tracking-tight">
-                      {resultsData.recommendation.brandName} {resultsData.recommendation.modelName} {resultsData.recommendation.generationName || ''}
-                    </h3>
+                  <div className="flex items-center gap-3.5">
+                    <BrandLogo brandName={resultsData.recommendation.brandName} size={42} />
+                    <div>
+                      <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest block mb-1">
+                        Yapay Zeka Destekli Araç Önerisi
+                      </span>
+                      <h3 className="text-2xl font-black text-white tracking-tight">
+                        {resultsData.recommendation.brandName} {resultsData.recommendation.modelName} {resultsData.recommendation.generationName || ''}
+                      </h3>
+                    </div>
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     <span className="px-3 py-1 bg-white/5 border border-white/10 text-slate-300 text-xs font-bold rounded-xl">
