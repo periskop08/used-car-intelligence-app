@@ -13,12 +13,21 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView as NativeSafeAreaView } from 'react-native-safe-area-context';
+const SafeAreaView = NativeSafeAreaView as any;
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TorkScoutLoader from '../../components/TorkScoutLoader';
+
+let ImagePicker: any = null;
+try {
+  ImagePicker = require('expo-image-picker');
+} catch (e) {
+  console.warn('ImagePicker could not be loaded:', e);
+}
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -39,7 +48,14 @@ const resolveMediaUrl = (url?: string | null): string => {
 
 type MainSection = 'LISTINGS' | 'CLUB';
 type ListingsSubTab = 'LISTING_MODERATION' | 'LISTING_PERFORMANCE' | 'LISTING_QUALITY';
-type ClubSubTab = 'CLUB_POSTS' | 'CLUB_USERS' | 'CLUB_REPORTS';
+type ClubSubTab =
+  | 'CLUB_OVERVIEW'
+  | 'CLUB_POSTS'
+  | 'CLUB_COMMENTS'
+  | 'CLUB_USERS'
+  | 'CLUB_MESSAGES'
+  | 'CLUB_REPORTS'
+  | 'CLUB_SETTINGS_LOGS';
 
 const LISTING_STATUS_TABS = [
   { key: 'PENDING_REVIEW', label: 'Onay Bekleyenler' },
@@ -50,6 +66,14 @@ const LISTING_STATUS_TABS = [
   { key: 'PASSIVE', label: 'Pasif İlanlar' },
   { key: 'EXPIRED', label: 'Süresi Dolanlar' },
   { key: 'REPORTED', label: 'Şikâyet Edilenler' },
+];
+
+const MODERATION_REASON_CODES = [
+  { code: 'PHOTO_INSUFFICIENT', label: 'Eksik / Yetersiz Fotoğraf' },
+  { code: 'INCORRECT_SPECS', label: 'Hatalı Araç / Donanım Bilgisi' },
+  { code: 'PRICE_ANOMALY', label: 'Gerçek Dışı / Hatalı Fiyat' },
+  { code: 'FAKED_LISTING', label: 'Sahte / Güvenlik İhlali İlan' },
+  { code: 'DUPLICATE_LISTING', label: 'Mükerrer (Tekrarlayan) İlan' },
 ];
 
 const HEALTH_CHECK_CARDS = [
@@ -118,11 +142,13 @@ export default function AdminScreen() {
   const [listingSearch, setListingSearch] = useState<string>('');
   const [sellerTypeFilter, setSellerTypeFilter] = useState<string>('ALL');
   const [riskFilter, setRiskFilter] = useState<string>('ALL');
+  const [listingSort, setListingSort] = useState<'NEWEST' | 'OLDEST'>('NEWEST');
 
   // Listing Inspection Modal State
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
   const [inspectionData, setInspectionData] = useState<any | null>(null);
   const [inspectionLoading, setInspectionLoading] = useState<boolean>(false);
+  const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
 
   // Listing Reason Prompt Modal (Reject / Request Revision)
   const [reasonModalOpen, setReasonModalOpen] = useState<boolean>(false);
@@ -153,16 +179,28 @@ export default function AdminScreen() {
   const [qualityDrilldownLoading, setQualityDrilldownLoading] = useState<boolean>(false);
 
   // ==========================================
-  // 4. CLUB -> POSTS & MODERATION STATE
+  // 4. CLUB -> OVERVIEW STATE
   // ==========================================
-  const [clubPostTab, setClubPostTab] = useState<'ALL' | 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'USER_SUBMISSIONS' | 'COMMENTS_QUEUE'>('ALL');
-  const [clubUserSubFilter, setClubUserSubFilter] = useState<'PENDING_REVIEW' | 'ALL' | 'PUBLISHED' | 'REJECTED'>('PENDING_REVIEW');
+  const [clubDashboard, setClubDashboard] = useState<any | null>(null);
+  const [clubDashboardLoading, setClubDashboardLoading] = useState<boolean>(false);
+
+  // ==========================================
+  // 5. CLUB -> POSTS & MODERATION STATE
+  // ==========================================
+  const [clubPostTab, setClubPostTab] = useState<
+    'ALL' | 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'USER_SUBMISSIONS'
+  >('ALL');
+  const [clubUserSubFilter, setClubUserSubFilter] = useState<
+    'PENDING_REVIEW' | 'ALL' | 'PUBLISHED' | 'REJECTED'
+  >('PENDING_REVIEW');
   const [clubPosts, setClubPosts] = useState<any[]>([]);
   const [pendingUserPostsCount, setPendingUserPostsCount] = useState<number>(0);
   const [clubPostsLoading, setClubPostsLoading] = useState<boolean>(false);
 
-  // Club Comments Queue State
-  const [clubCommentFilter, setClubCommentFilter] = useState<'ALL' | 'PENDING_REVIEW' | 'HIDDEN' | 'VISIBLE'>('ALL');
+  // Club Comments Tab State
+  const [clubCommentFilter, setClubCommentFilter] = useState<
+    'ALL' | 'PENDING_REVIEW' | 'HIDDEN' | 'VISIBLE'
+  >('ALL');
   const [clubCommentGroups, setClubCommentGroups] = useState<any[]>([]);
   const [clubCommentsLoading, setClubCommentsLoading] = useState<boolean>(false);
 
@@ -176,19 +214,42 @@ export default function AdminScreen() {
   const [rejectTargetPost, setRejectTargetPost] = useState<any | null>(null);
   const [rejectPostReason, setRejectPostReason] = useState<string>('');
 
-  // Club Create Post Modal
+  // ==========================================
+  // FULL WEB-PARITY CLUB CREATE / EDIT POST MODAL STATE
+  // ==========================================
   const [createPostModalOpen, setCreatePostModalOpen] = useState<boolean>(false);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [newPostTitle, setNewPostTitle] = useState<string>('');
   const [newPostContent, setNewPostContent] = useState<string>('');
+  const [newPostMediaUrls, setNewPostMediaUrls] = useState<string[]>([]);
+  const [manualMediaUrlInput, setManualMediaUrlInput] = useState<string>('');
+  const [uploadingPostMedia, setUploadingPostMedia] = useState<boolean>(false);
   const [newPostPinned, setNewPostPinned] = useState<boolean>(false);
   const [newPostCommentsEnabled, setNewPostCommentsEnabled] = useState<boolean>(true);
   const [creatingPost, setCreatingPost] = useState<boolean>(false);
 
+  // Full Poll Builder State (Matching Web PollCreationFields)
+  const [pollEnabled, setPollEnabled] = useState<boolean>(false);
+  const [pollQuestion, setPollQuestion] = useState<string>('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [pollSelectionType, setPollSelectionType] = useState<'SINGLE' | 'MULTIPLE'>('SINGLE');
+  const [pollMaxSelections, setPollMaxSelections] = useState<number>(2);
+  const [pollResultVisibility, setPollResultVisibility] = useState<
+    'AFTER_VOTE' | 'ALWAYS' | 'AFTER_END' | 'ADMIN_ONLY'
+  >('AFTER_VOTE');
+  const [pollDurationType, setPollDurationType] = useState<
+    'UNLIMITED' | '1H' | '6H' | '12H' | '1D' | '3D' | '7D'
+  >('UNLIMITED');
+  const [pollNotifyOnClose, setPollNotifyOnClose] = useState<boolean>(false);
+
   // ==========================================
-  // 5. CLUB -> MEMBERS, MODERATORS & RESTRICTIONS STATE
+  // 6. CLUB -> MEMBERS, MODERATORS & RESTRICTIONS STATE
   // ==========================================
-  const [clubUsersMode, setClubUsersMode] = useState<'MEMBERS' | 'RESTRICTIONS'>('MEMBERS');
+  const [clubUsersMode, setClubUsersMode] = useState<'MEMBERS' | 'MODERATORS' | 'RESTRICTIONS'>(
+    'MEMBERS'
+  );
   const [clubMembers, setClubMembers] = useState<any[]>([]);
+  const [clubModerators, setClubModerators] = useState<any[]>([]);
   const [clubMembersSearch, setClubMembersSearch] = useState<string>('');
   const [clubMembersLoading, setClubMembersLoading] = useState<boolean>(false);
   const [clubRestrictions, setClubRestrictions] = useState<any[]>([]);
@@ -203,7 +264,18 @@ export default function AdminScreen() {
   const [submittingRestrict, setSubmittingRestrict] = useState<boolean>(false);
 
   // ==========================================
-  // 6. CLUB -> REPORTS & COMPLAINTS STATE
+  // 7. CLUB -> DIRECT & BULK MESSAGES STATE
+  // ==========================================
+  const [msgTargetUser, setMsgTargetUser] = useState<any | null>(null);
+  const [directMsgText, setDirectMsgText] = useState<string>('');
+  const [sendingDirectMsg, setSendingDirectMsg] = useState<boolean>(false);
+  const [selectedBulkUserIds, setSelectedBulkUserIds] = useState<string[]>([]);
+  const [bulkMsgModalOpen, setBulkMsgModalOpen] = useState<boolean>(false);
+  const [bulkMsgText, setBulkMsgText] = useState<string>('');
+  const [sendingBulkMsg, setSendingBulkMsg] = useState<boolean>(false);
+
+  // ==========================================
+  // 8. CLUB -> REPORTS & COMPLAINTS STATE
   // ==========================================
   const [clubReportSection, setClubReportSection] = useState<string>('MODERATION');
   const [clubReportRange, setClubReportRange] = useState<string>('30D');
@@ -211,7 +283,25 @@ export default function AdminScreen() {
   const [clubReportsLoading, setClubReportsLoading] = useState<boolean>(false);
   const [flaggedComments, setFlaggedComments] = useState<any[]>([]);
 
-  const getToken = async () => AsyncStorage.getItem('accessToken');
+  // ==========================================
+  // 9. CLUB -> SETTINGS & AUDIT LOGS STATE
+  // ==========================================
+  const [settingsOrLogsMode, setSettingsOrLogsMode] = useState<'SETTINGS' | 'AUDIT_LOG'>('SETTINGS');
+  const [clubSettings, setClubSettings] = useState({
+    rulesText: '',
+    supportUrl: '',
+    commentCharLimit: 1000,
+    commentRateLimitSeconds: 10,
+    dailyCommentLimit: 50,
+    maxImagesPerPost: 10,
+  });
+  const [clubSettingsLoading, setClubSettingsLoading] = useState<boolean>(false);
+  const [savingClubSettings, setSavingClubSettings] = useState<boolean>(false);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogsLoading, setAuditLogsLoading] = useState<boolean>(false);
+
+  const getToken = async () =>
+    (await AsyncStorage.getItem('accessToken')) || (await AsyncStorage.getItem('token'));
 
   // ------------------------------------------
   // FETCHERS: LISTINGS MODERATION
@@ -242,7 +332,7 @@ export default function AdminScreen() {
       if (listingSearch.trim()) params.append('search', listingSearch.trim());
       if (sellerTypeFilter !== 'ALL') params.append('sellerType', sellerTypeFilter);
       if (riskFilter !== 'ALL') params.append('riskLevel', riskFilter);
-      params.append('sort', 'NEWEST');
+      params.append('sort', listingSort);
 
       const res = await fetch(`${API_URL}/admin/listing-moderation/items?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -258,7 +348,7 @@ export default function AdminScreen() {
     } finally {
       setListingsLoading(false);
     }
-  }, [listingStatus, listingsPage, listingSearch, sellerTypeFilter, riskFilter]);
+  }, [listingStatus, listingsPage, listingSearch, sellerTypeFilter, riskFilter, listingSort]);
 
   const openListingInspection = async (listingId: string) => {
     setSelectedListingId(listingId);
@@ -386,7 +476,7 @@ export default function AdminScreen() {
   };
 
   // ------------------------------------------
-  // FETCHERS: LISTINGS PERFORMANCE
+  // FETCHERS: LISTINGS PERFORMANCE & QUALITY
   // ------------------------------------------
   const fetchPerformance = useCallback(async () => {
     const token = await getToken();
@@ -426,9 +516,6 @@ export default function AdminScreen() {
     }
   };
 
-  // ------------------------------------------
-  // FETCHERS: LISTINGS QUALITY
-  // ------------------------------------------
   const fetchQuality = useCallback(async () => {
     const token = await getToken();
     if (!token) return;
@@ -470,6 +557,26 @@ export default function AdminScreen() {
   };
 
   // ------------------------------------------
+  // FETCHERS: CLUB OVERVIEW
+  // ------------------------------------------
+  const fetchClubOverview = useCallback(async () => {
+    const token = await getToken();
+    if (!token) return;
+    setClubDashboardLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/admin/club/dashboard`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClubDashboard(data);
+      }
+    } catch {} finally {
+      setClubDashboardLoading(false);
+    }
+  }, []);
+
+  // ------------------------------------------
   // FETCHERS: CLUB POSTS & COMMENTS
   // ------------------------------------------
   const fetchClubPosts = useCallback(async () => {
@@ -477,33 +584,12 @@ export default function AdminScreen() {
     if (!token) return;
     setClubPostsLoading(true);
     try {
-      // Also fetch pending user submissions count
       fetch(`${API_URL}/admin/club/posts?source=USER_SUBMISSIONS&status=PENDING_REVIEW`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((r) => (r.ok ? r.json() : []))
         .then((arr) => setPendingUserPostsCount(Array.isArray(arr) ? arr.length : 0))
         .catch(() => {});
-
-      if (clubPostTab === 'COMMENTS_QUEUE') {
-        setClubCommentsLoading(true);
-        let res = await fetch(
-          `${API_URL}/admin/club/comments/groups?status=${encodeURIComponent(clubCommentFilter)}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (!res.ok) {
-          res = await fetch(`${API_URL}/admin/club/comments?status=${encodeURIComponent(clubCommentFilter)}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        }
-        if (res.ok) {
-          const data = await res.json();
-          setClubCommentGroups(Array.isArray(data) ? data : []);
-        }
-        setClubCommentsLoading(false);
-        setClubPostsLoading(false);
-        return;
-      }
 
       let queryUrl = `${API_URL}/admin/club/posts?status=${clubPostTab}&source=ADMIN`;
       if (clubPostTab === 'USER_SUBMISSIONS') {
@@ -521,7 +607,30 @@ export default function AdminScreen() {
     } finally {
       setClubPostsLoading(false);
     }
-  }, [clubPostTab, clubUserSubFilter, clubCommentFilter]);
+  }, [clubPostTab, clubUserSubFilter]);
+
+  const fetchClubCommentsQueue = useCallback(async () => {
+    const token = await getToken();
+    if (!token) return;
+    setClubCommentsLoading(true);
+    try {
+      let res = await fetch(
+        `${API_URL}/admin/club/comments/groups?status=${encodeURIComponent(clubCommentFilter)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) {
+        res = await fetch(`${API_URL}/admin/club/comments?status=${encodeURIComponent(clubCommentFilter)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+      if (res.ok) {
+        const data = await res.json();
+        setClubCommentGroups(Array.isArray(data) ? data : []);
+      }
+    } catch {} finally {
+      setClubCommentsLoading(false);
+    }
+  }, [clubCommentFilter]);
 
   const openClubPostDrawer = async (post: any) => {
     setSelectedClubPost(post);
@@ -541,7 +650,301 @@ export default function AdminScreen() {
     }
   };
 
-  const handleClubPostAction = async (postId: string, action: 'publish' | 'archive' | 'approve' | 'comments-toggle') => {
+  // ==========================================
+  // CLUB CREATE / EDIT POST & PHOTO UPLOAD & POLLS
+  // ==========================================
+  const resetCreatePostForm = () => {
+    setEditingPostId(null);
+    setNewPostTitle('');
+    setNewPostContent('');
+    setNewPostMediaUrls([]);
+    setManualMediaUrlInput('');
+    setNewPostPinned(false);
+    setNewPostCommentsEnabled(true);
+    setPollEnabled(false);
+    setPollQuestion('');
+    setPollOptions(['', '']);
+    setPollSelectionType('SINGLE');
+    setPollMaxSelections(2);
+    setPollResultVisibility('AFTER_VOTE');
+    setPollDurationType('UNLIMITED');
+    setPollNotifyOnClose(false);
+  };
+
+  const openNewClubPostModal = () => {
+    resetCreatePostForm();
+    setCreatePostModalOpen(true);
+  };
+
+  const openEditClubPostModal = (post: any) => {
+    resetCreatePostForm();
+    setEditingPostId(post.id);
+    setNewPostTitle(post.title || '');
+    setNewPostContent(post.content || '');
+    const existingUrls = Array.isArray(post.media)
+      ? post.media.map((m: any) => m.mediaUrl || m.url).filter(Boolean)
+      : [];
+    setNewPostMediaUrls(existingUrls);
+    setNewPostPinned(!!post.isPinned);
+    setNewPostCommentsEnabled(post.commentsEnabled !== false);
+    setCreatePostModalOpen(true);
+  };
+
+  const handlePickClubPostImages = async () => {
+    try {
+      if (!ImagePicker) {
+        Alert.alert('Hata', 'Fotoğraf seçici modülü yüklenemedi.');
+        return;
+      }
+      if (newPostMediaUrls.length >= 10) {
+        Alert.alert('Limit Doldu', 'Gönderi başına en fazla 10 fotoğraf yüklenebilir.');
+        return;
+      }
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('İzin Gerekli', 'Fotoğraf yüklemek için galeri erişim izni vermelisiniz.');
+        return;
+      }
+      const remaining = 10 - newPostMediaUrls.length;
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions?.Images || 'Images',
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const token = await getToken();
+        if (!token) return;
+        setUploadingPostMedia(true);
+        const uploadedUrls: string[] = [];
+
+        for (const asset of result.assets) {
+          const uri = asset.uri;
+          if (!uri) continue;
+          const formData = new FormData();
+          const filename = uri.split('/').pop() || `club-post-${Date.now()}.jpg`;
+          const match = /\.(\w+)$/.exec(filename);
+          const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+          formData.append('file', {
+            uri,
+            name: filename,
+            type,
+          } as any);
+
+          let uploadRes = await fetch(`${API_URL}/admin/club/media/upload`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          });
+
+          if (!uploadRes.ok) {
+            uploadRes = await fetch(`${API_URL}/club/media/upload`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              body: formData,
+            });
+          }
+
+          if (uploadRes.ok) {
+            const data = await uploadRes.json();
+            if (data?.url) uploadedUrls.push(data.url);
+          }
+        }
+
+        if (uploadedUrls.length > 0) {
+          setNewPostMediaUrls((prev) => [...prev, ...uploadedUrls].slice(0, 10));
+        } else {
+          Alert.alert('Hata', 'Seçilen görseller sunucuya yüklenemedi.');
+        }
+      }
+    } catch (e) {
+      console.error('Pick club post image error:', e);
+      Alert.alert('Hata', 'Fotoğraf yükleme sırasında bir hata oluştu.');
+    } finally {
+      setUploadingPostMedia(false);
+    }
+  };
+
+  const handleAddManualMediaUrl = () => {
+    const trimmed = manualMediaUrlInput.trim();
+    if (!trimmed) return;
+    if (newPostMediaUrls.length >= 10) {
+      Alert.alert('Limit Doldu', 'En fazla 10 görsel ekleyebilirsiniz.');
+      return;
+    }
+    setNewPostMediaUrls((prev) => [...prev, trimmed]);
+    setManualMediaUrlInput('');
+  };
+
+  const handleRemovePostMedia = (idx: number) => {
+    setNewPostMediaUrls((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddPollOption = () => {
+    if (pollOptions.length >= 10) return;
+    setPollOptions((prev) => [...prev, '']);
+  };
+
+  const handleRemovePollOption = (idx: number) => {
+    if (pollOptions.length <= 2) return;
+    const next = pollOptions.filter((_, i) => i !== idx);
+    setPollOptions(next);
+    setPollMaxSelections((prev) => Math.min(prev, next.length));
+  };
+
+  const handleUpdatePollOption = (idx: number, val: string) => {
+    const next = [...pollOptions];
+    next[idx] = val;
+    setPollOptions(next);
+  };
+
+  const handleMovePollOption = (idx: number, dir: 'up' | 'down') => {
+    const target = dir === 'up' ? idx - 1 : idx + 1;
+    if (target < 0 || target >= pollOptions.length) return;
+    const next = [...pollOptions];
+    const tmp = next[idx];
+    next[idx] = next[target];
+    next[target] = tmp;
+    setPollOptions(next);
+  };
+
+  const computePollEndsAtIso = (): string | undefined => {
+    if (pollDurationType === 'UNLIMITED') return undefined;
+    const now = new Date();
+    switch (pollDurationType) {
+      case '1H':
+        now.setHours(now.getHours() + 1);
+        break;
+      case '6H':
+        now.setHours(now.getHours() + 6);
+        break;
+      case '12H':
+        now.setHours(now.getHours() + 12);
+        break;
+      case '1D':
+        now.setDate(now.getDate() + 1);
+        break;
+      case '3D':
+        now.setDate(now.getDate() + 3);
+        break;
+      case '7D':
+        now.setDate(now.getDate() + 7);
+        break;
+    }
+    return now.toISOString();
+  };
+
+  const handleCreateOrUpdateClubPost = async (publishImmediately: boolean) => {
+    const hasTitle = !!newPostTitle.trim();
+    const hasContent = !!newPostContent.trim();
+    const hasMedia = newPostMediaUrls.length > 0;
+    const hasPoll = pollEnabled && !!pollQuestion.trim();
+
+    if (!hasTitle && !hasContent && !hasMedia && !hasPoll) {
+      Alert.alert(
+        'Eksik Bilgi',
+        'Lütfen gönderi başlığı, metni, fotoğraf veya anket alanlarından en az birini doldurun.'
+      );
+      return;
+    }
+
+    if (pollEnabled && !editingPostId) {
+      if (!pollQuestion.trim()) {
+        Alert.alert('Eksik Anket Sorusu', 'Lütfen anket sorusunu girin.');
+        return;
+      }
+      const validOpts = pollOptions.map((o) => o.trim()).filter(Boolean);
+      if (validOpts.length < 2) {
+        Alert.alert('Eksik Seçenek', 'Anket için en az 2 geçerli seçenek girmelisiniz.');
+        return;
+      }
+    }
+
+    const token = await getToken();
+    if (!token) return;
+    setCreatingPost(true);
+    try {
+      if (editingPostId) {
+        // Update existing post
+        const res = await fetch(`${API_URL}/admin/club/posts/${editingPostId}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: newPostTitle.trim() || undefined,
+            content: newPostContent.trim() || undefined,
+            isPinned: newPostPinned,
+            commentsEnabled: newPostCommentsEnabled,
+          }),
+        });
+        if (res.ok) {
+          setCreatePostModalOpen(false);
+          resetCreatePostForm();
+          Alert.alert('Başarılı', 'Gönderi güncellendi.');
+          fetchClubPosts();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          Alert.alert('Hata', err.message || 'Gönderi güncellenemedi.');
+        }
+        return;
+      }
+
+      const payload: any = {
+        title: newPostTitle.trim() || undefined,
+        content: newPostContent.trim() || undefined,
+        mediaUrls: newPostMediaUrls,
+        isPinned: newPostPinned,
+        commentsEnabled: newPostCommentsEnabled,
+        publishImmediately,
+      };
+
+      if (pollEnabled) {
+        payload.poll = {
+          question: pollQuestion.trim(),
+          options: pollOptions.map((o) => o.trim()).filter(Boolean),
+          selectionType: pollSelectionType,
+          maxSelections: pollSelectionType === 'MULTIPLE' ? pollMaxSelections : 1,
+          resultVisibility: pollResultVisibility,
+          endsAt: computePollEndsAtIso(),
+          notifyParticipantsOnClose: pollNotifyOnClose,
+        };
+      }
+
+      const res = await fetch(`${API_URL}/admin/club/posts`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setCreatePostModalOpen(false);
+        resetCreatePostForm();
+        Alert.alert(
+          'Başarılı',
+          publishImmediately ? 'Gönderi başarıyla yayınlandı!' : 'Gönderi taslak olarak kaydedildi.'
+        );
+        fetchClubPosts();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert('Hata', err.message || 'Gönderi oluşturulamadı.');
+      }
+    } catch {
+      Alert.alert('Hata', 'Sunucu hatası oluştu.');
+    } finally {
+      setCreatingPost(false);
+    }
+  };
+
+  const handleClubPostAction = async (
+    postId: string,
+    action: 'publish' | 'archive' | 'approve' | 'comments-toggle'
+  ) => {
     const token = await getToken();
     if (!token) return;
     try {
@@ -562,6 +965,41 @@ export default function AdminScreen() {
     } catch {
       Alert.alert('Hata', 'Sunucu bağlantısı sağlanamadı.');
     }
+  };
+
+  const handleTogglePinPost = async (post: any) => {
+    const token = await getToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/admin/club/posts/${post.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isPinned: !post.isPinned }),
+      });
+      if (res.ok) {
+        Alert.alert('Başarılı', post.isPinned ? 'Sabitleme kaldırıldı.' : 'Gönderi sabitlendi.');
+        fetchClubPosts();
+      }
+    } catch {}
+  };
+
+  const handleClosePoll = async (pollId: string) => {
+    const token = await getToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/admin/club/polls/${pollId}/close`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        Alert.alert('Başarılı', 'Anket oylamaya kapatıldı.');
+        fetchClubPosts();
+        setSelectedClubPost(null);
+      }
+    } catch {}
   };
 
   const submitRejectUserPost = async () => {
@@ -597,49 +1035,6 @@ export default function AdminScreen() {
     }
   };
 
-  const handleCreateClubPost = async (publishImmediately: boolean) => {
-    if (!newPostTitle.trim() && !newPostContent.trim()) {
-      Alert.alert('Uyarı', 'Lütfen başlık veya içerik girin.');
-      return;
-    }
-    const token = await getToken();
-    if (!token) return;
-    setCreatingPost(true);
-    try {
-      const res = await fetch(`${API_URL}/admin/club/posts`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: newPostTitle.trim() || undefined,
-          content: newPostContent.trim() || undefined,
-          mediaUrls: [],
-          isPinned: newPostPinned,
-          commentsEnabled: newPostCommentsEnabled,
-          publishImmediately,
-        }),
-      });
-      if (res.ok) {
-        setCreatePostModalOpen(false);
-        setNewPostTitle('');
-        setNewPostContent('');
-        setNewPostPinned(false);
-        setNewPostCommentsEnabled(true);
-        Alert.alert('Başarılı', publishImmediately ? 'Gönderi yayınlandı.' : 'Gönderi taslak olarak kaydedildi.');
-        fetchClubPosts();
-      } else {
-        const err = await res.json().catch(() => ({}));
-        Alert.alert('Hata', err.message || 'Gönderi oluşturulamadı.');
-      }
-    } catch {
-      Alert.alert('Hata', 'Sunucu hatası oluştu.');
-    } finally {
-      setCreatingPost(false);
-    }
-  };
-
   const handleCommentAction = async (
     commentId: string,
     action: 'publish' | 'review' | 'hide' | 'delete'
@@ -660,8 +1055,8 @@ export default function AdminScreen() {
         if (selectedClubPost) {
           openClubPostDrawer(selectedClubPost);
         }
-        if (clubPostTab === 'COMMENTS_QUEUE') {
-          fetchClubPosts();
+        if (clubSubTab === 'CLUB_COMMENTS') {
+          fetchClubCommentsQueue();
         }
         if (clubSubTab === 'CLUB_REPORTS') {
           fetchClubReports();
@@ -675,7 +1070,7 @@ export default function AdminScreen() {
   };
 
   // ------------------------------------------
-  // FETCHERS: CLUB MEMBERS & RESTRICTIONS
+  // FETCHERS: CLUB MEMBERS, MODERATORS & RESTRICTIONS
   // ------------------------------------------
   const fetchClubMembersAndRestrictions = useCallback(async () => {
     const token = await getToken();
@@ -695,6 +1090,19 @@ export default function AdminScreen() {
         if (res.ok) {
           const data = await res.json();
           setClubMembers(Array.isArray(data) ? data : data.users || data.items || []);
+        }
+      } catch {} finally {
+        setClubMembersLoading(false);
+      }
+    } else if (clubUsersMode === 'MODERATORS') {
+      setClubMembersLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/admin/club/moderators`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setClubModerators(Array.isArray(data) ? data : []);
         }
       } catch {} finally {
         setClubMembersLoading(false);
@@ -797,6 +1205,73 @@ export default function AdminScreen() {
   };
 
   // ------------------------------------------
+  // FETCHERS: CLUB DIRECT & BULK MESSAGES
+  // ------------------------------------------
+  const handleSendDirectMessage = async () => {
+    if (!msgTargetUser || !directMsgText.trim()) return;
+    const token = await getToken();
+    if (!token) return;
+    setSendingDirectMsg(true);
+    try {
+      const res = await fetch(`${API_URL}/admin/club/users/${msgTargetUser.id}/message`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: directMsgText.trim(),
+          sendNotification: true,
+        }),
+      });
+      if (res.ok) {
+        setDirectMsgText('');
+        setMsgTargetUser(null);
+        Alert.alert('Başarılı', 'Mesaj ve bildirim kullanıcıya iletildi.');
+      } else {
+        Alert.alert('Hata', 'Mesaj gönderilemedi.');
+      }
+    } catch {
+      Alert.alert('Hata', 'Sunucu hatası.');
+    } finally {
+      setSendingDirectMsg(false);
+    }
+  };
+
+  const handleSendBulkMessage = async () => {
+    if (selectedBulkUserIds.length === 0 || !bulkMsgText.trim()) return;
+    const token = await getToken();
+    if (!token) return;
+    setSendingBulkMsg(true);
+    try {
+      const res = await fetch(`${API_URL}/admin/club/messages/bulk`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userIds: selectedBulkUserIds,
+          content: bulkMsgText.trim(),
+          sendNotification: true,
+        }),
+      });
+      if (res.ok) {
+        setBulkMsgModalOpen(false);
+        setBulkMsgText('');
+        setSelectedBulkUserIds([]);
+        Alert.alert('Başarılı', 'Toplu mesaj kuyruğa alındı ve gönderildi.');
+      } else {
+        Alert.alert('Hata', 'Toplu mesaj gönderilemedi.');
+      }
+    } catch {
+      Alert.alert('Hata', 'Sunucu hatası.');
+    } finally {
+      setSendingBulkMsg(false);
+    }
+  };
+
+  // ------------------------------------------
   // FETCHERS: CLUB REPORTS & COMPLAINTS
   // ------------------------------------------
   const fetchClubReports = useCallback(async () => {
@@ -827,6 +1302,66 @@ export default function AdminScreen() {
     }
   }, [clubReportSection, clubReportRange]);
 
+  // ------------------------------------------
+  // FETCHERS: CLUB SETTINGS & AUDIT LOGS
+  // ------------------------------------------
+  const fetchClubSettingsAndLogs = useCallback(async () => {
+    const token = await getToken();
+    if (!token) return;
+    if (settingsOrLogsMode === 'SETTINGS') {
+      setClubSettingsLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/admin/club/settings`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setClubSettings((prev) => ({ ...prev, ...data }));
+        }
+      } catch {} finally {
+        setClubSettingsLoading(false);
+      }
+    } else {
+      setAuditLogsLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/admin/club/moderation-log?limit=80`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAuditLogs(Array.isArray(data) ? data : []);
+        }
+      } catch {} finally {
+        setAuditLogsLoading(false);
+      }
+    }
+  }, [settingsOrLogsMode]);
+
+  const handleSaveClubSettings = async () => {
+    const token = await getToken();
+    if (!token) return;
+    setSavingClubSettings(true);
+    try {
+      const res = await fetch(`${API_URL}/admin/club/settings`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(clubSettings),
+      });
+      if (res.ok) {
+        Alert.alert('Başarılı', 'Club topluluk ayarları kaydedildi ve Audit Log yazıldı.');
+      } else {
+        Alert.alert('Hata', 'Ayarlar güncellenemedi.');
+      }
+    } catch {
+      Alert.alert('Hata', 'Sunucu hatası.');
+    } finally {
+      setSavingClubSettings(false);
+    }
+  };
+
   // Trigger fetches based on active tab
   useEffect(() => {
     if (mainSection === 'LISTINGS') {
@@ -839,12 +1374,18 @@ export default function AdminScreen() {
         fetchQuality();
       }
     } else if (mainSection === 'CLUB') {
-      if (clubSubTab === 'CLUB_POSTS') {
+      if (clubSubTab === 'CLUB_OVERVIEW') {
+        fetchClubOverview();
+      } else if (clubSubTab === 'CLUB_POSTS') {
         fetchClubPosts();
-      } else if (clubSubTab === 'CLUB_USERS') {
+      } else if (clubSubTab === 'CLUB_COMMENTS') {
+        fetchClubCommentsQueue();
+      } else if (clubSubTab === 'CLUB_USERS' || clubSubTab === 'CLUB_MESSAGES') {
         fetchClubMembersAndRestrictions();
       } else if (clubSubTab === 'CLUB_REPORTS') {
         fetchClubReports();
+      } else if (clubSubTab === 'CLUB_SETTINGS_LOGS') {
+        fetchClubSettingsAndLogs();
       }
     }
   }, [
@@ -855,9 +1396,12 @@ export default function AdminScreen() {
     fetchListings,
     fetchPerformance,
     fetchQuality,
+    fetchClubOverview,
     fetchClubPosts,
+    fetchClubCommentsQueue,
     fetchClubMembersAndRestrictions,
     fetchClubReports,
+    fetchClubSettingsAndLogs,
   ]);
 
   const handleRefreshCurrent = () => {
@@ -871,9 +1415,13 @@ export default function AdminScreen() {
         fetchQuality();
       }
     } else {
-      if (clubSubTab === 'CLUB_POSTS') fetchClubPosts();
-      else if (clubSubTab === 'CLUB_USERS') fetchClubMembersAndRestrictions();
-      else fetchClubReports();
+      if (clubSubTab === 'CLUB_OVERVIEW') fetchClubOverview();
+      else if (clubSubTab === 'CLUB_POSTS') fetchClubPosts();
+      else if (clubSubTab === 'CLUB_COMMENTS') fetchClubCommentsQueue();
+      else if (clubSubTab === 'CLUB_USERS' || clubSubTab === 'CLUB_MESSAGES')
+        fetchClubMembersAndRestrictions();
+      else if (clubSubTab === 'CLUB_REPORTS') fetchClubReports();
+      else fetchClubSettingsAndLogs();
     }
   };
 
@@ -965,26 +1513,36 @@ export default function AdminScreen() {
           })}
         </View>
       ) : (
-        <View style={styles.subTabsBar}>
-          {[
-            { key: 'CLUB_POSTS', label: 'Gönderiler & Moderasyon', icon: 'newspaper-outline' },
-            { key: 'CLUB_USERS', label: 'Üyeler & Moderatörler', icon: 'people-outline' },
-            { key: 'CLUB_REPORTS', label: 'Şikayetler & Raporlar', icon: 'flag-outline' },
-          ].map((sub) => {
-            const active = clubSubTab === sub.key;
-            return (
-              <TouchableOpacity
-                key={sub.key}
-                style={[styles.subTabChip, active && styles.subTabChipActive]}
-                onPress={() => setClubSubTab(sub.key as ClubSubTab)}
-              >
-                <Ionicons name={sub.icon as any} size={13} color={active ? '#f97316' : '#94a3b8'} />
-                <Text style={[styles.subTabChipText, active && styles.subTabChipTextActive]}>
-                  {sub.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+        <View style={styles.subTabsScrollWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 10, gap: 6 }}
+          >
+            {[
+              { key: 'CLUB_OVERVIEW', label: 'Genel Bakış', icon: 'grid-outline' },
+              { key: 'CLUB_POSTS', label: 'Gönderiler & Moderasyon', icon: 'newspaper-outline' },
+              { key: 'CLUB_COMMENTS', label: 'Yorumlar', icon: 'chatbubbles-outline' },
+              { key: 'CLUB_USERS', label: 'Üyeler, Mod & Ban', icon: 'people-outline' },
+              { key: 'CLUB_MESSAGES', label: 'Mesajlar', icon: 'mail-outline' },
+              { key: 'CLUB_REPORTS', label: 'Şikayet & Raporlar', icon: 'flag-outline' },
+              { key: 'CLUB_SETTINGS_LOGS', label: 'Ayarlar & Audit Log', icon: 'settings-outline' },
+            ].map((sub) => {
+              const active = clubSubTab === sub.key;
+              return (
+                <TouchableOpacity
+                  key={sub.key}
+                  style={[styles.subTabChipScrollable, active && styles.subTabChipActive]}
+                  onPress={() => setClubSubTab(sub.key as ClubSubTab)}
+                >
+                  <Ionicons name={sub.icon as any} size={13} color={active ? '#f97316' : '#94a3b8'} />
+                  <Text style={[styles.subTabChipText, active && styles.subTabChipTextActive]}>
+                    {sub.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
       )}
 
@@ -1001,7 +1559,6 @@ export default function AdminScreen() {
         {/* ============================================================ */}
         {mainSection === 'LISTINGS' && listingsSubTab === 'LISTING_MODERATION' && (
           <>
-            {/* Status Chips */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1115,6 +1672,14 @@ export default function AdminScreen() {
                     </Text>
                   </TouchableOpacity>
                 ))}
+                <TouchableOpacity
+                  style={styles.miniFilterChip}
+                  onPress={() => setListingSort((prev) => (prev === 'NEWEST' ? 'OLDEST' : 'NEWEST'))}
+                >
+                  <Text style={styles.miniFilterText}>
+                    ⇅ {listingSort === 'NEWEST' ? 'En Yeni Önce' : 'En Eski Önce'}
+                  </Text>
+                </TouchableOpacity>
               </ScrollView>
             </View>
 
@@ -1213,7 +1778,6 @@ export default function AdminScreen() {
                         </View>
                       </View>
 
-                      {/* Seller & Date Row */}
                       <View style={styles.listingSellerRow}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
                           <Ionicons name="person-circle-outline" size={16} color="#f97316" />
@@ -1233,7 +1797,6 @@ export default function AdminScreen() {
                         </Text>
                       </View>
 
-                      {/* Quick Action Buttons */}
                       <View style={styles.listingActionRow}>
                         <TouchableOpacity
                           style={[styles.actionBtn, styles.actionBtnNeutral]}
@@ -1297,7 +1860,6 @@ export default function AdminScreen() {
                   );
                 })}
 
-                {/* Pagination */}
                 {listingsTotalPages > 1 && (
                   <View style={styles.paginationBar}>
                     <TouchableOpacity
@@ -1548,25 +2110,88 @@ export default function AdminScreen() {
         )}
 
         {/* ============================================================ */}
-        {/* SECTION 2A: CLUB -> GÖNDERİLER & MODERASYON                  */}
+        {/* SECTION 2A: CLUB -> GENEL BAKIŞ (DASHBOARD OVERVIEW)         */}
         {/* ============================================================ */}
-        {mainSection === 'CLUB' && clubSubTab === 'CLUB_POSTS' && (
+        {mainSection === 'CLUB' && clubSubTab === 'CLUB_OVERVIEW' && (
           <>
-            {/* Top Action Bar */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={styles.sectionHelperText}>
-                Topluluk gönderileri, Garajım paylaşımları ve yorum denetimi
+                Tork Scout Club Canlı Operasyon Özeti
               </Text>
-              <TouchableOpacity
-                style={styles.primaryOrangeBtn}
-                onPress={() => setCreatePostModalOpen(true)}
-              >
+              <TouchableOpacity style={styles.primaryOrangeBtn} onPress={openNewClubPostModal}>
                 <Ionicons name="add-circle-outline" size={15} color="#fff" />
-                <Text style={styles.primaryOrangeBtnText}>Yeni Gönderi</Text>
+                <Text style={styles.primaryOrangeBtnText}>Yeni Gönderi Oluştur</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Filter Pills */}
+            {clubDashboardLoading ? (
+              <View style={styles.loaderBox}>
+                <TorkScoutLoader />
+                <Text style={styles.loaderText}>Club özeti yükleniyor...</Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.summaryGrid}>
+                  {(
+                    clubDashboard?.stats || [
+                      { label: 'Toplam Gönderi', value: 0 },
+                      { label: 'Yayındaki Gönderi', value: 0 },
+                      { label: 'Toplam Yorum', value: 0 },
+                      { label: 'İnceleme Bekleyen', value: 0 },
+                      { label: 'Aktif Moderatör', value: 0 },
+                      { label: 'Susturulan Üye', value: 0 },
+                      { label: 'Yasaklı (Ban) Üye', value: 0 },
+                    ]
+                  ).map((st: any, idx: number) => (
+                    <View key={st.key || idx} style={styles.summaryBox}>
+                      <Text style={styles.summaryBoxLabel}>{st.label}</Text>
+                      <Text style={styles.summaryBoxVal}>{st.value ?? 0}</Text>
+                      {!!st.secondaryText && (
+                        <Text style={[styles.listingDateText, { marginTop: 2 }]}>
+                          {st.secondaryText}
+                        </Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+
+                {Array.isArray(clubDashboard?.recentPosts) && clubDashboard.recentPosts.length > 0 && (
+                  <View style={{ gap: 8 }}>
+                    <Text style={[styles.headerTitle, { fontSize: 14 }]}>Son Club Gönderileri</Text>
+                    {clubDashboard.recentPosts.slice(0, 5).map((p: any) => (
+                      <TouchableOpacity
+                        key={p.id}
+                        style={styles.listingCard}
+                        onPress={() => openClubPostDrawer(p)}
+                      >
+                        <Text style={styles.listingTitleText}>{p.title || 'Gönderi'}</Text>
+                        <Text style={styles.listingMetaText} numberOfLines={2}>
+                          {p.content}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {/* ============================================================ */}
+        {/* SECTION 2B: CLUB -> GÖNDERİLER & MODERASYON                  */}
+        {/* ============================================================ */}
+        {mainSection === 'CLUB' && clubSubTab === 'CLUB_POSTS' && (
+          <>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={styles.sectionHelperText}>
+                Topluluk gönderileri ve Club üyelerinin Garajım paylaşımları
+              </Text>
+              <TouchableOpacity style={styles.primaryOrangeBtn} onPress={openNewClubPostModal}>
+                <Ionicons name="add-circle-outline" size={15} color="#fff" />
+                <Text style={styles.primaryOrangeBtnText}>+ Yeni Gönderi Oluştur</Text>
+              </TouchableOpacity>
+            </View>
+
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1574,11 +2199,14 @@ export default function AdminScreen() {
             >
               {[
                 { key: 'ALL', label: 'Tüm Gönderiler' },
-                { key: 'USER_SUBMISSIONS', label: '🚗 Üye Garaj Paylaşımları', badge: pendingUserPostsCount },
+                {
+                  key: 'USER_SUBMISSIONS',
+                  label: '🚗 Club Kullanıcıları Gönderileri',
+                  badge: pendingUserPostsCount,
+                },
                 { key: 'PUBLISHED', label: 'Yayındakiler' },
                 { key: 'DRAFT', label: 'Taslaklar' },
-                { key: 'ARCHIVED', label: 'Kaldırılanlar' },
-                { key: 'COMMENTS_QUEUE', label: '💬 Yorum Moderasyonu' },
+                { key: 'ARCHIVED', label: 'Yayından Kaldırılanlar' },
               ].map((t) => {
                 const active = clubPostTab === t.key;
                 return (
@@ -1592,7 +2220,9 @@ export default function AdminScreen() {
                     </Text>
                     {!!t.badge && t.badge > 0 && (
                       <View style={[styles.statusCountBox, { backgroundColor: '#f59e0b' }]}>
-                        <Text style={[styles.statusCountText, { color: '#020617' }]}>{t.badge}</Text>
+                        <Text style={[styles.statusCountText, { color: '#020617' }]}>
+                          {t.badge} Bekliyor
+                        </Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -1600,7 +2230,6 @@ export default function AdminScreen() {
               })}
             </ScrollView>
 
-            {/* Sub-filter for USER_SUBMISSIONS */}
             {clubPostTab === 'USER_SUBMISSIONS' && (
               <ScrollView
                 horizontal
@@ -1610,7 +2239,7 @@ export default function AdminScreen() {
                 {[
                   { key: 'PENDING_REVIEW', label: 'Onay Bekleyenler' },
                   { key: 'ALL', label: 'Tümü' },
-                  { key: 'PUBLISHED', label: 'Onaylananlar' },
+                  { key: 'PUBLISHED', label: 'Onaylananlar (Yayında)' },
                   { key: 'REJECTED', label: 'Reddedilenler' },
                 ].map((sub) => (
                   <TouchableOpacity
@@ -1634,109 +2263,11 @@ export default function AdminScreen() {
               </ScrollView>
             )}
 
-            {/* Sub-filter for COMMENTS_QUEUE */}
-            {clubPostTab === 'COMMENTS_QUEUE' && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 6 }}
-              >
-                {[
-                  { key: 'ALL', label: 'Tüm Yorumlar' },
-                  { key: 'PENDING_REVIEW', label: 'İnceleme Bekleyenler' },
-                  { key: 'HIDDEN', label: 'Gizlenenler' },
-                  { key: 'VISIBLE', label: 'Görünür Olanlar' },
-                ].map((sub) => (
-                  <TouchableOpacity
-                    key={sub.key}
-                    style={[
-                      styles.miniFilterChip,
-                      clubCommentFilter === sub.key && styles.miniFilterChipActive,
-                    ]}
-                    onPress={() => setClubCommentFilter(sub.key as any)}
-                  >
-                    <Text
-                      style={[
-                        styles.miniFilterText,
-                        clubCommentFilter === sub.key && styles.miniFilterTextActive,
-                      ]}
-                    >
-                      {sub.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-
-            {/* Posts or Comments Queue */}
-            {clubPostsLoading || clubCommentsLoading ? (
+            {clubPostsLoading ? (
               <View style={styles.loaderBox}>
                 <TorkScoutLoader />
-                <Text style={styles.loaderText}>Veriler yükleniyor...</Text>
+                <Text style={styles.loaderText}>Gönderiler yükleniyor...</Text>
               </View>
-            ) : clubPostTab === 'COMMENTS_QUEUE' ? (
-              clubCommentGroups.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Ionicons name="chatbubbles-outline" size={38} color="#475569" />
-                  <Text style={styles.emptyTitle}>Yorum kaydı bulunamadı</Text>
-                </View>
-              ) : (
-                <View style={{ gap: 10 }}>
-                  {clubCommentGroups.map((item: any, idx: number) => {
-                    // Could be grouped or flat comment
-                    if (item.post && item.counts) {
-                      return (
-                        <TouchableOpacity
-                          key={item.post.id || idx}
-                          style={styles.listingCard}
-                          onPress={() => openClubPostDrawer(item.post)}
-                        >
-                          <Text style={styles.listingTitleText}>
-                            {item.post.title || 'Topluluk Gönderisi'}
-                          </Text>
-                          <Text style={styles.listingMetaText}>
-                            Toplam: {item.counts.total} • Yayında: {item.counts.visible} • Bekleyen:{' '}
-                            {item.counts.pendingReview} • Gizli: {item.counts.hidden}
-                          </Text>
-                          <Text style={[styles.kpiActionLink, { marginTop: 6 }]}>
-                            Yorumları Denetle ➔
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    }
-                    return (
-                      <View key={item.id || idx} style={styles.listingCard}>
-                        <Text style={styles.listingSellerName}>
-                          {item.author?.username || item.author?.email || 'Üye'}
-                        </Text>
-                        <Text style={[styles.listingTitleText, { fontWeight: '500', marginTop: 4 }]}>
-                          {item.content}
-                        </Text>
-                        <View style={styles.listingActionRow}>
-                          <TouchableOpacity
-                            style={[styles.actionBtn, styles.actionBtnApprove]}
-                            onPress={() => handleCommentAction(item.id, 'publish')}
-                          >
-                            <Text style={[styles.actionBtnText, { color: '#10b981' }]}>Görünür Yap</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.actionBtn, styles.actionBtnWarn]}
-                            onPress={() => handleCommentAction(item.id, 'hide')}
-                          >
-                            <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>Gizle</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.actionBtn, styles.actionBtnReject]}
-                            onPress={() => handleCommentAction(item.id, 'delete')}
-                          >
-                            <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>Sil</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              )
             ) : clubPosts.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Ionicons name="newspaper-outline" size={38} color="#475569" />
@@ -1791,7 +2322,7 @@ export default function AdminScreen() {
                               ? 'ONAY BEKLİYOR'
                               : isRejected
                               ? 'REDDEDİLDİ'
-                              : 'ARŞİV / TASLAK'}
+                              : 'TASLAK / ARŞİV'}
                           </Text>
                         </View>
                       </View>
@@ -1802,13 +2333,22 @@ export default function AdminScreen() {
                         </Text>
                       )}
 
+                      {!!p.poll && (
+                        <View style={styles.pollBadgeRow}>
+                          <Ionicons name="stats-chart" size={13} color="#fb923c" />
+                          <Text style={styles.pollBadgeText} numberOfLines={1}>
+                            Anket: {p.poll.question}
+                          </Text>
+                        </View>
+                      )}
+
                       {mediaList.length > 0 && (
                         <ScrollView
                           horizontal
                           showsHorizontalScrollIndicator={false}
                           contentContainerStyle={{ gap: 6, marginTop: 6 }}
                         >
-                          {mediaList.slice(0, 5).map((m: any, idx: number) => (
+                          {mediaList.slice(0, 6).map((m: any, idx: number) => (
                             <Image
                               key={m.id || idx}
                               source={{ uri: resolveMediaUrl(m.mediaUrl || m.url) }}
@@ -1844,6 +2384,30 @@ export default function AdminScreen() {
                             Detay & Yorumlar
                           </Text>
                         </TouchableOpacity>
+
+                        {!isUserSub && (
+                          <>
+                            <TouchableOpacity
+                              style={[styles.actionBtn, styles.actionBtnInfo]}
+                              onPress={() => openEditClubPostModal(p)}
+                            >
+                              <Ionicons name="create-outline" size={14} color="#38bdf8" />
+                              <Text style={[styles.actionBtnText, { color: '#38bdf8' }]}>
+                                Düzenle
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.actionBtn, styles.actionBtnWarn]}
+                              onPress={() => handleTogglePinPost(p)}
+                            >
+                              <Ionicons name="pin-outline" size={14} color="#f59e0b" />
+                              <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>
+                                {p.isPinned ? 'Sabitlemeyi Kaldır' : 'Sabitle'}
+                              </Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
 
                         {isUserSub ? (
                           <>
@@ -1906,43 +2470,141 @@ export default function AdminScreen() {
         )}
 
         {/* ============================================================ */}
-        {/* SECTION 2B: CLUB -> ÜYELER, MODERATÖRLER & KISITLAMALAR      */}
+        {/* SECTION 2C: CLUB -> YORUM MODERASYONU                        */}
+        {/* ============================================================ */}
+        {mainSection === 'CLUB' && clubSubTab === 'CLUB_COMMENTS' && (
+          <>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {[
+                { key: 'ALL', label: 'Tüm Yorumlar' },
+                { key: 'PENDING_REVIEW', label: 'İnceleme Bekleyenler' },
+                { key: 'HIDDEN', label: 'Gizlenenler' },
+                { key: 'VISIBLE', label: 'Görünür Olanlar' },
+              ].map((sub) => (
+                <TouchableOpacity
+                  key={sub.key}
+                  style={[
+                    styles.statusPill,
+                    clubCommentFilter === sub.key && styles.statusPillActive,
+                  ]}
+                  onPress={() => setClubCommentFilter(sub.key as any)}
+                >
+                  <Text
+                    style={[
+                      styles.statusPillText,
+                      clubCommentFilter === sub.key && styles.statusPillTextActive,
+                    ]}
+                  >
+                    {sub.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {clubCommentsLoading ? (
+              <View style={styles.loaderBox}>
+                <TorkScoutLoader />
+                <Text style={styles.loaderText}>Yorumlar yükleniyor...</Text>
+              </View>
+            ) : clubCommentGroups.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="chatbubbles-outline" size={38} color="#475569" />
+                <Text style={styles.emptyTitle}>Yorum kaydı bulunamadı</Text>
+              </View>
+            ) : (
+              <View style={{ gap: 10 }}>
+                {clubCommentGroups.map((item: any, idx: number) => {
+                  if (item.post && item.counts) {
+                    return (
+                      <TouchableOpacity
+                        key={item.post.id || idx}
+                        style={styles.listingCard}
+                        onPress={() => openClubPostDrawer(item.post)}
+                      >
+                        <Text style={styles.listingTitleText}>
+                          {item.post.title || 'Topluluk Gönderisi'}
+                        </Text>
+                        <Text style={styles.listingMetaText}>
+                          Toplam: {item.counts.total} • Yayında: {item.counts.visible} • Bekleyen:{' '}
+                          {item.counts.pendingReview} • Gizli: {item.counts.hidden}
+                        </Text>
+                        <Text style={[styles.kpiActionLink, { marginTop: 4 }]}>
+                          Gönderi Yorumlarını Denetle ➔
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  return (
+                    <View key={item.id || idx} style={styles.listingCard}>
+                      <Text style={styles.listingSellerName}>
+                        👤 {item.author?.username || item.author?.email || 'Üye'}
+                      </Text>
+                      <Text style={[styles.postBodySnippet, { marginTop: 4 }]}>{item.content}</Text>
+                      <View style={styles.listingActionRow}>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.actionBtnApprove]}
+                          onPress={() => handleCommentAction(item.id, 'publish')}
+                        >
+                          <Text style={[styles.actionBtnText, { color: '#10b981' }]}>Yayınla</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.actionBtnWarn]}
+                          onPress={() => handleCommentAction(item.id, 'hide')}
+                        >
+                          <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>Gizle</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.actionBtnReject]}
+                          onPress={() => handleCommentAction(item.id, 'delete')}
+                        >
+                          <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>Sil</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </>
+        )}
+
+        {/* ============================================================ */}
+        {/* SECTION 2D: CLUB -> ÜYELER, MODERATÖRLER & KISITLAMALAR      */}
         {/* ============================================================ */}
         {mainSection === 'CLUB' && clubSubTab === 'CLUB_USERS' && (
           <>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity
-                style={[styles.statusPill, clubUsersMode === 'MEMBERS' && styles.statusPillActive]}
-                onPress={() => setClubUsersMode('MEMBERS')}
-              >
-                <Text
-                  style={[
-                    styles.statusPillText,
-                    clubUsersMode === 'MEMBERS' && styles.statusPillTextActive,
-                  ]}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {[
+                { key: 'MEMBERS', label: '👥 Tüm Club Üyeleri' },
+                { key: 'MODERATORS', label: '🛡️ Yetkili Moderatörler' },
+                { key: 'RESTRICTIONS', label: '🚫 Susturma & Ban Listesi' },
+              ].map((m) => (
+                <TouchableOpacity
+                  key={m.key}
+                  style={[styles.statusPill, clubUsersMode === m.key && styles.statusPillActive]}
+                  onPress={() => setClubUsersMode(m.key as any)}
                 >
-                  👥 Üyeler & Moderatörler
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.statusPill,
-                  clubUsersMode === 'RESTRICTIONS' && styles.statusPillActive,
-                ]}
-                onPress={() => setClubUsersMode('RESTRICTIONS')}
-              >
-                <Text
-                  style={[
-                    styles.statusPillText,
-                    clubUsersMode === 'RESTRICTIONS' && styles.statusPillTextActive,
-                  ]}
-                >
-                  🚫 Susturma & Ban Listesi
-                </Text>
-              </TouchableOpacity>
-            </View>
+                  <Text
+                    style={[
+                      styles.statusPillText,
+                      clubUsersMode === m.key && styles.statusPillTextActive,
+                    ]}
+                  >
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
 
-            {clubUsersMode === 'MEMBERS' ? (
+            {clubUsersMode === 'MEMBERS' && (
               <>
                 <View style={styles.filterBox}>
                   <View style={styles.searchRow}>
@@ -1979,7 +2641,7 @@ export default function AdminScreen() {
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <View style={{ flex: 1 }}>
                               <Text style={styles.listingTitleText}>
-                                {m.username || m.email || m.firstName || 'Club Üyesi'}
+                                {m.displayName || m.username || m.email || 'Club Üyesi'}
                               </Text>
                               <Text style={styles.listingMetaText}>
                                 {m.email} {m.customerNo ? `• ${m.customerNo}` : ''}
@@ -1991,6 +2653,19 @@ export default function AdminScreen() {
                           </View>
 
                           <View style={styles.listingActionRow}>
+                            <TouchableOpacity
+                              style={[styles.actionBtn, styles.actionBtnNeutral]}
+                              onPress={() => {
+                                setMsgTargetUser(m);
+                                setDirectMsgText('');
+                              }}
+                            >
+                              <Ionicons name="mail-outline" size={14} color="#f97316" />
+                              <Text style={[styles.actionBtnText, { color: '#f97316' }]}>
+                                Mesaj Gönder
+                              </Text>
+                            </TouchableOpacity>
+
                             <TouchableOpacity
                               style={[styles.actionBtn, styles.actionBtnInfo]}
                               onPress={() => handleToggleModerator(m.id, isMod)}
@@ -2031,7 +2706,51 @@ export default function AdminScreen() {
                   </View>
                 )}
               </>
-            ) : (
+            )}
+
+            {clubUsersMode === 'MODERATORS' && (
+              <>
+                {clubMembersLoading ? (
+                  <View style={styles.loaderBox}>
+                    <TorkScoutLoader />
+                    <Text style={styles.loaderText}>Moderatörler yükleniyor...</Text>
+                  </View>
+                ) : clubModerators.length === 0 ? (
+                  <View style={styles.emptyCard}>
+                    <Ionicons name="shield-outline" size={38} color="#475569" />
+                    <Text style={styles.emptyTitle}>Henüz atanmış moderatör yok</Text>
+                    <Text style={styles.emptySubtitle}>
+                      Tüm Club Üyeleri sekmesinden istediğiniz üyeyi moderatör olarak atayabilirsiniz.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ gap: 10 }}>
+                    {clubModerators.map((mod) => (
+                      <View key={mod.id} style={styles.listingCard}>
+                        <Text style={styles.listingTitleText}>
+                          {mod.userFormatted || mod.user?.username || mod.user?.email || 'Moderatör'}
+                        </Text>
+                        <Text style={styles.listingMetaText}>{mod.user?.email}</Text>
+                        <View style={styles.listingActionRow}>
+                          <TouchableOpacity
+                            style={[styles.actionBtn, styles.actionBtnReject]}
+                            onPress={() =>
+                              handleToggleModerator(mod.userId || mod.user?.id, true)
+                            }
+                          >
+                            <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>
+                              Moderatör Yetkisini Kaldır
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
+
+            {clubUsersMode === 'RESTRICTIONS' && (
               <>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   {[
@@ -2117,7 +2836,80 @@ export default function AdminScreen() {
         )}
 
         {/* ============================================================ */}
-        {/* SECTION 2C: CLUB -> ŞİKAYETLER & RAPORLAR                    */}
+        {/* SECTION 2E: CLUB -> MESAJLAR (DIRECT & BULK MESSAGING)       */}
+        {/* ============================================================ */}
+        {mainSection === 'CLUB' && clubSubTab === 'CLUB_MESSAGES' && (
+          <>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={styles.sectionHelperText}>
+                Club üyelerine 1-e-1 veya toplu bildirim/mesaj gönderin
+              </Text>
+              {selectedBulkUserIds.length > 0 && (
+                <TouchableOpacity
+                  style={styles.primaryOrangeBtn}
+                  onPress={() => setBulkMsgModalOpen(true)}
+                >
+                  <Ionicons name="send" size={13} color="#fff" />
+                  <Text style={styles.primaryOrangeBtnText}>
+                    Toplu Gönder ({selectedBulkUserIds.length})
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {clubMembersLoading ? (
+              <View style={styles.loaderBox}>
+                <TorkScoutLoader />
+              </View>
+            ) : (
+              <View style={{ gap: 8 }}>
+                {clubMembers.map((u) => {
+                  const selected = selectedBulkUserIds.includes(u.id);
+                  return (
+                    <View key={u.id} style={styles.listingCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <TouchableOpacity
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}
+                          onPress={() =>
+                            setSelectedBulkUserIds((prev) =>
+                              prev.includes(u.id) ? prev.filter((id) => id !== u.id) : [...prev, u.id]
+                            )
+                          }
+                        >
+                          <Ionicons
+                            name={selected ? 'checkbox' : 'square-outline'}
+                            size={20}
+                            color={selected ? '#f97316' : '#64748b'}
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.listingTitleText}>
+                              {u.displayName || u.username || u.email}
+                            </Text>
+                            <Text style={styles.listingMetaText}>{u.email || u.customerNo}</Text>
+                          </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.actionBtnNeutral]}
+                          onPress={() => {
+                            setMsgTargetUser(u);
+                            setDirectMsgText('');
+                          }}
+                        >
+                          <Ionicons name="paper-plane-outline" size={14} color="#f97316" />
+                          <Text style={[styles.actionBtnText, { color: '#f97316' }]}>Mesaj Yaz</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </>
+        )}
+
+        {/* ============================================================ */}
+        {/* SECTION 2F: CLUB -> ŞİKAYETLER & RAPORLAR                    */}
         {/* ============================================================ */}
         {mainSection === 'CLUB' && clubSubTab === 'CLUB_REPORTS' && (
           <>
@@ -2148,6 +2940,32 @@ export default function AdminScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {[
+                { key: '7D', label: 'Son 7 Gün' },
+                { key: '30D', label: 'Son 30 Gün' },
+                { key: 'YTD', label: 'Bu Yıl' },
+              ].map((rng) => (
+                <TouchableOpacity
+                  key={rng.key}
+                  style={[
+                    styles.miniFilterChip,
+                    clubReportRange === rng.key && styles.miniFilterChipActive,
+                  ]}
+                  onPress={() => setClubReportRange(rng.key)}
+                >
+                  <Text
+                    style={[
+                      styles.miniFilterText,
+                      clubReportRange === rng.key && styles.miniFilterTextActive,
+                    ]}
+                  >
+                    {rng.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             {clubReportsLoading ? (
               <View style={styles.loaderBox}>
@@ -2226,10 +3044,133 @@ export default function AdminScreen() {
             )}
           </>
         )}
+
+        {/* ============================================================ */}
+        {/* SECTION 2G: CLUB -> AYARLAR & AUDIT LOG                      */}
+        {/* ============================================================ */}
+        {mainSection === 'CLUB' && clubSubTab === 'CLUB_SETTINGS_LOGS' && (
+          <>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={[
+                  styles.statusPill,
+                  settingsOrLogsMode === 'SETTINGS' && styles.statusPillActive,
+                ]}
+                onPress={() => setSettingsOrLogsMode('SETTINGS')}
+              >
+                <Text
+                  style={[
+                    styles.statusPillText,
+                    settingsOrLogsMode === 'SETTINGS' && styles.statusPillTextActive,
+                  ]}
+                >
+                  ⚙️ Topluluk & Güvenlik Ayarları
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.statusPill,
+                  settingsOrLogsMode === 'AUDIT_LOG' && styles.statusPillActive,
+                ]}
+                onPress={() => setSettingsOrLogsMode('AUDIT_LOG')}
+              >
+                <Text
+                  style={[
+                    styles.statusPillText,
+                    settingsOrLogsMode === 'AUDIT_LOG' && styles.statusPillTextActive,
+                  ]}
+                >
+                  📋 Yönetim Audit Logları
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {settingsOrLogsMode === 'SETTINGS' ? (
+              clubSettingsLoading ? (
+                <View style={styles.loaderBox}>
+                  <TorkScoutLoader />
+                </View>
+              ) : (
+                <View style={[styles.listingCard, { gap: 12 }]}>
+                  <Text style={styles.kpiTitle}>TOPLULUK KURALLARI METNİ</Text>
+                  <TextInput
+                    style={styles.dialogTextArea}
+                    multiline
+                    value={clubSettings.rulesText}
+                    onChangeText={(v) => setClubSettings((s) => ({ ...s, rulesText: v }))}
+                    placeholder="Topluluk kuralları..."
+                    placeholderTextColor="#64748b"
+                  />
+
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.kpiTitle}>YORUM KARAKTER LİMİTİ</Text>
+                      <TextInput
+                        style={[styles.dialogInput, { marginTop: 6 }]}
+                        keyboardType="numeric"
+                        value={String(clubSettings.commentCharLimit ?? 1000)}
+                        onChangeText={(v) =>
+                          setClubSettings((s) => ({ ...s, commentCharLimit: Number(v) || 1000 }))
+                        }
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.kpiTitle}>MAX FOTOĞRAF / GÖNDERİ</Text>
+                      <TextInput
+                        style={[styles.dialogInput, { marginTop: 6 }]}
+                        keyboardType="numeric"
+                        value={String(clubSettings.maxImagesPerPost ?? 10)}
+                        onChangeText={(v) =>
+                          setClubSettings((s) => ({ ...s, maxImagesPerPost: Number(v) || 10 }))
+                        }
+                      />
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    disabled={savingClubSettings}
+                    style={[styles.primaryOrangeBtn, { justifyContent: 'center', paddingVertical: 12 }]}
+                    onPress={handleSaveClubSettings}
+                  >
+                    <Ionicons name="save-outline" size={16} color="#fff" />
+                    <Text style={[styles.primaryOrangeBtnText, { fontSize: 13 }]}>
+                      {savingClubSettings ? 'Kaydediliyor...' : 'Ayarları Kaydet & Audit Log Yaz'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )
+            ) : auditLogsLoading ? (
+              <View style={styles.loaderBox}>
+                <TorkScoutLoader />
+              </View>
+            ) : auditLogs.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Henüz kaydedilmiş audit log bulunmuyor</Text>
+              </View>
+            ) : (
+              <View style={{ gap: 8 }}>
+                {auditLogs.map((log) => (
+                  <View key={log.id} style={styles.listingCard}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={styles.listingNoText}>
+                        {log.actor?.username || log.actor?.firstName || 'Yönetici'}
+                      </Text>
+                      <Text style={styles.listingDateText}>
+                        {new Date(log.createdAt).toLocaleString('tr-TR')}
+                      </Text>
+                    </View>
+                    <Text style={styles.listingTitleText}>{log.actionType || log.action}</Text>
+                    {!!log.reason && <Text style={styles.listingMetaText}>{log.reason}</Text>}
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
 
       {/* ============================================================== */}
-      {/* MODAL 1: LISTING INSPECTION MODAL                              */}
+      {/* MODAL 1: LISTING INSPECTION MODAL (FULL WEB PARITY)            */}
       {/* ============================================================== */}
       <Modal
         visible={!!selectedListingId}
@@ -2258,21 +3199,31 @@ export default function AdminScreen() {
             </View>
           ) : (
             <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }}>
-              {/* Photos */}
+              {/* Photos with Fullscreen Lightbox on tap */}
               {Array.isArray(inspectionData.media) && inspectionData.media.length > 0 && (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 10 }}
-                >
-                  {inspectionData.media.map((m: any, idx: number) => (
-                    <Image
-                      key={m.id || idx}
-                      source={{ uri: resolveMediaUrl(m.url) }}
-                      style={styles.inspectionPhoto}
-                    />
-                  ))}
-                </ScrollView>
+                <View style={{ gap: 6 }}>
+                  <Text style={styles.kpiTitle}>
+                    📷 İLAN FOTOĞRAFLARI ({inspectionData.media.length}) — Büyütmek için dokunun
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 10 }}
+                  >
+                    {inspectionData.media.map((m: any, idx: number) => {
+                      const imgUrl = resolveMediaUrl(m.url);
+                      return (
+                        <TouchableOpacity
+                          key={m.id || idx}
+                          activeOpacity={0.9}
+                          onPress={() => setLightboxImageUrl(imgUrl)}
+                        >
+                          <Image source={{ uri: imgUrl }} style={styles.inspectionPhoto} />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
               )}
 
               {/* Key Price & Vehicle Info */}
@@ -2293,6 +3244,30 @@ export default function AdminScreen() {
                   </Text>
                 )}
               </View>
+
+              {/* Damage & Tramer Declaration */}
+              {inspectionData.damageDeclaration && (
+                <View style={styles.listingCard}>
+                  <Text style={styles.kpiTitle}>EKSPERTİZ & HASAR BEYANI</Text>
+                  <Text style={styles.listingMetaText}>
+                    Ağır Hasar: {inspectionData.listing.heavyDamage ? 'EVET (Ağır Hasarlı)' : 'Hayır'}{' '}
+                    • Tramer: ₺
+                    {Number(inspectionData.listing.tramerAmount || 0).toLocaleString('tr-TR')}
+                  </Text>
+                </View>
+              )}
+
+              {/* Auto Quality Checks */}
+              {Array.isArray(inspectionData.autoChecks) && inspectionData.autoChecks.length > 0 && (
+                <View style={styles.listingCard}>
+                  <Text style={styles.kpiTitle}>OTOMATİK KALİTE & GÜVENLİK KONTROLLERİ</Text>
+                  {inspectionData.autoChecks.map((chk: any, idx: number) => (
+                    <Text key={idx} style={styles.listingMetaText}>
+                      • {chk.label || chk.title || chk.code}: {chk.status || chk.result}
+                    </Text>
+                  ))}
+                </View>
+              )}
 
               {/* Seller Info */}
               {inspectionData.seller && (
@@ -2362,6 +3337,30 @@ export default function AdminScreen() {
         </SafeAreaView>
       </Modal>
 
+      {/* FULLSCREEN IMAGE LIGHTBOX MODAL */}
+      <Modal
+        visible={!!lightboxImageUrl}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLightboxImageUrl(null)}
+      >
+        <View style={styles.dialogBackdrop}>
+          <TouchableOpacity
+            style={[styles.backBtn, { alignSelf: 'flex-end', marginBottom: 12 }]}
+            onPress={() => setLightboxImageUrl(null)}
+          >
+            <Ionicons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+          {lightboxImageUrl && (
+            <Image
+              source={{ uri: lightboxImageUrl }}
+              style={{ width: '100%', height: '75%' }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
+
       {/* ============================================================== */}
       {/* MODAL 2: LISTING REJECT / REVISION REASON DIALOG               */}
       {/* ============================================================== */}
@@ -2381,9 +3380,30 @@ export default function AdminScreen() {
                 ? 'Satıcıdan Düzeltme İste'
                 : 'İlanı Reddet'}
             </Text>
-            <Text style={styles.dialogSub}>
-              Satıcıya gönderilecek gerekçe mesajını aşağıdan düzenleyebilirsiniz:
-            </Text>
+            <Text style={styles.dialogSub}>Gerekçe Kategorisi Seçin:</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              {MODERATION_REASON_CODES.map((rc) => (
+                <TouchableOpacity
+                  key={rc.code}
+                  style={[
+                    styles.miniFilterChip,
+                    reasonCode === rc.code && styles.miniFilterChipActive,
+                  ]}
+                  onPress={() => setReasonCode(rc.code)}
+                >
+                  <Text
+                    style={[
+                      styles.miniFilterText,
+                      reasonCode === rc.code && styles.miniFilterTextActive,
+                    ]}
+                  >
+                    {rc.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.dialogSub}>Satıcıya İletilecek Açıklama (*Zorunlu):</Text>
             <TextInput
               style={styles.dialogTextArea}
               multiline
@@ -2392,6 +3412,18 @@ export default function AdminScreen() {
               placeholder="Satıcıya iletilecek mesaj..."
               placeholderTextColor="#64748b"
             />
+
+            <Text style={[styles.dialogSub, { marginTop: 8 }]}>
+              Yönetici İç Notu (Opsiyonel - Sadece Admin Görür):
+            </Text>
+            <TextInput
+              style={styles.dialogInput}
+              value={internalNote}
+              onChangeText={setInternalNote}
+              placeholder="Dahili moderasyon notu..."
+              placeholderTextColor="#64748b"
+            />
+
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
               <TouchableOpacity
                 style={[styles.actionBtn, styles.actionBtnNeutral]}
@@ -2550,6 +3582,27 @@ export default function AdminScreen() {
                   </ScrollView>
                 )}
 
+                {selectedClubPost.poll && (
+                  <View style={[styles.filterBox, { marginTop: 8, gap: 6 }]}>
+                    <Text style={styles.kpiTitle}>📊 ANKET: {selectedClubPost.poll.question}</Text>
+                    {(selectedClubPost.poll.options || []).map((opt: any, i: number) => (
+                      <Text key={opt.id || i} style={styles.listingMetaText}>
+                        • {opt.text || opt.optionText} ({opt.voteCount ?? opt._count?.votes ?? 0} Oy)
+                      </Text>
+                    ))}
+                    {!selectedClubPost.poll.isClosed && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.actionBtnWarn, { alignSelf: 'flex-start' }]}
+                        onPress={() => handleClosePoll(selectedClubPost.poll.id)}
+                      >
+                        <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>
+                          Anketi Şimdi Sonlandır
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
                 <View style={[styles.listingActionRow, { marginTop: 10 }]}>
                   <TouchableOpacity
                     style={[styles.actionBtn, styles.actionBtnInfo]}
@@ -2672,85 +3725,441 @@ export default function AdminScreen() {
       </Modal>
 
       {/* ============================================================== */}
-      {/* MODAL 6: CREATE NEW CLUB POST DIALOG                           */}
+      {/* MODAL 6: FULL WEB-PARITY CREATE / EDIT CLUB POST MODAL         */}
+      {/* (Images Gallery Upload + URL + Full Poll Builder + Pin/Draft)  */}
       {/* ============================================================== */}
       <Modal
         visible={createPostModalOpen}
-        transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setCreatePostModalOpen(false)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.dialogBackdrop}
-        >
-          <View style={styles.dialogBox}>
-            <Text style={styles.dialogTitle}>Yeni Club Gönderisi Oluştur</Text>
-            <TextInput
-              style={[styles.dialogInput, { marginTop: 10 }]}
-              placeholder="Gönderi Başlığı (Opsiyonel)"
-              placeholderTextColor="#64748b"
-              value={newPostTitle}
-              onChangeText={setNewPostTitle}
-            />
-            <TextInput
-              style={[styles.dialogTextArea, { marginTop: 8 }]}
-              multiline
-              placeholder="Topluluk duyurusu veya gönderi içeriği..."
-              placeholderTextColor="#64748b"
-              value={newPostContent}
-              onChangeText={setNewPostContent}
-            />
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-              <TouchableOpacity
-                style={[styles.miniFilterChip, newPostPinned && styles.miniFilterChipActive]}
-                onPress={() => setNewPostPinned((v) => !v)}
-              >
-                <Text style={[styles.miniFilterText, newPostPinned && styles.miniFilterTextActive]}>
-                  📌 Sabitle
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.miniFilterChip,
-                  newPostCommentsEnabled && styles.miniFilterChipActive,
-                ]}
-                onPress={() => setNewPostCommentsEnabled((v) => !v)}
-              >
-                <Text
-                  style={[
-                    styles.miniFilterText,
-                    newPostCommentsEnabled && styles.miniFilterTextActive,
-                  ]}
-                >
-                  💬 Yorumlara Açık
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.actionBtnNeutral]}
-                onPress={() => setCreatePostModalOpen(false)}
-              >
-                <Text style={styles.actionBtnText}>İptal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                disabled={creatingPost}
-                style={[styles.actionBtn, styles.actionBtnWarn]}
-                onPress={() => handleCreateClubPost(false)}
-              >
-                <Text style={[styles.actionBtnText, { color: '#f59e0b' }]}>Taslak Kaydet</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                disabled={creatingPost}
-                style={[styles.actionBtn, styles.actionBtnApprove]}
-                onPress={() => handleCreateClubPost(true)}
-              >
-                <Text style={[styles.actionBtnText, { color: '#10b981' }]}>Hemen Yayınla</Text>
-              </TouchableOpacity>
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setCreatePostModalOpen(false)}
+              style={styles.backBtn}
+            >
+              <Ionicons name="close" size={20} color="#f8fafc" />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerTitle}>
+                {editingPostId ? 'Club Gönderisini Düzenle' : 'Yeni Club Gönderisi Oluştur'}
+              </Text>
+              <Text style={styles.headerSubtitle}>
+                Duyuru, görsel galerisi (max 10) ve interaktif anket paylaşımı
+              </Text>
             </View>
           </View>
-        </KeyboardAvoidingView>
+
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 48 }}>
+              {/* 1. POST TITLE */}
+              <View style={styles.listingCard}>
+                <Text style={styles.kpiTitle}>GÖNDERİ BAŞLIĞI (OPSİYONEL)</Text>
+                <TextInput
+                  style={styles.dialogInput}
+                  placeholder="Örn: Haftanın Otomotiv Gündemi & Anketi"
+                  placeholderTextColor="#64748b"
+                  value={newPostTitle}
+                  onChangeText={setNewPostTitle}
+                />
+
+                {/* 2. POST CONTENT */}
+                <Text style={[styles.kpiTitle, { marginTop: 8 }]}>GÖNDERİ METNİ / İÇERİK</Text>
+                <TextInput
+                  style={[styles.dialogTextArea, { minHeight: 110 }]}
+                  multiline
+                  placeholder="Toplulukla paylaşmak istediğiniz duyuru, inceleme veya tartışma metnini buraya yazın..."
+                  placeholderTextColor="#64748b"
+                  value={newPostContent}
+                  onChangeText={setNewPostContent}
+                />
+              </View>
+
+              {/* 3. PHOTO GALLERY UPLOAD & URL (UP TO 10 PHOTOS) */}
+              {!editingPostId && (
+                <View style={styles.listingCard}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.kpiTitle}>
+                      📸 FOTOĞRAF & GÖRSEL EKLE ({newPostMediaUrls.length}/10)
+                    </Text>
+                    <TouchableOpacity
+                      disabled={uploadingPostMedia}
+                      style={styles.primaryOrangeBtn}
+                      onPress={handlePickClubPostImages}
+                    >
+                      {uploadingPostMedia ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <Ionicons name="images-outline" size={14} color="#fff" />
+                          <Text style={styles.primaryOrangeBtnText}>Galeriden Seç</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Optional Manual URL Input */}
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                    <TextInput
+                      style={[styles.dialogInput, { flex: 1 }]}
+                      placeholder="veya görsel URL yapıştırın (https://...)"
+                      placeholderTextColor="#64748b"
+                      value={manualMediaUrlInput}
+                      onChangeText={setManualMediaUrlInput}
+                    />
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.actionBtnNeutral, { paddingHorizontal: 14 }]}
+                      onPress={handleAddManualMediaUrl}
+                    >
+                      <Text style={[styles.actionBtnText, { color: '#f97316' }]}>+ Ekle</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {newPostMediaUrls.length > 0 && (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 10, marginTop: 8 }}
+                    >
+                      {newPostMediaUrls.map((url, idx) => (
+                        <View key={idx} style={{ position: 'relative' }}>
+                          <Image
+                            source={{ uri: resolveMediaUrl(url) }}
+                            style={styles.uploadedMediaThumb}
+                          />
+                          <TouchableOpacity
+                            style={styles.removeMediaBadge}
+                            onPress={() => handleRemovePostMedia(idx)}
+                          >
+                            <Ionicons name="close" size={13} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+              )}
+
+              {/* 4. PIN & COMMENTS TOGGLES */}
+              <View style={styles.listingCard}>
+                <View style={styles.switchItemRow}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={styles.listingTitleText}>📌 Gönderiyi En Üste Sabitle</Text>
+                    <Text style={styles.listingMetaText}>
+                      Topluluk akışının en üstünde sabitlenmiş duyuru rozetiyle görünür.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={newPostPinned}
+                    onValueChange={setNewPostPinned}
+                    trackColor={{ false: '#334155', true: '#ea580c' }}
+                    thumbColor="#ffffff"
+                  />
+                </View>
+
+                <View style={[styles.switchItemRow, { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 10 }]}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={styles.listingTitleText}>💬 Yorumlara İzin Ver</Text>
+                    <Text style={styles.listingMetaText}>
+                      Üyeler bu gönderinin altına yorum yazabilir.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={newPostCommentsEnabled}
+                    onValueChange={setNewPostCommentsEnabled}
+                    trackColor={{ false: '#334155', true: '#ea580c' }}
+                    thumbColor="#ffffff"
+                  />
+                </View>
+
+                {!editingPostId && (
+                  <View style={[styles.switchItemRow, { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 10 }]}>
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                      <Text style={styles.listingTitleText}>📊 Gönderiye Anket Ekle</Text>
+                      <Text style={styles.listingMetaText}>
+                        Gönderiye interaktif çok seçenekli oylama anketi bağlayın.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={pollEnabled}
+                      onValueChange={setPollEnabled}
+                      trackColor={{ false: '#334155', true: '#ea580c' }}
+                      thumbColor="#ffffff"
+                    />
+                  </View>
+                )}
+              </View>
+
+              {/* 5. FULL POLL BUILDER (MATCHING WEB PollCreationFields) */}
+              {!editingPostId && pollEnabled && (
+                <View style={[styles.listingCard, { borderColor: 'rgba(249,115,22,0.4)', gap: 12 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={[styles.kpiTitle, { color: '#fb923c' }]}>
+                      📊 ANKET OLUŞTURUCU ({pollOptions.length}/10 Seçenek)
+                    </Text>
+                    <Text style={styles.listingDateText}>{pollQuestion.length}/300</Text>
+                  </View>
+
+                  <TextInput
+                    style={styles.dialogInput}
+                    placeholder="Anket Sorusu (*Zorunlu - Örn: Hangi segmenti tercih edersiniz?)"
+                    placeholderTextColor="#64748b"
+                    maxLength={300}
+                    value={pollQuestion}
+                    onChangeText={setPollQuestion}
+                  />
+
+                  <Text style={styles.kpiTitle}>ANKET SEÇENEKLERİ (EN AZ 2, EN FAZLA 10)</Text>
+                  <View style={{ gap: 8 }}>
+                    {pollOptions.map((opt, idx) => (
+                      <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ color: '#94a3b8', fontSize: 12, width: 18 }}>{idx + 1}.</Text>
+                        <TextInput
+                          style={[styles.dialogInput, { flex: 1 }]}
+                          placeholder={`Seçenek ${idx + 1}`}
+                          placeholderTextColor="#64748b"
+                          maxLength={150}
+                          value={opt}
+                          onChangeText={(v) => handleUpdatePollOption(idx, v)}
+                        />
+                        <TouchableOpacity
+                          disabled={idx === 0}
+                          style={[styles.iconMiniBtn, idx === 0 && { opacity: 0.3 }]}
+                          onPress={() => handleMovePollOption(idx, 'up')}
+                        >
+                          <Ionicons name="chevron-up" size={14} color="#cbd5e1" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          disabled={idx === pollOptions.length - 1}
+                          style={[
+                            styles.iconMiniBtn,
+                            idx === pollOptions.length - 1 && { opacity: 0.3 },
+                          ]}
+                          onPress={() => handleMovePollOption(idx, 'down')}
+                        >
+                          <Ionicons name="chevron-down" size={14} color="#cbd5e1" />
+                        </TouchableOpacity>
+                        {pollOptions.length > 2 && (
+                          <TouchableOpacity
+                            style={[styles.iconMiniBtn, { borderColor: 'rgba(239,68,68,0.35)' }]}
+                            onPress={() => handleRemovePollOption(idx)}
+                          >
+                            <Ionicons name="trash-outline" size={14} color="#ef4444" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+
+                  {pollOptions.length < 10 && (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.actionBtnNeutral, { alignSelf: 'flex-start' }]}
+                      onPress={handleAddPollOption}
+                    >
+                      <Ionicons name="add" size={15} color="#f97316" />
+                      <Text style={[styles.actionBtnText, { color: '#f97316' }]}>
+                        + Seçenek Ekle
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Poll Selection Type (SINGLE vs MULTIPLE) */}
+                  <View style={{ gap: 6, marginTop: 4 }}>
+                    <Text style={styles.kpiTitle}>SEÇİM TÜRÜ</Text>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.miniFilterChip,
+                          pollSelectionType === 'SINGLE' && styles.miniFilterChipActive,
+                        ]}
+                        onPress={() => {
+                          setPollSelectionType('SINGLE');
+                          setPollMaxSelections(1);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.miniFilterText,
+                            pollSelectionType === 'SINGLE' && styles.miniFilterTextActive,
+                          ]}
+                        >
+                          ○ Tek Seçim (Radio)
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.miniFilterChip,
+                          pollSelectionType === 'MULTIPLE' && styles.miniFilterChipActive,
+                        ]}
+                        onPress={() => {
+                          setPollSelectionType('MULTIPLE');
+                          setPollMaxSelections(2);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.miniFilterText,
+                            pollSelectionType === 'MULTIPLE' && styles.miniFilterTextActive,
+                          ]}
+                        >
+                          □ Çoklu Seçim (Checkbox)
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {pollSelectionType === 'MULTIPLE' && (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ gap: 6, marginTop: 4 }}
+                      >
+                        {Array.from(
+                          { length: Math.max(1, pollOptions.length - 1) },
+                          (_, i) => i + 2
+                        ).map((num) => (
+                          <TouchableOpacity
+                            key={num}
+                            style={[
+                              styles.miniFilterChip,
+                              pollMaxSelections === num && styles.miniFilterChipActive,
+                            ]}
+                            onPress={() => setPollMaxSelections(num)}
+                          >
+                            <Text
+                              style={[
+                                styles.miniFilterText,
+                                pollMaxSelections === num && styles.miniFilterTextActive,
+                              ]}
+                            >
+                              En fazla {num} seçim
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    )}
+                  </View>
+
+                  {/* Poll Result Visibility */}
+                  <View style={{ gap: 6 }}>
+                    <Text style={styles.kpiTitle}>SONUÇ GÖRÜNÜRLÜĞÜ</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 6 }}
+                    >
+                      {[
+                        { key: 'AFTER_VOTE', label: 'Oy Verdikten Sonra' },
+                        { key: 'ALWAYS', label: 'Her Zaman Açık' },
+                        { key: 'AFTER_END', label: 'Anket Bitince' },
+                        { key: 'ADMIN_ONLY', label: 'Sadece Admin' },
+                      ].map((rv) => (
+                        <TouchableOpacity
+                          key={rv.key}
+                          style={[
+                            styles.miniFilterChip,
+                            pollResultVisibility === rv.key && styles.miniFilterChipActive,
+                          ]}
+                          onPress={() => setPollResultVisibility(rv.key as any)}
+                        >
+                          <Text
+                            style={[
+                              styles.miniFilterText,
+                              pollResultVisibility === rv.key && styles.miniFilterTextActive,
+                            ]}
+                          >
+                            {rv.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  {/* Poll Duration */}
+                  <View style={{ gap: 6 }}>
+                    <Text style={styles.kpiTitle}>ANKET SÜRESİ</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 6 }}
+                    >
+                      {[
+                        { key: 'UNLIMITED', label: 'Süresiz' },
+                        { key: '1H', label: '1 Saat' },
+                        { key: '6H', label: '6 Saat' },
+                        { key: '12H', label: '12 Saat' },
+                        { key: '1D', label: '1 Gün' },
+                        { key: '3D', label: '3 Gün' },
+                        { key: '7D', label: '7 Gün' },
+                      ].map((dur) => (
+                        <TouchableOpacity
+                          key={dur.key}
+                          style={[
+                            styles.miniFilterChip,
+                            pollDurationType === dur.key && styles.miniFilterChipActive,
+                          ]}
+                          onPress={() => setPollDurationType(dur.key as any)}
+                        >
+                          <Text
+                            style={[
+                              styles.miniFilterText,
+                              pollDurationType === dur.key && styles.miniFilterTextActive,
+                            ]}
+                          >
+                            {dur.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+              )}
+
+              {/* SUBMIT BAR (Draft vs Publish) */}
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                {!editingPostId && (
+                  <TouchableOpacity
+                    disabled={creatingPost}
+                    style={[
+                      styles.actionBtn,
+                      styles.actionBtnWarn,
+                      { flex: 1, justifyContent: 'center', paddingVertical: 13 },
+                    ]}
+                    onPress={() => handleCreateOrUpdateClubPost(false)}
+                  >
+                    <Ionicons name="document-text-outline" size={16} color="#f59e0b" />
+                    <Text style={[styles.actionBtnText, { color: '#f59e0b', fontSize: 13 }]}>
+                      Taslak Kaydet
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  disabled={creatingPost}
+                  style={[
+                    styles.primaryOrangeBtn,
+                    { flex: 1.4, justifyContent: 'center', paddingVertical: 13 },
+                  ]}
+                  onPress={() => handleCreateOrUpdateClubPost(true)}
+                >
+                  {creatingPost ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="rocket-outline" size={16} color="#fff" />
+                      <Text style={[styles.primaryOrangeBtnText, { fontSize: 13 }]}>
+                        {editingPostId ? 'Değişiklikleri Kaydet' : 'Hemen Yayınla'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
 
       {/* ============================================================== */}
@@ -2768,7 +4177,9 @@ export default function AdminScreen() {
         >
           <View style={styles.dialogBox}>
             <Text style={styles.dialogTitle}>
-              {restrictType === 'BAN' ? 'Kullanıcıyı Kulüpten Yasakla (Ban)' : 'Kullanıcıyı Sustur (Mute)'}
+              {restrictType === 'BAN'
+                ? 'Kullanıcıyı Kulüpten Yasakla (Ban)'
+                : 'Kullanıcıyı Sustur (Mute)'}
             </Text>
             <Text style={styles.dialogSub}>
               Hedef Üye: {restrictModalUser?.username || restrictModalUser?.email}
@@ -2806,6 +4217,62 @@ export default function AdminScreen() {
                 <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>
                   {restrictType === 'BAN' ? 'Yasakla' : 'Sustur'}
                 </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* MODAL 8: DIRECT OR BULK MESSAGE DIALOG                         */}
+      {/* ============================================================== */}
+      <Modal
+        visible={!!msgTargetUser || bulkMsgModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setMsgTargetUser(null);
+          setBulkMsgModalOpen(false);
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.dialogBackdrop}
+        >
+          <View style={styles.dialogBox}>
+            <Text style={styles.dialogTitle}>
+              {bulkMsgModalOpen
+                ? `Toplu Bildirim & Mesaj Gönder (${selectedBulkUserIds.length} Üye)`
+                : `${msgTargetUser?.displayName || msgTargetUser?.username || msgTargetUser?.email} Üyesine Mesaj`}
+            </Text>
+            <Text style={styles.dialogSub}>
+              Gönderilen mesaj kullanıcının bildirim ve mesaj merkezine doğrudan iletilir:
+            </Text>
+            <TextInput
+              style={styles.dialogTextArea}
+              multiline
+              placeholder="Mesajınızı buraya yazın..."
+              placeholderTextColor="#64748b"
+              value={bulkMsgModalOpen ? bulkMsgText : directMsgText}
+              onChangeText={bulkMsgModalOpen ? setBulkMsgText : setDirectMsgText}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionBtnNeutral]}
+                onPress={() => {
+                  setMsgTargetUser(null);
+                  setBulkMsgModalOpen(false);
+                }}
+              >
+                <Text style={styles.actionBtnText}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={sendingDirectMsg || sendingBulkMsg}
+                style={styles.primaryOrangeBtn}
+                onPress={bulkMsgModalOpen ? handleSendBulkMessage : handleSendDirectMessage}
+              >
+                <Ionicons name="send" size={14} color="#fff" />
+                <Text style={styles.primaryOrangeBtnText}>Gönder</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2923,6 +4390,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
   },
+  subTabsScrollWrapper: {
+    paddingBottom: 10,
+    backgroundColor: '#090d16',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
   subTabChip: {
     flex: 1,
     flexDirection: 'row',
@@ -2931,6 +4404,18 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 8,
     paddingHorizontal: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  subTabChipScrollable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderWidth: 1,
@@ -3013,7 +4498,7 @@ const styles = StyleSheet.create({
   },
   miniFilterChip: {
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 8,
     backgroundColor: '#020617',
     borderWidth: 1,
@@ -3309,11 +4794,63 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
   },
+  pollBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(249,115,22,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(249,115,22,0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  pollBadgeText: {
+    color: '#fb923c',
+    fontSize: 11,
+    fontWeight: '700',
+    flex: 1,
+  },
   clubPostThumb: {
     width: 64,
     height: 64,
     borderRadius: 8,
     backgroundColor: '#020617',
+  },
+  uploadedMediaThumb: {
+    width: 82,
+    height: 82,
+    borderRadius: 10,
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  removeMediaBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switchItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  iconMiniBtn: {
+    width: 30,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalContainer: {
     flex: 1,
