@@ -707,18 +707,19 @@ export default function Home() {
     if (!matchedVariantId) return;
     if (typeof window !== "undefined") {
       try {
-        sessionStorage.setItem(
-          "ts_search_scope",
-          JSON.stringify({
-            vehicleType: searchMode,
-            year: selectedYear,
-            bodyType: selectedBodyType,
-            engine: selectedEngine,
-            fuel: selectedFuelType,
-            trim: selectedTrim,
-            transmission: selectedTransmission,
-          })
-        );
+        const scopeData = JSON.stringify({
+          brand: getBrandName(),
+          model: getModelName(),
+          vehicleType: searchMode,
+          year: selectedYear,
+          bodyType: selectedBodyType,
+          engine: selectedEngine,
+          fuel: selectedFuelType,
+          trim: selectedTrim,
+          transmission: selectedTransmission,
+        });
+        sessionStorage.setItem("ts_search_scope", scopeData);
+        localStorage.setItem("ts_search_scope", scopeData);
       } catch {}
     }
     router.push(`/vehicle/${matchedVariantId}?vehicleType=${searchMode}`);
@@ -837,92 +838,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Interactive Vehicle Selector or Guest Welcome Screen */}
-      {authChecked && !hasAuthToken ? (
-        <div className="w-full max-w-5xl space-y-6 -mt-6">
-          {/* 1. Üst Başlık (Hero Alanı) */}
-          <div className="bg-slate-900/90 border border-orange-500/30 rounded-3xl p-8 sm:p-10 text-center space-y-4 shadow-2xl">
-            <div className="w-16 h-16 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-3xl mx-auto">
-              🔍
-            </div>
-            <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-              Tork Scout AI Araç Sorgulama & Risk Raporu
-            </h2>
-            <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
-              Almayı düşündüğünüz otomobil, SUV, ticari araç veya motosikletin kronik arızalarını, gerçek piyasa risklerini ve ekspertizde bakılması gereken kritik noktaları yapay zeka destekli mühendislik raporuyla saniyeler içinde öğrenin.
-            </p>
-          </div>
-
-          {/* 2. Araç Sorgula'da Sizi Neler Bekliyor? (4 Ana Fayda Kartı) */}
-          <div className="space-y-4">
-            <h3 className="text-base sm:text-lg font-black text-white px-1">
-              Araç Sorgula’da Sizi Neler Bekliyor?
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                {
-                  emoji: "🔍",
-                  title: "Kronik Arıza & FMEA Risk Analizi",
-                  desc: "Seçtiğiniz marka, model, yıl, motor ve şanzıman kombinasyonuna özel bilinen fabrika kroniklerini, arıza olasılıklarını ve ciddiyet derecelerini görün.",
-                },
-                {
-                  emoji: "📋",
-                  title: "Ekspertiz Öncesi Kontrol & Satıcıya Sorulacaklar Listesi",
-                  desc: 'Aracı görmeye gittiğinizde ustaya veya satıcıya sormanız gereken nokta atışı soruları ve masraftan kurtaran "Aracı Bırakıp Uzaklaşma (Walk-Away)" kriterlerini inceleyin.',
-                },
-                {
-                  emoji: "⚙️",
-                  title: "Fabrika Katalog Verileri, MTV & Donanım Değerlendirmesi",
-                  desc: "Motor gücü, tork, 0-100 hızlanma, yakıt tüketimi, bagaj hacmi, güncel yıllık MTV tutarı ve seçilen donanım paketinin artı/eksilerini tek ekranda görüntüleyin.",
-                },
-                {
-                  emoji: "🤖",
-                  title: "100 Üzerinden Satın Alma Puanı & AI Araç Danışmanı (Chatbot)",
-                  desc: "Aracın genel alınabilirlik skorunu görün ve rapor sonrasında Tork Scout AI Danışmanı ile yazışarak aklınıza takılan tüm teknik soruları sorun.",
-                },
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className="bg-slate-900/90 border border-white/10 rounded-2xl p-5 flex items-start gap-4 shadow-lg"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-2xl shrink-0">
-                    {item.emoji}
-                  </div>
-                  <div className="space-y-1.5">
-                    <h4 className="text-sm sm:text-base font-extrabold text-white">
-                      {item.title}
-                    </h4>
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                      {item.desc}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 3. Alt Aksiyon Alanı (CTA Butonları) */}
-          <div className="bg-slate-900/90 border border-white/10 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-xl">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-lg mx-auto">
-              <a
-                href="/login?redirect=/"
-                className="w-full sm:flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm shadow-lg shadow-orange-500/20 transition flex items-center justify-center gap-2"
-              >
-                <span>Giriş Yap ve Araç Sorgula →</span>
-              </a>
-              <a
-                href="/register?redirect=/"
-                className="w-full sm:flex-1 py-3.5 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-orange-500/40 text-orange-300 hover:text-white font-extrabold text-sm transition flex items-center justify-center"
-              >
-                <span>Ücretsiz Hesap Oluştur</span>
-              </a>
-            </div>
-            <p className="text-xs text-slate-400 max-w-xl mx-auto leading-relaxed">
-              Hesabınızla giriş yaparak veya ücretsiz üye olarak Tork Scout AI Araç Sorgulama özelliğine hemen erişebilirsiniz.
-            </p>
-          </div>
-        </div>
-      ) : (
+      {/* Interactive Vehicle Selector */}
       <div className="w-full max-w-5xl glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl shadow-orange-500/5 -mt-6">
         <VehicleSearchModeSelector
           value={searchMode}
@@ -1144,7 +1060,6 @@ export default function Home() {
           Aracı İncele & AI Raporu Al
         </button>
       </div>
-      )}
 
       {/* Nasıl Çalışır section moved to bottom */}
 

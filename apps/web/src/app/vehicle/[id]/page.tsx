@@ -274,7 +274,9 @@ export default function VehicleDetail() {
   const getReportSessionCacheKey = (vid: string): string => {
     if (typeof window === "undefined") return `ts_rep_${vid}`;
     try {
-      const rawScope = sessionStorage.getItem("ts_search_scope");
+      const rawScope =
+        sessionStorage.getItem("ts_search_scope") ||
+        localStorage.getItem("ts_search_scope");
       if (rawScope) {
         const s = JSON.parse(rawScope);
         const scopeParts = [
@@ -379,9 +381,12 @@ export default function VehicleDetail() {
       let searchScope: any = undefined;
       if (typeof window !== "undefined") {
         try {
-          const rawScope = sessionStorage.getItem("ts_search_scope");
+          const rawScope =
+            sessionStorage.getItem("ts_search_scope") ||
+            localStorage.getItem("ts_search_scope");
           if (rawScope) {
             searchScope = JSON.parse(rawScope);
+            sessionStorage.setItem("ts_search_scope", rawScope);
           }
         } catch {}
       }
@@ -696,6 +701,43 @@ export default function VehicleDetail() {
   }
 
   if (!hasAuthToken) {
+    let savedScope: any = null;
+    if (typeof window !== "undefined") {
+      try {
+        const raw =
+          sessionStorage.getItem("ts_search_scope") ||
+          localStorage.getItem("ts_search_scope");
+        if (raw) savedScope = JSON.parse(raw);
+      } catch {}
+    }
+
+    const brandStr =
+      savedScope?.brand ||
+      (typeof vehicle?.brand === "object" ? vehicle?.brand?.name : vehicle?.brand) ||
+      "";
+    const modelStr =
+      savedScope?.model ||
+      (typeof vehicle?.model === "object" ? vehicle?.model?.name : vehicle?.model) ||
+      "";
+    const yearStr = savedScope?.year || vehicle?.year || "";
+    const engineStr =
+      savedScope?.engine ||
+      (typeof vehicle?.engine === "object"
+        ? vehicle?.engine?.code || vehicle?.engine?.name
+        : vehicle?.engine) ||
+      "";
+    const trimStr =
+      savedScope?.trim ||
+      (typeof vehicle?.trim === "object" ? vehicle?.trim?.name : vehicle?.trim) ||
+      "";
+    const selectedVehicleLabel = [brandStr, modelStr, yearStr, engineStr, trimStr]
+      .filter(Boolean)
+      .join(" • ");
+
+    const searchQueryStr = typeof window !== "undefined" ? window.location.search : "";
+    const redirectUrl = `/vehicle/${variantId}${searchQueryStr}`;
+    const encodedRedirect = encodeURIComponent(redirectUrl);
+
     return (
       <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-10 space-y-6">
         {/* 1. Üst Başlık (Hero Alanı) */}
@@ -703,6 +745,11 @@ export default function VehicleDetail() {
           <div className="w-16 h-16 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-3xl mx-auto">
             🔍
           </div>
+          {selectedVehicleLabel && (
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs font-extrabold text-emerald-300">
+              <span>✓ Seçilen Araç Hazır: {selectedVehicleLabel}</span>
+            </div>
+          )}
           <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
             Tork Scout AI Araç Sorgulama & Risk Raporu
           </h1>
@@ -763,20 +810,20 @@ export default function VehicleDetail() {
         <div className="bg-slate-900/90 border border-white/10 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-xl">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-lg mx-auto">
             <a
-              href={`/login?redirect=/vehicle/${variantId}`}
+              href={`/login?redirect=${encodedRedirect}`}
               className="w-full sm:flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm shadow-lg shadow-orange-500/20 transition flex items-center justify-center gap-2"
             >
-              <span>Giriş Yap ve Araç Sorgula →</span>
+              <span>Giriş Yap ve Raporu Gör →</span>
             </a>
             <a
-              href={`/register?redirect=/vehicle/${variantId}`}
+              href={`/register?redirect=${encodedRedirect}`}
               className="w-full sm:flex-1 py-3.5 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-orange-500/40 text-orange-300 hover:text-white font-extrabold text-sm transition flex items-center justify-center"
             >
               <span>Ücretsiz Hesap Oluştur</span>
             </a>
           </div>
           <p className="text-xs text-slate-400 max-w-xl mx-auto leading-relaxed">
-            Hesabınızla giriş yaparak veya ücretsiz üye olarak Tork Scout AI Araç Sorgulama özelliğine hemen erişebilirsiniz.
+            Giriş yaptıktan veya ücretsiz hesap oluşturduktan sonra doldurduğunuz araç filtreleri kaybolmaz; doğrudan seçtiğiniz aracın rapor ekranına yönlendirilirsiniz.
           </p>
         </div>
       </div>
