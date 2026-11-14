@@ -466,31 +466,31 @@ export const CATEGORY_ITEMS: {
   desc: string;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
 }[] = [
-  {
-    id: 'AUTOMOBILE',
-    name: 'Otomobil',
-    desc: 'Sedan, Hatchback, Station Wagon ve binek araçlar',
-    icon: 'car-sports',
-  },
-  {
-    id: 'SUV_PICKUP',
-    name: 'Arazi, SUV & Pickup',
-    desc: 'SUV, Crossover, Pickup ve 4x4 arazi araçları',
-    icon: 'car-lifted-pickup',
-  },
-  {
-    id: 'MINIVAN_PANELVAN',
-    name: 'Minivan & Panelvan',
-    desc: 'Hafif ticari, kamyonet, minibüs ve panelvan araçlar',
-    icon: 'van-utility',
-  },
-  {
-    id: 'MOTORCYCLE',
-    name: 'Motosiklet',
-    desc: 'Scooter, touring, supersport ve tüm motosikletler',
-    icon: 'motorbike',
-  },
-];
+    {
+      id: 'AUTOMOBILE',
+      name: 'Otomobil',
+      desc: 'Sedan, Hatchback, Station Wagon ve binek araçlar',
+      icon: 'car-sports',
+    },
+    {
+      id: 'SUV_PICKUP',
+      name: 'Arazi, SUV & Pickup',
+      desc: 'SUV, Crossover, Pickup ve 4x4 arazi araçları',
+      icon: 'car-lifted-pickup',
+    },
+    {
+      id: 'MINIVAN_PANELVAN',
+      name: 'Minivan & Panelvan',
+      desc: 'Hafif ticari, kamyonet, minibüs ve panelvan araçlar',
+      icon: 'van-utility',
+    },
+    {
+      id: 'MOTORCYCLE',
+      name: 'Motosiklet',
+      desc: 'Scooter, touring, supersport ve tüm motosikletler',
+      icon: 'motorbike',
+    },
+  ];
 
 export const getCategoryLabel = (
   cat: 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE' | null | undefined
@@ -522,8 +522,8 @@ export default function MobileDashboard({
     Platform.OS === 'ios'
       ? Math.max(insets.top, 54)
       : standaloneQueryScreen
-      ? Math.max(insets.top, StatusBar.currentHeight || 24)
-      : 0;
+        ? Math.max(insets.top, StatusBar.currentHeight || 24)
+        : 0;
   const modalBottomInset = Math.max(insets.bottom, 16);
   const [user, setUser] = useState<{
     id?: string;
@@ -658,6 +658,10 @@ export default function MobileDashboard({
   // Loading States for Cascading Options
   const [loadingOptions, setLoadingOptions] = useState(false);
 
+  // Auth Gate State for Araç Sorgula
+  const [hasAuthToken, setHasAuthToken] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
   // Modal Control
   const [queryModalVisible, setQueryModalVisible] = useState(standaloneQueryScreen);
   const [modalView, setModalView] = useState<'form' | 'step'>('form');
@@ -733,8 +737,8 @@ export default function MobileDashboard({
   }, []);
 
   useEffect(() => {
+    checkUserSession();
     if (!standaloneQueryScreen) {
-      checkUserSession();
       fetchFeaturedListings();
     }
     if (selectedCategory) {
@@ -832,23 +836,29 @@ export default function MobileDashboard({
 
   const checkUserSession = async () => {
     try {
-      const token = await AsyncStorage.getItem('accessToken') || await AsyncStorage.getItem('token');
+      const token = (await AsyncStorage.getItem('accessToken')) || (await AsyncStorage.getItem('token'));
       if (token) {
+        setHasAuthToken(true);
         const res = await fetch(`${API_URL}/users/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
           const profile = await res.json();
           setUser(profile);
-        } else {
+        } else if (res.status === 401) {
           await AsyncStorage.removeItem('accessToken');
+          await AsyncStorage.removeItem('token');
+          setHasAuthToken(false);
           setUser(null);
         }
       } else {
+        setHasAuthToken(false);
         setUser(null);
       }
     } catch (err) {
       console.error('Session check error:', err);
+    } finally {
+      setAuthChecked(true);
     }
   };
 
@@ -873,8 +883,8 @@ export default function MobileDashboard({
 
   useFocusEffect(
     useCallback(() => {
+      checkUserSession();
       if (!standaloneQueryScreen) {
-        checkUserSession();
         fetchUnreadCount();
       }
     }, [standaloneQueryScreen])
@@ -1390,7 +1400,7 @@ export default function MobileDashboard({
     }
   };
 
-  const modalBackActionRef = useRef<() => void>(() => {});
+  const modalBackActionRef = useRef<() => void>(() => { });
   modalBackActionRef.current = handleModalBackGesture;
 
   const modalStateRef = useRef({ modalView, activeStep });
@@ -1720,1420 +1730,1668 @@ export default function MobileDashboard({
         <>
           {/* TOP HEADER - White Clean Navbar */}
           <View style={styles.topNavbar}>
-        <View style={styles.logoRow}>
-          <Image
-            source={require('../../../assets/images/torkscout-header-logo.png')}
-            style={{ width: 156, height: 26 }}
-            resizeMode="contain"
-          />
-        </View>
-
-        <View style={styles.topRightActions}>
-          <TouchableOpacity
-            style={styles.headerProfileButton}
-            onPress={() => router.navigate('/(tabs)/profile' as any)}
-            activeOpacity={0.8}
-          >
-            {user?.profilePhotoUrl ? (
-              <ExpoImage
-                source={{ uri: formatCloudflareImageUrl(user.profilePhotoUrl) }}
-                style={styles.headerProfileImg}
-                contentFit="cover"
-              />
-            ) : user?.firstName || user?.username ? (
-              <View style={styles.headerProfileInitialBox}>
-                <Text style={styles.headerProfileInitialText}>
-                  {(user?.firstName?.[0] || user?.username?.[0] || 'U').toUpperCase()}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.headerProfileIconBox}>
-                <Ionicons name="person-outline" size={18} color="#0f172a" />
-              </View>
-            )}
-
-            {/* Notification Count Badge */}
-            {unreadCount > 0 && (
-              <View style={styles.headerBadge}>
-                <Text style={styles.headerBadgeText}>
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* HERO BANNER CARD - Deep Navy Blue with EXACT VECTOR SPEED LOGO FROM WEB SITE */}
-        <View style={styles.heroCardContainer}>
-          <View style={styles.heroContentLeft}>
-            <Text style={styles.heroTitle}>İlanı gör, aracı anla, doğru kararı ver</Text>
-            <Text style={styles.heroSubtitle}>
-              Araçları karşılaştırın, size en uygun aracı keşfedin.
-            </Text>
-
-            <View style={styles.heroActionsRow}>
-              <TouchableOpacity
-                style={styles.heroOrangeButton}
-                activeOpacity={0.85}
-                onPress={() => {
-                  router.push('/vehicle-query' as any);
-                }}
-              >
-                <Text style={styles.heroOrangeButtonText}>Araç Sorgula</Text>
-                <Ionicons name="arrow-forward" size={16} color="#ffffff" style={{ marginLeft: 6 }} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.heroOutlineButton}
-                activeOpacity={0.85}
-                onPress={() => router.push('/comparison')}
-              >
-                <Text style={styles.heroOutlineButtonText}>Araç Karşılaştır</Text>
-                <Ionicons name="scale-outline" size={16} color="#ea580c" style={{ marginLeft: 6 }} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Exact Web Vector SVG Speed Logo */}
-          <View style={styles.heroLogoWrapper}>
-            <TorkScoutWebExactAnimatedLogo />
-          </View>
-        </View>
-
-        {/* KEŞFET SECTION */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Keşfet</Text>
-          <TouchableOpacity onPress={() => router.navigate('/(tabs)/kesfet' as any)}>
-            <Text style={styles.sectionLinkText}>Keşfete Git</Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView
-          ref={kesfetScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.kesfetScrollRow}
-          onContentSizeChange={(w) => {
-            kesfetContentWidthRef.current = w;
-          }}
-          onLayout={(e) => {
-            kesfetLayoutWidthRef.current = e.nativeEvent.layout.width;
-          }}
-          onTouchStart={handleKesfetUserTouch}
-          onScrollBeginDrag={handleKesfetUserTouch}
-        >
-          {/* 1. Araç Rehberi */}
-          <TouchableOpacity
-            style={styles.kesfetCard}
-            activeOpacity={0.85}
-            onPress={() => router.push('/vehicle-guide' as any)}
-          >
-            <Image
-              source={require('../../../assets/images/arac-rehberi-icon.png')}
-              style={{ width: 42, height: 42, borderRadius: 12 }}
-              resizeMode="contain"
-            />
-            <View style={styles.kesfetCardContent}>
-              <Text style={styles.kesfetCardText}>Araç Rehberi</Text>
-              <Text style={styles.kesfetCardSubText}>Kronik &amp; Teknik</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-          </TouchableOpacity>
-
-          {/* 2. Aracını Bul */}
-          <TouchableOpacity
-            style={styles.kesfetCard}
-            activeOpacity={0.85}
-            onPress={() => router.push('/aracini-bul' as any)}
-          >
-            <Image
-              source={require('../../../assets/images/aracini-bul-icon.png')}
-              style={{ width: 42, height: 42, borderRadius: 12 }}
-              resizeMode="contain"
-            />
-            <View style={styles.kesfetCardContent}>
-              <Text style={styles.kesfetCardText}>Aracını Bul</Text>
-              <Text style={styles.kesfetCardSubText}>Kaydır &amp; Keşfet</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-          </TouchableOpacity>
-
-          {/* 3. Akış */}
-          <TouchableOpacity
-            style={styles.kesfetCard}
-            activeOpacity={0.85}
-            onPress={() => router.push('/ilan-akisi')}
-          >
-            <Image
-              source={require('../../../assets/images/akis-icon.png')}
-              style={{ width: 42, height: 42, borderRadius: 12 }}
-              resizeMode="contain"
-            />
-            <View style={styles.kesfetCardContent}>
-              <Text style={styles.kesfetCardText}>Akış</Text>
-              <Text style={styles.kesfetCardSubText}>Canlı Paylaşımlar</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-          </TouchableOpacity>
-
-          {/* 4. İşi Cepte Öneriyor */}
-          <TouchableOpacity
-            style={styles.kesfetCard}
-            activeOpacity={0.85}
-            onPressIn={handleKesfetUserTouch}
-            onPress={() => router.push('/isicepte' as any)}
-          >
-            <Image
-              source={require('../../../assets/images/isicepte-logo.png')}
-              style={{ width: 42, height: 42, borderRadius: 12 }}
-              resizeMode="contain"
-            />
-            <View style={styles.kesfetCardContent}>
-              <Text style={styles.kesfetCardText}>İşi Cepte Öneriyor</Text>
-              <Text style={styles.kesfetCardSubText}>Onaylı Ustalar</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-          </TouchableOpacity>
-        </ScrollView>
-
-        {/* VİTRİN / ACİL PROMOTIONAL SECTION */}
-        <View style={styles.promoSectionContainer}>
-          <View style={styles.promoHeaderRow}>
-            {/* Direct 2-State Segmented Navigation Header */}
-            <View style={styles.promoSegmentWrap}>
-              <TouchableOpacity
-                style={[
-                  styles.promoSegmentBtn,
-                  promoTab === 'vitrin' && styles.promoSegmentBtnVitrinActive,
-                ]}
-                activeOpacity={0.8}
-                onPress={() => {
-                  setPromoTab('vitrin');
-                  fetchFeaturedListings('vitrin');
-                }}
-              >
-                <Ionicons
-                  name="star"
-                  size={13}
-                  color={promoTab === 'vitrin' ? '#0f172a' : '#64748b'}
-                />
-                <Text
-                  style={[
-                    styles.promoSegmentText,
-                    promoTab === 'vitrin' && styles.promoSegmentTextVitrinActive,
-                  ]}
-                >
-                  Vitrin
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.promoSegmentBtn,
-                  promoTab === 'acil' && styles.promoSegmentBtnAcilActive,
-                ]}
-                activeOpacity={0.8}
-                onPress={() => {
-                  setPromoTab('acil');
-                  fetchFeaturedListings('acil');
-                }}
-              >
-                <Ionicons
-                  name="flame"
-                  size={13}
-                  color={promoTab === 'acil' ? '#ffffff' : '#64748b'}
-                />
-                <Text
-                  style={[
-                    styles.promoSegmentText,
-                    promoTab === 'acil' && styles.promoSegmentTextAcilActive,
-                  ]}
-                >
-                  Acil İlanlar
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {vitrinListings.length > 0 && (
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: '/listings',
-                    params: promoTab === 'vitrin' ? { showcaseOnly: 'true' } : { urgentOnly: 'true' },
-                  })
-                }
-                style={styles.promoAllLink}
-              >
-                <Text style={styles.promoAllLinkText}>
-                  {promoTab === 'vitrin' ? 'Tüm Vitrin İlanları' : 'Tüm Acil İlanlar'}
-                </Text>
-                <Ionicons name="chevron-forward" size={13} color="#ea580c" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <Text style={styles.promoSubDesc}>
-            {promoTab === 'vitrin'
-              ? 'Vitrin görünürlük hakkı aktif olan öne çıkan araç ilanları.'
-              : 'Acil satılık rozeti aktif olan fırsat araç ilanları.'}
-          </Text>
-
-          {loadingListings ? (
-            <TorkScoutLoader style={{ marginVertical: 32 }} />
-          ) : vitrinListings.length > 0 ? (
-            <View style={styles.vitrinRowsWrapper}>
-              {vitrinRows.map((rowItems, rowIndex) => (
-                <ScrollView
-                  key={`vitrin-row-${rowIndex}`}
-                  ref={(el) => {
-                    vitrinScrollRefs.current[rowIndex] = el;
-                  }}
-                  onScroll={(e) => {
-                    vitrinScrollOffsets.current[rowIndex] = e.nativeEvent.contentOffset.x;
-                  }}
-                  scrollEventThrottle={16}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.vitrinHorizontalScrollContent}
-                  style={styles.vitrinRowScrollView}
-                >
-                  {rowItems.map((item) => {
-                    const isFav = !!favorites[item.id];
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={styles.vitrinCard}
-                        activeOpacity={0.9}
-                        onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
-                      >
-                        <View style={styles.vitrinImageContainer}>
-                          <ExpoImage
-                            source={{ uri: item.imageUrl }}
-                            style={styles.vitrinCarImage}
-                            contentFit="cover"
-                            cachePolicy="memory-disk"
-                          />
-
-                          {/* Floating Badges Overlay (Vitrin & Acil) */}
-                          <View style={styles.vitrinBadgesOverlay}>
-                            {item.isUrgent && <UrgentBadge size="small" />}
-                            {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
-                          </View>
-
-                          <TouchableOpacity
-                            style={styles.favCircleButton}
-                            onPress={() => toggleFavorite(item.id)}
-                          >
-                            <Ionicons
-                              name={isFav ? 'heart' : 'heart-outline'}
-                              size={17}
-                              color={isFav ? '#ef4444' : '#ffffff'}
-                            />
-                          </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.vitrinCardBody}>
-                          <Text style={styles.vitrinTitle} numberOfLines={2}>
-                            {item.title}
-                          </Text>
-
-                          <Text style={styles.vitrinSpecs}>
-                            {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
-                          </Text>
-
-                          <View style={styles.vitrinPriceRow}>
-                            <Text style={styles.vitrinPrice}>
-                              {(item.price ?? 0).toLocaleString('tr-TR')} ₺
-                            </Text>
-                            <Text style={styles.vitrinCityBadge}>{item.city}</Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              ))}
-            </View>
-          ) : recentListings.length > 0 ? (
-            <View style={{ marginTop: 6 }}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Son Eklenen İlanlar</Text>
-                <TouchableOpacity onPress={() => router.push('/listings')}>
-                  <Text style={styles.sectionLinkText}>Tümünü Gör</Text>
-                </TouchableOpacity>
-              </View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.vitrinHorizontalScrollContent}
-                style={styles.vitrinRowScrollView}
-              >
-                {recentListings.map((item) => {
-                  const isFav = !!favorites[item.id];
-                  return (
-                    <TouchableOpacity
-                      key={`recent-${item.id}`}
-                      style={styles.vitrinCard}
-                      activeOpacity={0.9}
-                      onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
-                    >
-                      <View style={styles.vitrinImageContainer}>
-                        <ExpoImage
-                          source={{ uri: item.imageUrl }}
-                          style={styles.vitrinCarImage}
-                          contentFit="cover"
-                          cachePolicy="memory-disk"
-                        />
-                        <View style={styles.vitrinBadgesOverlay}>
-                          {item.isUrgent && <UrgentBadge size="small" />}
-                          {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
-                        </View>
-                        <TouchableOpacity
-                          style={styles.favCircleButton}
-                          onPress={() => toggleFavorite(item.id)}
-                        >
-                          <Ionicons
-                            name={isFav ? 'heart' : 'heart-outline'}
-                            size={17}
-                            color={isFav ? '#ef4444' : '#ffffff'}
-                          />
-                        </TouchableOpacity>
-                      </View>
-                      <View style={styles.vitrinCardBody}>
-                        <Text style={styles.vitrinTitle} numberOfLines={2}>
-                          {item.title}
-                        </Text>
-                        <Text style={styles.vitrinSpecs}>
-                          {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
-                        </Text>
-                        <View style={styles.vitrinPriceRow}>
-                          <Text style={styles.vitrinPrice}>
-                            {(item.price ?? 0).toLocaleString('tr-TR')} ₺
-                          </Text>
-                          <Text style={styles.vitrinCityBadge}>{item.city}</Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          ) : (
-            <View style={styles.emptyPromoBox}>
-              <View style={styles.emptyPromoCompactLeft}>
-                <View style={styles.emptyPromoIconWrap}>
-                  <Ionicons
-                    name={promoTab === 'vitrin' ? 'star-outline' : 'flame-outline'}
-                    size={18}
-                    color="#64748b"
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.emptyPromoTitle}>
-                    {promoTab === 'vitrin'
-                      ? 'Şu anda vitrinde aktif ilan bulunmuyor.'
-                      : 'Şu anda acil satılık aktif ilan bulunmuyor.'}
-                  </Text>
-                  <Text style={styles.emptyPromoSub}>
-                    Tüm satılık araçları incelemek için Akış'a göz atabilirsiniz.
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.emptyPromoBtn}
-                onPress={() => router.push('/ilan-akisi')}
-              >
-                <Text style={styles.emptyPromoBtnText}>Akışa Git ➔</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-      </View>
-    </ScrollView>
-        </>
-      )}
-
-      {/* SINGLE UNIFIED MODAL / STANDALONE SCREEN MATCHING REFERENCE UI */}
-  {standaloneQueryScreen || queryModalVisible ? (
-    <View
-      style={[
-        styles.fullModalContainer,
-        {
-          paddingTop: modalTopInset,
-          paddingBottom: modalBottomInset,
-        },
-      ]}
-      {...modalPanResponder.panHandlers}
-      onTouchStart={(e) => {
-        const touch = e.nativeEvent;
-        touchSwipeStartRef.current = {
-          x: touch.pageX,
-          y: touch.pageY,
-          time: Date.now(),
-          handled: false,
-        };
-      }}
-      onTouchMove={(e) => {
-        const start = touchSwipeStartRef.current;
-        if (!start || start.handled) return;
-        const touch = e.nativeEvent;
-        const dx = touch.pageX - start.x;
-        const dy = touch.pageY - start.y;
-        const absDx = Math.abs(dx);
-        const absDy = Math.abs(dy);
-
-        const isLeftEdgeSwipe = (start.x <= 60 || modalStateRef.current.modalView === 'form') && dx > 55 && absDx > absDy * 1.4;
-        const isRightEdgeSwipe =
-          start.x >= windowWidth - 60 &&
-          dx < -55 &&
-          absDx > absDy * 1.4 &&
-          !(modalStateRef.current.modalView === 'step' && modalStateRef.current.activeStep === 'brand');
-
-        if (isLeftEdgeSwipe || isRightEdgeSwipe) {
-          start.handled = true;
-          modalBackActionRef.current();
-        }
-      }}
-      onTouchEnd={(e) => {
-        const start = touchSwipeStartRef.current;
-        if (!start || start.handled) return;
-        const touch = e.nativeEvent;
-        const dx = touch.pageX - start.x;
-        const dy = touch.pageY - start.y;
-        const absDx = Math.abs(dx);
-        const absDy = Math.abs(dy);
-
-        const isLeftEdgeSwipe = (start.x <= 60 || modalStateRef.current.modalView === 'form') && dx > 42 && absDx > absDy * 1.35;
-        const isRightEdgeSwipe =
-          start.x >= windowWidth - 60 &&
-          dx < -42 &&
-          absDx > absDy * 1.35 &&
-          !(modalStateRef.current.modalView === 'step' && modalStateRef.current.activeStep === 'brand');
-
-        if (isLeftEdgeSwipe || isRightEdgeSwipe) {
-          start.handled = true;
-          modalBackActionRef.current();
-        }
-        touchSwipeStartRef.current = null;
-      }}
-    >
-      {/* iOS & Android Left-Edge Native-Feel Swipe Zone */}
-      <View
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: modalTopInset + 56,
-          bottom: 0,
-          width: 20,
-          zIndex: 999,
-        }}
-        {...leftEdgePanResponder.panHandlers}
-      />
-      {!(modalView === 'step' && activeStep === 'brand') && (
-        <View
-          style={{
-            position: 'absolute',
-            right: 0,
-            top: modalTopInset + 56,
-            bottom: 0,
-            width: 20,
-            zIndex: 999,
-          }}
-          {...rightEdgePanResponder.panHandlers}
-        />
-      )}
-      {modalView === 'form' ? (
-        /* FORM VIEW MATCHING REFERENCE IMAGE 2 */
-        <ScrollView contentContainerStyle={styles.refFormPadding} showsVerticalScrollIndicator={false}>
-          {/* Header with Back Arrow & Centered Title */}
-          <View style={styles.refHeaderRow}>
-            <TouchableOpacity
-              style={styles.refBackButton}
-              onPress={closeQueryModal}
-            >
-              <Ionicons name="chevron-back" size={24} color="#0f172a" />
-            </TouchableOpacity>
-            <Text style={styles.refHeaderTitle}>Araç Sorgula</Text>
-            <View style={{ width: 24 }} />
-          </View>
-
-          {/* TorkScout Brand Header */}
-          <View style={styles.brandHeroSection}>
-            <View style={styles.brandHeroLogoRow}>
+            <View style={styles.logoRow}>
               <Image
                 source={require('../../../assets/images/torkscout-header-logo.png')}
-                style={{ width: 165, height: 28 }}
+                style={{ width: 156, height: 26 }}
                 resizeMode="contain"
               />
             </View>
-            <Text style={styles.brandHeroSubtitle}>
-              Aracını seç, teknik özelliklerini, yaygın sorunlarını ve satın alma öncesi kritik detaylarını öğren.
-            </Text>
-          </View>
 
-          {/* Araç Bilgileri Card */}
-          <View style={styles.vehicleInfoCard}>
-            <View style={styles.vehicleInfoCardHeader}>
-              <View style={styles.vehicleInfoIconCircle}>
-                <Ionicons name="search" size={18} color="#0284c7" />
-              </View>
-              <Text style={styles.vehicleInfoCardTitle}>Araç Bilgileri</Text>
-            </View>
-
-            {/* 0. Vasıta Türü */}
-            <TouchableOpacity
-              style={[
-                styles.filterRowItem,
-                isCategoryCycling && { backgroundColor: '#fff7ed' },
-              ]}
-              onPress={() => !isCategoryCycling && openStepView('category')}
-              activeOpacity={0.7}
-              disabled={isCategoryCycling}
-            >
-              <Text style={styles.filterRowLabel}>Vasıta Türü</Text>
-              <View style={styles.filterRowRight}>
-                {isCategoryCycling ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <ActivityIndicator size="small" color="#ea580c" />
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#ea580c' }}>
-                      {cyclingCategoryText}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={selectedCategory ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                    {getCategoryLabel(selectedCategory)}
-                  </Text>
-                )}
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color={isCategoryCycling ? '#ea580c' : '#cbd5e1'}
-                />
-              </View>
-            </TouchableOpacity>
-
-            {/* 1. Marka */}
-            <TouchableOpacity
-              style={[
-                styles.filterRowItem,
-                (!selectedCategory || isCategoryCycling) && styles.filterRowItemDisabled,
-              ]}
-              onPress={() => selectedCategory && !isCategoryCycling && openStepView('brand')}
-              disabled={!selectedCategory || isCategoryCycling}
-            >
-              <Text style={styles.filterRowLabel}>
-                {selectedCategory === 'MOTORCYCLE' ? 'Motosiklet Markası' : 'Marka'}
-              </Text>
-              <View style={styles.filterRowRight}>
-                <Text style={selectedBrand ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                  {selectedBrand ? selectedBrand.name : 'Seçilmedi'}
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-              </View>
-            </TouchableOpacity>
-
-            {/* 2. Model Ailesi */}
-            <TouchableOpacity
-              style={[
-                styles.filterRowItem,
-                selectedCategory === 'MOTORCYCLE' && { borderBottomWidth: 0 },
-                !selectedBrand && styles.filterRowItemDisabled,
-              ]}
-              onPress={() => selectedBrand && openStepView('model')}
-              disabled={!selectedBrand}
-            >
-              <Text style={styles.filterRowLabel}>Model Ailesi</Text>
-              <View style={styles.filterRowRight}>
-                <Text style={selectedModel ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                  {selectedModel ? selectedModel.name : 'Seçilmedi'}
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-              </View>
-            </TouchableOpacity>
-
-            {/* Otomobil, Arazi/SUV & Minivan için Kalan 6 Varyant Alanı */}
-            {selectedCategory !== 'MOTORCYCLE' && (
-              <>
-                {/* 3. Yıl */}
-                <TouchableOpacity
-                  style={[
-                    styles.filterRowItem,
-                    !selectedModel && styles.filterRowItemDisabled,
-                  ]}
-                  onPress={() => selectedModel && openStepView('year')}
-                  disabled={!selectedModel}
-                >
-                  <Text style={styles.filterRowLabel}>Yıl</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedYear ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedYear ? selectedYear : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 4. Kasa Tipi */}
-                <TouchableOpacity
-                  style={[
-                    styles.filterRowItem,
-                    !selectedYear && styles.filterRowItemDisabled,
-                  ]}
-                  onPress={() => selectedYear && openStepView('bodyType')}
-                  disabled={!selectedYear}
-                >
-                  <Text style={styles.filterRowLabel}>Kasa Tipi</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedBodyType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedBodyType ? selectedBodyType : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 5. Motor / Versiyon */}
-                <TouchableOpacity
-                  style={[
-                    styles.filterRowItem,
-                    !selectedBodyType && styles.filterRowItemDisabled,
-                  ]}
-                  onPress={() => selectedBodyType && openStepView('engine')}
-                  disabled={!selectedBodyType}
-                >
-                  <Text style={styles.filterRowLabel}>Motor / Versiyon</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedEngine ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedEngine ? selectedEngine : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 6. Yakıt */}
-                <TouchableOpacity
-                  style={[
-                    styles.filterRowItem,
-                    !selectedEngine && styles.filterRowItemDisabled,
-                  ]}
-                  onPress={() => selectedEngine && openStepView('fuelType')}
-                  disabled={!selectedEngine}
-                >
-                  <Text style={styles.filterRowLabel}>Yakıt Türü</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedFuelType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedFuelType ? selectedFuelType : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 7. Şanzıman */}
-                <TouchableOpacity
-                  style={[
-                    styles.filterRowItem,
-                    !selectedFuelType && styles.filterRowItemDisabled,
-                  ]}
-                  onPress={() => selectedFuelType && openStepView('transmission')}
-                  disabled={!selectedFuelType}
-                >
-                  <Text style={styles.filterRowLabel}>Şanzıman Tipi</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedTransmission ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedTransmission ? selectedTransmission : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 8. Donanım */}
-                <TouchableOpacity
-                  style={[
-                    styles.filterRowItem,
-                    { borderBottomWidth: 0 },
-                    !selectedTransmission && styles.filterRowItemDisabled,
-                  ]}
-                  onPress={() => selectedTransmission && openStepView('trim')}
-                  disabled={!selectedTransmission}
-                >
-                  <Text style={styles.filterRowLabel}>Donanım Paketi</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedTrim ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedTrim ? selectedTrim : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-
-          {/* Bottom Orange Action Button */}
-          <TouchableOpacity
-            style={[
-              styles.refOrangeSubmitButton,
-              (!selectedCategory || !selectedBrand || !selectedModel || isCategoryCycling) && styles.refOrangeSubmitButtonDisabled,
-            ]}
-            onPress={handleStartReport}
-            disabled={!selectedCategory || !selectedBrand || !selectedModel || isCategoryCycling}
-          >
-            <Text style={styles.refOrangeSubmitButtonText}>Sorgulamaya Başla</Text>
-            <Ionicons name="arrow-forward" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
-          </TouchableOpacity>
-        </ScrollView>
-      ) : (
-        /* STEP SELECTION VIEW MATCHING REFERENCE UI */
-        <View style={styles.refModalContent}>
-          {/* Header with Back Arrow & Centered Title */}
-          <View style={styles.refHeaderRow}>
-            <TouchableOpacity style={styles.refBackButton} onPress={handleStepBack}>
-              <Ionicons name="chevron-back" size={24} color="#0f172a" />
-            </TouchableOpacity>
-
-            <Text style={styles.refHeaderTitle}>{getStepTitle()}</Text>
-            <View style={{ width: 24 }} />
-          </View>
-
-          {/* Progress Indicator: Step Badge (e.g. 2/2 or 8/8) & Segmented Bar */}
-          {activeStep !== 'category' && (
-            <View style={styles.progressRow}>
-              <Text style={styles.progressText}>
-                {getStepNumber()} / {selectedCategory === 'MOTORCYCLE' ? 2 : 8}
-              </Text>
-              <View style={styles.progressBarTrack}>
-                {Array.from({ length: selectedCategory === 'MOTORCYCLE' ? 2 : 8 }, (_, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.progressBarSegment,
-                      i < getStepNumber() && styles.progressBarSegmentActive,
-                    ]}
+            <View style={styles.topRightActions}>
+              <TouchableOpacity
+                style={styles.headerProfileButton}
+                onPress={() => router.navigate('/(tabs)/profile' as any)}
+                activeOpacity={0.8}
+              >
+                {user?.profilePhotoUrl ? (
+                  <ExpoImage
+                    source={{ uri: formatCloudflareImageUrl(user.profilePhotoUrl) }}
+                    style={styles.headerProfileImg}
+                    contentFit="cover"
                   />
-                ))}
-              </View>
-            </View>
-          )}
-
-          <Text style={styles.refSubtitle}>{getStepSubtitle()}</Text>
-
-          {/* Selected Brand Summary Card for Step 2 (Model Selection) */}
-          {selectedBrand && activeStep === 'model' && (
-            <View style={styles.selectedBrandBadgeCard}>
-              <View style={styles.selectedBrandBadgeLeft}>
-                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
-                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.selectedBrandBadgeLogo} resizeMode="contain" />
+                ) : user?.firstName || user?.username ? (
+                  <View style={styles.headerProfileInitialBox}>
+                    <Text style={styles.headerProfileInitialText}>
+                      {(user?.firstName?.[0] || user?.username?.[0] || 'U').toUpperCase()}
+                    </Text>
+                  </View>
                 ) : (
-                  <Ionicons name="car-sport" size={24} color="#0f172a" />
+                  <View style={styles.headerProfileIconBox}>
+                    <Ionicons name="person-outline" size={18} color="#0f172a" />
+                  </View>
                 )}
-                <Text style={styles.selectedBrandBadgeName} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
-              </View>
-              <Ionicons name="checkmark" size={20} color="#ea580c" />
-            </View>
-          )}
 
-          {/* Selected Summary Card for Step 3 (Year Selection) */}
-          {selectedBrand && selectedModel && activeStep === 'year' && (
-            <View style={styles.selectedSummaryBadgeCard}>
-              <View style={styles.selectedSummaryBadgeItem}>
-                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
-                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.selectedSummaryLogo} resizeMode="contain" />
-                ) : (
-                  <Ionicons name="car-sport" size={22} color="#0f172a" />
+                {/* Notification Count Badge */}
+                {unreadCount > 0 && (
+                  <View style={styles.headerBadge}>
+                    <Text style={styles.headerBadgeText}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
                 )}
-                <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
-                <Ionicons name="checkmark" size={16} color="#ea580c" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* HERO BANNER CARD - Deep Navy Blue with EXACT VECTOR SPEED LOGO FROM WEB SITE */}
+            <View style={styles.heroCardContainer}>
+              <View style={styles.heroContentLeft}>
+                <Text style={styles.heroTitle}>İlanı gör, aracı anla, doğru kararı ver</Text>
+                <Text style={styles.heroSubtitle}>
+                  Araçları karşılaştırın, size en uygun aracı keşfedin.
+                </Text>
+
+                <View style={styles.heroActionsRow}>
+                  <TouchableOpacity
+                    style={styles.heroOrangeButton}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      router.push('/vehicle-query' as any);
+                    }}
+                  >
+                    <Text style={styles.heroOrangeButtonText}>Araç Sorgula</Text>
+                    <Ionicons name="arrow-forward" size={16} color="#ffffff" style={{ marginLeft: 6 }} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.heroOutlineButton}
+                    activeOpacity={0.85}
+                    onPress={() => router.push('/comparison')}
+                  >
+                    <Text style={styles.heroOutlineButtonText}>Araç Karşılaştır</Text>
+                    <Ionicons name="scale-outline" size={16} color="#ea580c" style={{ marginLeft: 6 }} />
+                  </TouchableOpacity>
+                </View>
               </View>
 
-              <View style={styles.selectedSummaryDivider} />
-
-              <View style={styles.selectedSummaryBadgeItem}>
-                <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
-                <Ionicons name="checkmark" size={16} color="#ea580c" />
+              {/* Exact Web Vector SVG Speed Logo */}
+              <View style={styles.heroLogoWrapper}>
+                <TorkScoutWebExactAnimatedLogo />
               </View>
             </View>
-          )}
 
-          {/* Selected Summary Card for Step 4 (Body Type Selection) */}
-          {selectedBrand && selectedModel && selectedYear && activeStep === 'bodyType' && (
-            <View style={styles.selectedSummaryBadgeCard}>
-              <View style={styles.selectedSummaryBadgeItem}>
-                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
-                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.selectedSummaryLogo} resizeMode="contain" />
-                ) : (
-                  <Ionicons name="car-sport" size={20} color="#0f172a" />
-                )}
-                <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
-                <Ionicons name="checkmark" size={15} color="#ea580c" />
-              </View>
-
-              <View style={styles.selectedSummaryDivider} />
-
-              <View style={styles.selectedSummaryBadgeItem}>
-                <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
-                <Ionicons name="checkmark" size={15} color="#ea580c" />
-              </View>
-
-              <View style={styles.selectedSummaryDivider} />
-
-              <View style={styles.selectedSummaryBadgeItem}>
-                <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
-                <Ionicons name="checkmark" size={15} color="#ea580c" />
-              </View>
+            {/* KEŞFET SECTION */}
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Keşfet</Text>
+              <TouchableOpacity onPress={() => router.navigate('/(tabs)/kesfet' as any)}>
+                <Text style={styles.sectionLinkText}>Keşfete Git</Text>
+              </TouchableOpacity>
             </View>
-          )}
 
-          {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 5 (Motor / Versiyon Seç) MATCHING REFERENCE IMAGE */}
-          {selectedBrand && selectedModel && selectedYear && activeStep === 'engine' && (
-            <View style={styles.breadCrumbSummaryCard}>
-              <View style={styles.breadCrumbItem}>
-                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
-                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
-                ) : (
-                  <Ionicons name="car-sport" size={20} color="#0f172a" />
-                )}
-                <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
-                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
-                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
-                </View>
-              </View>
-
-              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
-
-              <View style={styles.breadCrumbItem}>
-                <Ionicons name="car-outline" size={22} color="#0f172a" />
-                <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedBodyType || 'Sedan'}</Text>
-                  <Text style={styles.breadCrumbSubText}>Kasa Tipi</Text>
-                </View>
-              </View>
-
-              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
-
-              <View style={styles.breadCrumbItem}>
-                <Ionicons name="color-fill-outline" size={20} color="#0f172a" />
-                <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedFuelType || 'Benzin'}</Text>
-                  <Text style={styles.breadCrumbSubText}>Yakıt</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 6 (Yakıt Türü Seç) MATCHING REFERENCE SCREENSHOT */}
-          {selectedBrand && selectedModel && selectedYear && activeStep === 'fuelType' && (
-            <View style={styles.breadCrumbSummaryCard}>
-              <View style={styles.breadCrumbItem}>
-                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
-                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
-                ) : (
-                  <Ionicons name="car-sport" size={20} color="#0f172a" />
-                )}
-                <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
-                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
-                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
-                </View>
-              </View>
-
-              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
-
-              <View style={styles.breadCrumbItem}>
-                <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedEngine || '—'}</Text>
-                  <Text style={styles.breadCrumbSubText}>Motor</Text>
-                </View>
-              </View>
-
-              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
-
-              <View style={styles.breadCrumbItem}>
-                <Ionicons name="car-outline" size={22} color="#0f172a" />
-                <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedBodyType || '—'}</Text>
-                  <Text style={styles.breadCrumbSubText}>Kasa Tipi</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 7 (Şanzıman Tipi Seç) MATCHING REFERENCE SCREENSHOT */}
-          {selectedBrand && selectedModel && selectedYear && activeStep === 'transmission' && (
-            <View style={styles.breadCrumbSummaryCard}>
-              <View style={styles.breadCrumbItem}>
-                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
-                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
-                ) : (
-                  <Ionicons name="car-sport" size={20} color="#0f172a" />
-                )}
-                <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
-                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
-                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
-                </View>
-              </View>
-
-              <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
-
-              <View style={styles.breadCrumbItem}>
-                <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedEngine || '—'}</Text>
-                </View>
-              </View>
-
-              <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
-
-              <View style={styles.breadCrumbItem}>
-                <Ionicons name="color-fill-outline" size={16} color="#0f172a" />
-                <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedFuelType || '—'}</Text>
-              </View>
-
-              <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
-
-              <View style={styles.breadCrumbItem}>
-                <Ionicons name="car-outline" size={16} color="#0f172a" />
-                <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedBodyType || '—'}</Text>
-              </View>
-            </View>
-          )}
-
-          {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 8 (Donanım Paketi Seç) MATCHING REFERENCE SCREENSHOT */}
-          {selectedBrand && selectedModel && selectedYear && activeStep === 'trim' && (
-            <View style={styles.breadCrumbSummaryCard}>
-              <View style={styles.breadCrumbItem}>
-                {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
-                  <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
-                ) : (
-                  <Ionicons name="car-sport" size={20} color="#0f172a" />
-                )}
-                <View style={{ gap: 1 }}>
-                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
-                  <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
-                  <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
-                </View>
-              </View>
-
-              <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-
-              <View style={styles.breadCrumbItem}>
-                <Text style={styles.breadCrumbMainText}>{selectedEngine || '—'}</Text>
-              </View>
-
-              <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-
-              <View style={styles.breadCrumbItem}>
-                <Ionicons name="color-fill-outline" size={14} color="#0f172a" />
-                <Text style={styles.breadCrumbMainText}>{selectedFuelType || '—'}</Text>
-              </View>
-
-              <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-
-              <View style={styles.breadCrumbItem}>
-                <AutomaticGearIcon color="#0f172a" />
-                <Text style={styles.breadCrumbMainText}>{selectedTransmission || '—'}</Text>
-              </View>
-
-              <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-
-              <View style={styles.breadCrumbItem}>
-                <Ionicons name="car-outline" size={14} color="#0f172a" />
-                <Text style={styles.breadCrumbMainText}>{selectedBodyType || '—'}</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Search Bar matching reference UI (Hidden for Category, Year, Body Type, Engine, Fuel Type, Transmission, and Trim selections) */}
-          {activeStep !== 'category' && activeStep !== 'year' && activeStep !== 'bodyType' && activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'transmission' && activeStep !== 'trim' && (
-            <View style={styles.refSearchBox}>
-              <Ionicons name="search-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.refSearchInput}
-                placeholder={getSearchPlaceholder()}
-                placeholderTextColor="#94a3b8"
-                value={searchText}
-                onChangeText={setSearchText}
-              />
-            </View>
-          )}
-
-          {/* Scrollable Content Container */}
-          <View style={styles.stepBodyWithJumper}>
             <ScrollView
-              contentContainerStyle={styles.stepScrollInner}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
+              ref={kesfetScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.kesfetScrollRow}
+              onContentSizeChange={(w) => {
+                kesfetContentWidthRef.current = w;
+              }}
+              onLayout={(e) => {
+                kesfetLayoutWidthRef.current = e.nativeEvent.layout.width;
+              }}
+              onTouchStart={handleKesfetUserTouch}
+              onScrollBeginDrag={handleKesfetUserTouch}
             >
-              {activeStep === 'brand' && !searchText && (
-                <>
-                  {/* Popüler Markalar Horizontal Row */}
-                  <Text style={styles.sectionHeaderLabel}>Popüler Markalar</Text>
+              {/* 1. Araç Rehberi */}
+              <TouchableOpacity
+                style={styles.kesfetCard}
+                activeOpacity={0.85}
+                onPress={() => router.push('/vehicle-guide' as any)}
+              >
+                <Image
+                  source={require('../../../assets/images/arac-rehberi-icon.png')}
+                  style={{ width: 42, height: 42, borderRadius: 12 }}
+                  resizeMode="contain"
+                />
+                <View style={styles.kesfetCardContent}>
+                  <Text style={styles.kesfetCardText}>Araç Rehberi</Text>
+                  <Text style={styles.kesfetCardSubText}>Kronik &amp; Teknik</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              {/* 2. Aracını Bul */}
+              <TouchableOpacity
+                style={styles.kesfetCard}
+                activeOpacity={0.85}
+                onPress={() => router.push('/aracini-bul' as any)}
+              >
+                <Image
+                  source={require('../../../assets/images/aracini-bul-icon.png')}
+                  style={{ width: 42, height: 42, borderRadius: 12 }}
+                  resizeMode="contain"
+                />
+                <View style={styles.kesfetCardContent}>
+                  <Text style={styles.kesfetCardText}>Aracını Bul</Text>
+                  <Text style={styles.kesfetCardSubText}>Kaydır &amp; Keşfet</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              {/* 3. Akış */}
+              <TouchableOpacity
+                style={styles.kesfetCard}
+                activeOpacity={0.85}
+                onPress={() => router.push('/ilan-akisi')}
+              >
+                <Image
+                  source={require('../../../assets/images/akis-icon.png')}
+                  style={{ width: 42, height: 42, borderRadius: 12 }}
+                  resizeMode="contain"
+                />
+                <View style={styles.kesfetCardContent}>
+                  <Text style={styles.kesfetCardText}>Akış</Text>
+                  <Text style={styles.kesfetCardSubText}>Canlı Paylaşımlar</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              {/* 4. İşi Cepte Öneriyor */}
+              <TouchableOpacity
+                style={styles.kesfetCard}
+                activeOpacity={0.85}
+                onPressIn={handleKesfetUserTouch}
+                onPress={() => router.push('/isicepte' as any)}
+              >
+                <Image
+                  source={require('../../../assets/images/isicepte-logo.png')}
+                  style={{ width: 42, height: 42, borderRadius: 12 }}
+                  resizeMode="contain"
+                />
+                <View style={styles.kesfetCardContent}>
+                  <Text style={styles.kesfetCardText}>İşi Cepte Öneriyor</Text>
+                  <Text style={styles.kesfetCardSubText}>Onaylı Ustalar</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+              </TouchableOpacity>
+            </ScrollView>
+
+            {/* VİTRİN / ACİL PROMOTIONAL SECTION */}
+            <View style={styles.promoSectionContainer}>
+              <View style={styles.promoHeaderRow}>
+                {/* Direct 2-State Segmented Navigation Header */}
+                <View style={styles.promoSegmentWrap}>
+                  <TouchableOpacity
+                    style={[
+                      styles.promoSegmentBtn,
+                      promoTab === 'vitrin' && styles.promoSegmentBtnVitrinActive,
+                    ]}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setPromoTab('vitrin');
+                      fetchFeaturedListings('vitrin');
+                    }}
+                  >
+                    <Ionicons
+                      name="star"
+                      size={13}
+                      color={promoTab === 'vitrin' ? '#0f172a' : '#64748b'}
+                    />
+                    <Text
+                      style={[
+                        styles.promoSegmentText,
+                        promoTab === 'vitrin' && styles.promoSegmentTextVitrinActive,
+                      ]}
+                    >
+                      Vitrin
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.promoSegmentBtn,
+                      promoTab === 'acil' && styles.promoSegmentBtnAcilActive,
+                    ]}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setPromoTab('acil');
+                      fetchFeaturedListings('acil');
+                    }}
+                  >
+                    <Ionicons
+                      name="flame"
+                      size={13}
+                      color={promoTab === 'acil' ? '#ffffff' : '#64748b'}
+                    />
+                    <Text
+                      style={[
+                        styles.promoSegmentText,
+                        promoTab === 'acil' && styles.promoSegmentTextAcilActive,
+                      ]}
+                    >
+                      Acil İlanlar
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {vitrinListings.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push({
+                        pathname: '/listings',
+                        params: promoTab === 'vitrin' ? { showcaseOnly: 'true' } : { urgentOnly: 'true' },
+                      })
+                    }
+                    style={styles.promoAllLink}
+                  >
+                    <Text style={styles.promoAllLinkText}>
+                      {promoTab === 'vitrin' ? 'Tüm Vitrin İlanları' : 'Tüm Acil İlanlar'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={13} color="#ea580c" />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <Text style={styles.promoSubDesc}>
+                {promoTab === 'vitrin'
+                  ? 'Vitrin görünürlük hakkı aktif olan öne çıkan araç ilanları.'
+                  : 'Acil satılık rozeti aktif olan fırsat araç ilanları.'}
+              </Text>
+
+              {loadingListings ? (
+                <TorkScoutLoader style={{ marginVertical: 32 }} />
+              ) : vitrinListings.length > 0 ? (
+                <View style={styles.vitrinRowsWrapper}>
+                  {vitrinRows.map((rowItems, rowIndex) => (
+                    <ScrollView
+                      key={`vitrin-row-${rowIndex}`}
+                      ref={(el) => {
+                        vitrinScrollRefs.current[rowIndex] = el;
+                      }}
+                      onScroll={(e) => {
+                        vitrinScrollOffsets.current[rowIndex] = e.nativeEvent.contentOffset.x;
+                      }}
+                      scrollEventThrottle={16}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.vitrinHorizontalScrollContent}
+                      style={styles.vitrinRowScrollView}
+                    >
+                      {rowItems.map((item) => {
+                        const isFav = !!favorites[item.id];
+                        return (
+                          <TouchableOpacity
+                            key={item.id}
+                            style={styles.vitrinCard}
+                            activeOpacity={0.9}
+                            onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
+                          >
+                            <View style={styles.vitrinImageContainer}>
+                              <ExpoImage
+                                source={{ uri: item.imageUrl }}
+                                style={styles.vitrinCarImage}
+                                contentFit="cover"
+                                cachePolicy="memory-disk"
+                              />
+
+                              {/* Floating Badges Overlay (Vitrin & Acil) */}
+                              <View style={styles.vitrinBadgesOverlay}>
+                                {item.isUrgent && <UrgentBadge size="small" />}
+                                {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
+                              </View>
+
+                              <TouchableOpacity
+                                style={styles.favCircleButton}
+                                onPress={() => toggleFavorite(item.id)}
+                              >
+                                <Ionicons
+                                  name={isFav ? 'heart' : 'heart-outline'}
+                                  size={17}
+                                  color={isFav ? '#ef4444' : '#ffffff'}
+                                />
+                              </TouchableOpacity>
+                            </View>
+
+                            <View style={styles.vitrinCardBody}>
+                              <Text style={styles.vitrinTitle} numberOfLines={2}>
+                                {item.title}
+                              </Text>
+
+                              <Text style={styles.vitrinSpecs}>
+                                {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
+                              </Text>
+
+                              <View style={styles.vitrinPriceRow}>
+                                <Text style={styles.vitrinPrice}>
+                                  {(item.price ?? 0).toLocaleString('tr-TR')} ₺
+                                </Text>
+                                <Text style={styles.vitrinCityBadge}>{item.city}</Text>
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  ))}
+                </View>
+              ) : recentListings.length > 0 ? (
+                <View style={{ marginTop: 6 }}>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>Son Eklenen İlanlar</Text>
+                    <TouchableOpacity onPress={() => router.push('/listings')}>
+                      <Text style={styles.sectionLinkText}>Tümünü Gör</Text>
+                    </TouchableOpacity>
+                  </View>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.popularRowContent}
+                    contentContainerStyle={styles.vitrinHorizontalScrollContent}
+                    style={styles.vitrinRowScrollView}
                   >
-                    {(getPopularBrands().length > 0
-                      ? getPopularBrands()
-                      : [
-                        { id: 'pop-1', name: 'Volkswagen' },
-                        { id: 'pop-2', name: 'BMW' },
-                        { id: 'pop-3', name: 'Mercedes-Benz' },
-                        { id: 'pop-4', name: 'Renault' },
-                        { id: 'pop-5', name: 'Audi' },
-                      ]
-                    ).map((pBrand) => {
-                      const logoUri = getHomeBrandLogo(pBrand.name, selectedCategory);
+                    {recentListings.map((item) => {
+                      const isFav = !!favorites[item.id];
                       return (
                         <TouchableOpacity
-                          key={pBrand.id || pBrand.name}
-                          style={styles.popularBrandCard}
-                          activeOpacity={0.8}
-                          onPress={() => selectOption(pBrand)}
+                          key={`recent-${item.id}`}
+                          style={styles.vitrinCard}
+                          activeOpacity={0.9}
+                          onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
                         >
-                          <View style={styles.popularLogoContainer}>
-                            {logoUri ? (
-                              <Image source={{ uri: logoUri }} style={styles.popularLogoImage} resizeMode="contain" />
-                            ) : (
-                              <Ionicons name="car-sport" size={26} color="#0f172a" />
-                            )}
+                          <View style={styles.vitrinImageContainer}>
+                            <ExpoImage
+                              source={{ uri: item.imageUrl }}
+                              style={styles.vitrinCarImage}
+                              contentFit="cover"
+                              cachePolicy="memory-disk"
+                            />
+                            <View style={styles.vitrinBadgesOverlay}>
+                              {item.isUrgent && <UrgentBadge size="small" />}
+                              {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
+                            </View>
+                            <TouchableOpacity
+                              style={styles.favCircleButton}
+                              onPress={() => toggleFavorite(item.id)}
+                            >
+                              <Ionicons
+                                name={isFav ? 'heart' : 'heart-outline'}
+                                size={17}
+                                color={isFav ? '#ef4444' : '#ffffff'}
+                              />
+                            </TouchableOpacity>
                           </View>
-                          <Text style={styles.popularBrandTitle} numberOfLines={1} ellipsizeMode="tail">
-                            {pBrand.name}
-                          </Text>
+                          <View style={styles.vitrinCardBody}>
+                            <Text style={styles.vitrinTitle} numberOfLines={2}>
+                              {item.title}
+                            </Text>
+                            <Text style={styles.vitrinSpecs}>
+                              {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
+                            </Text>
+                            <View style={styles.vitrinPriceRow}>
+                              <Text style={styles.vitrinPrice}>
+                                {(item.price ?? 0).toLocaleString('tr-TR')} ₺
+                              </Text>
+                              <Text style={styles.vitrinCityBadge}>{item.city}</Text>
+                            </View>
+                          </View>
                         </TouchableOpacity>
                       );
                     })}
                   </ScrollView>
-                </>
+                </View>
+              ) : (
+                <View style={styles.emptyPromoBox}>
+                  <View style={styles.emptyPromoCompactLeft}>
+                    <View style={styles.emptyPromoIconWrap}>
+                      <Ionicons
+                        name={promoTab === 'vitrin' ? 'star-outline' : 'flame-outline'}
+                        size={18}
+                        color="#64748b"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.emptyPromoTitle}>
+                        {promoTab === 'vitrin'
+                          ? 'Şu anda vitrinde aktif ilan bulunmuyor.'
+                          : 'Şu anda acil satılık aktif ilan bulunmuyor.'}
+                      </Text>
+                      <Text style={styles.emptyPromoSub}>
+                        Tüm satılık araçları incelemek için Akış'a göz atabilirsiniz.
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.emptyPromoBtn}
+                    onPress={() => router.push('/ilan-akisi')}
+                  >
+                    <Text style={styles.emptyPromoBtnText}>Akışa Git ➔</Text>
+                  </TouchableOpacity>
+                </View>
               )}
+            </View>
+          </ScrollView>
+        </>
+      )}
 
-              {/* Options Section Header */}
-              {activeStep !== 'category' && activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'trim' && (
-                <Text style={styles.sectionHeaderLabel}>
-                  {activeStep === 'brand'
-                    ? (selectedCategory === 'MOTORCYCLE' ? 'Motosiklet Markaları' : 'Tüm Markalar')
-                    : activeStep === 'model'
-                      ? 'Model Aileleri'
-                      : activeStep === 'year'
-                        ? 'Yıl Seçenekleri'
-                        : activeStep === 'bodyType'
-                          ? 'Kasa Tipi Seçenekleri'
-                          : activeStep === 'transmission'
-                            ? 'Şanzıman tipini seçin.'
-                            : 'Seçenekler'}
+      {/* SINGLE UNIFIED MODAL / STANDALONE SCREEN MATCHING REFERENCE UI */}
+      {standaloneQueryScreen || queryModalVisible ? (
+        <View
+          style={[
+            styles.fullModalContainer,
+            {
+              paddingTop: modalTopInset,
+              paddingBottom: modalBottomInset,
+            },
+          ]}
+          {...modalPanResponder.panHandlers}
+          onTouchStart={(e) => {
+            const touch = e.nativeEvent;
+            touchSwipeStartRef.current = {
+              x: touch.pageX,
+              y: touch.pageY,
+              time: Date.now(),
+              handled: false,
+            };
+          }}
+          onTouchMove={(e) => {
+            const start = touchSwipeStartRef.current;
+            if (!start || start.handled) return;
+            const touch = e.nativeEvent;
+            const dx = touch.pageX - start.x;
+            const dy = touch.pageY - start.y;
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+
+            const isLeftEdgeSwipe = (start.x <= 60 || modalStateRef.current.modalView === 'form') && dx > 55 && absDx > absDy * 1.4;
+            const isRightEdgeSwipe =
+              start.x >= windowWidth - 60 &&
+              dx < -55 &&
+              absDx > absDy * 1.4 &&
+              !(modalStateRef.current.modalView === 'step' && modalStateRef.current.activeStep === 'brand');
+
+            if (isLeftEdgeSwipe || isRightEdgeSwipe) {
+              start.handled = true;
+              modalBackActionRef.current();
+            }
+          }}
+          onTouchEnd={(e) => {
+            const start = touchSwipeStartRef.current;
+            if (!start || start.handled) return;
+            const touch = e.nativeEvent;
+            const dx = touch.pageX - start.x;
+            const dy = touch.pageY - start.y;
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+
+            const isLeftEdgeSwipe = (start.x <= 60 || modalStateRef.current.modalView === 'form') && dx > 42 && absDx > absDy * 1.35;
+            const isRightEdgeSwipe =
+              start.x >= windowWidth - 60 &&
+              dx < -42 &&
+              absDx > absDy * 1.35 &&
+              !(modalStateRef.current.modalView === 'step' && modalStateRef.current.activeStep === 'brand');
+
+            if (isLeftEdgeSwipe || isRightEdgeSwipe) {
+              start.handled = true;
+              modalBackActionRef.current();
+            }
+            touchSwipeStartRef.current = null;
+          }}
+        >
+          {/* iOS & Android Left-Edge Native-Feel Swipe Zone */}
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: modalTopInset + 56,
+              bottom: 0,
+              width: 20,
+              zIndex: 999,
+            }}
+            {...leftEdgePanResponder.panHandlers}
+          />
+          {!(modalView === 'step' && activeStep === 'brand') && (
+            <View
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: modalTopInset + 56,
+                bottom: 0,
+                width: 20,
+                zIndex: 999,
+              }}
+              {...rightEdgePanResponder.panHandlers}
+            />
+          )}
+          {!authChecked ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <ActivityIndicator size="large" color="#ea580c" />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748b' }}>
+                Yükleniyor...
+              </Text>
+            </View>
+          ) : !hasAuthToken ? (
+            <ScrollView
+              contentContainerStyle={[styles.refFormPadding, { gap: 14, paddingBottom: 40 }]}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Header with Back Arrow & Centered Title */}
+              <View style={styles.refHeaderRow}>
+                <TouchableOpacity
+                  style={styles.refBackButton}
+                  onPress={closeQueryModal}
+                >
+                  <Ionicons name="chevron-back" size={24} color="#0f172a" />
+                </TouchableOpacity>
+                <Text style={styles.refHeaderTitle}>Araç Sorgula</Text>
+                <View style={{ width: 24 }} />
+              </View>
+
+              {/* 1. Üst Başlık (Hero Alanı) */}
+              <View
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: 20,
+                  padding: 20,
+                  borderWidth: 1,
+                  borderColor: '#fed7aa',
+                  alignItems: 'center',
+                  shadowColor: '#0f172a',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 10,
+                  elevation: 2,
+                }}
+              >
+                <View
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor: '#fff7ed',
+                    borderWidth: 1,
+                    borderColor: '#fdba74',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 12,
+                  }}
+                >
+                  <Ionicons name="search" size={26} color="#ea580c" />
+                </View>
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: '900',
+                    color: '#0f172a',
+                    textAlign: 'center',
+                    letterSpacing: -0.4,
+                  }}
+                >
+                  Tork Scout AI Araç Sorgulama & Risk Raporu
                 </Text>
-              )}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: '#475569',
+                    textAlign: 'center',
+                    lineHeight: 20,
+                    marginTop: 8,
+                    fontWeight: '500',
+                  }}
+                >
+                  Almayı düşündüğünüz otomobil, SUV, ticari araç veya motosikletin kronik arızalarını, gerçek piyasa risklerini ve ekspertizde bakılması gereken kritik noktaları yapay zeka destekli mühendislik raporuyla saniyeler içinde öğrenin.
+                </Text>
+              </View>
 
-              {loadingOptions ? (
-                <TorkScoutLoader style={{ marginVertical: 40 }} />
-              ) : activeStep === 'category' ? (
-                /* CATEGORY SELECTION LIST */
-                <View style={styles.categoryStepContainer}>
-                  {CATEGORY_ITEMS.map((cat) => {
-                    const isSelected = selectedCategory === cat.id;
-                    return (
-                      <TouchableOpacity
-                        key={cat.id}
-                        style={[styles.categoryStepCard, isSelected && styles.categoryStepCardSelected]}
-                        activeOpacity={0.8}
-                        onPress={() => {
-                          handleCategoryChange(cat.id);
-                          setModalView('form');
+              {/* 2. Araç Sorgula'da Sizi Neler Bekliyor? (4 Ana Fayda Kartı) */}
+              <View style={{ gap: 12 }}>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '900',
+                    color: '#0f172a',
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  Araç Sorgula’da Sizi Neler Bekliyor?
+                </Text>
+
+                {[
+                  {
+                    emoji: '🔍',
+                    title: 'Kronik Arıza & FMEA Risk Analizi',
+                    desc: 'Seçtiğiniz marka, model, yıl, motor ve şanzıman kombinasyonuna özel bilinen fabrika kroniklerini, arıza olasılıklarını ve ciddiyet derecelerini görün.',
+                    bg: '#fff7ed',
+                    border: '#fed7aa',
+                  },
+                  {
+                    emoji: '📋',
+                    title: 'Ekspertiz Öncesi Kontrol & Satıcıya Sorulacaklar Listesi',
+                    desc: 'Aracı görmeye gittiğinizde ustaya veya satıcıya sormanız gereken nokta atışı soruları ve masraftan kurtaran "Aracı Bırakıp Uzaklaşma (Walk-Away)" kriterlerini inceleyin.',
+                    bg: '#eff6ff',
+                    border: '#bfdbfe',
+                  },
+                  {
+                    emoji: '⚙️',
+                    title: 'Fabrika Katalog Verileri, MTV & Donanım Değerlendirmesi',
+                    desc: 'Motor gücü, tork, 0-100 hızlanma, yakıt tüketimi, bagaj hacmi, güncel yıllık MTV tutarı ve seçilen donanım paketinin artı/eksilerini tek ekranda görüntüleyin.',
+                    bg: '#f0fdf4',
+                    border: '#bbf7d0',
+                  },
+                  {
+                    emoji: '🤖',
+                    title: '100 Üzerinden Satın Alma Puanı & AI Araç Danışmanı (Chatbot)',
+                    desc: 'Aracın genel alınabilirlik skorunu görün ve rapor sonrasında Tork Scout AI Danışmanı ile yazışarak aklınıza takılan tüm teknik soruları sorun.',
+                    bg: '#faf5ff',
+                    border: '#e9d5ff',
+                  },
+                ].map((item, idx) => (
+                  <View
+                    key={idx}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      borderRadius: 16,
+                      padding: 15,
+                      borderWidth: 1,
+                      borderColor: '#e2e8f0',
+                      flexDirection: 'row',
+                      alignItems: 'flex-start',
+                      gap: 12,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 12,
+                        backgroundColor: item.bg,
+                        borderWidth: 1,
+                        borderColor: item.border,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text style={{ fontSize: 20 }}>{item.emoji}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: '800',
+                          color: '#0f172a',
+                          marginBottom: 4,
                         }}
                       >
-                        <View style={styles.categoryStepCardLeft}>
-                          <View style={[styles.categoryStepIconCircle, isSelected && styles.categoryStepIconCircleSelected]}>
-                            <MaterialCommunityIcons
-                              name={cat.icon}
-                              size={24}
-                              color={isSelected ? '#ea580c' : '#0f172a'}
-                            />
-                          </View>
-                          <Text style={[styles.categoryStepTitle, isSelected && styles.categoryStepTitleSelected]}>
-                            {cat.name}
-                          </Text>
-                        </View>
+                        {item.title}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: '#64748b',
+                          lineHeight: 18,
+                        }}
+                      >
+                        {item.desc}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
 
-                        <View style={styles.categoryStepCardRight}>
-                          {isSelected ? (
-                            <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
-                          ) : (
-                            <View style={styles.categoryStepUncheckedCircle} />
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
+              {/* 3. Alt Aksiyon Alanı (CTA Butonları) */}
+              <View
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: 18,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: '#e2e8f0',
+                  gap: 10,
+                  marginTop: 4,
+                }}
+              >
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#ea580c',
+                    borderRadius: 14,
+                    paddingVertical: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    shadowColor: '#ea580c',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 8,
+                    elevation: 4,
+                  }}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (!standaloneQueryScreen) setQueryModalVisible(false);
+                    router.push('/login' as any);
+                  }}
+                >
+                  <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '900' }}>
+                    Giriş Yap ve Araç Sorgula
+                  </Text>
+                  <Ionicons name="arrow-forward" size={17} color="#ffffff" />
+                </TouchableOpacity>
 
-                  <View style={styles.engineInfoBanner}>
-                    <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
-                    <Text style={styles.engineInfoBannerText}>
-                      Seçtiğiniz vasıta türüne göre ilgili marka, model ve teknik varyant kriterleri listelenecektir.
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#fff7ed',
+                    borderRadius: 14,
+                    paddingVertical: 13,
+                    borderWidth: 1,
+                    borderColor: '#fdba74',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (!standaloneQueryScreen) setQueryModalVisible(false);
+                    router.push('/register' as any);
+                  }}
+                >
+                  <Text style={{ color: '#ea580c', fontSize: 13.5, fontWeight: '800' }}>
+                    Ücretsiz Hesap Oluştur
+                  </Text>
+                </TouchableOpacity>
+
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: '#64748b',
+                    textAlign: 'center',
+                    lineHeight: 16,
+                    marginTop: 4,
+                  }}
+                >
+                  Hesabınızla giriş yaparak veya ücretsiz üye olarak Tork Scout AI Araç Sorgulama özelliğine hemen erişebilirsiniz.
+                </Text>
+              </View>
+            </ScrollView>
+          ) : modalView === 'form' ? (
+            /* FORM VIEW MATCHING REFERENCE IMAGE 2 */
+            <ScrollView contentContainerStyle={styles.refFormPadding} showsVerticalScrollIndicator={false}>
+              {/* Header with Back Arrow & Centered Title */}
+              <View style={styles.refHeaderRow}>
+                <TouchableOpacity
+                  style={styles.refBackButton}
+                  onPress={closeQueryModal}
+                >
+                  <Ionicons name="chevron-back" size={24} color="#0f172a" />
+                </TouchableOpacity>
+                <Text style={styles.refHeaderTitle}>Araç Sorgula</Text>
+                <View style={{ width: 24 }} />
+              </View>
+
+              {/* TorkScout Brand Header */}
+              <View style={styles.brandHeroSection}>
+                <View style={styles.brandHeroLogoRow}>
+                  <Image
+                    source={require('../../../assets/images/torkscout-header-logo.png')}
+                    style={{ width: 165, height: 28 }}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={styles.brandHeroSubtitle}>
+                  Aracını seç, teknik özelliklerini, yaygın sorunlarını ve satın alma öncesi kritik detaylarını öğren.
+                </Text>
+              </View>
+
+              {/* Araç Bilgileri Card */}
+              <View style={styles.vehicleInfoCard}>
+                <View style={styles.vehicleInfoCardHeader}>
+                  <View style={styles.vehicleInfoIconCircle}>
+                    <Ionicons name="search" size={18} color="#0284c7" />
+                  </View>
+                  <Text style={styles.vehicleInfoCardTitle}>Araç Bilgileri</Text>
+                </View>
+
+                {/* 0. Vasıta Türü */}
+                <TouchableOpacity
+                  style={[
+                    styles.filterRowItem,
+                    isCategoryCycling && { backgroundColor: '#fff7ed' },
+                  ]}
+                  onPress={() => !isCategoryCycling && openStepView('category')}
+                  activeOpacity={0.7}
+                  disabled={isCategoryCycling}
+                >
+                  <Text style={styles.filterRowLabel}>Vasıta Türü</Text>
+                  <View style={styles.filterRowRight}>
+                    {isCategoryCycling ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <ActivityIndicator size="small" color="#ea580c" />
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#ea580c' }}>
+                          {cyclingCategoryText}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={selectedCategory ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                        {getCategoryLabel(selectedCategory)}
+                      </Text>
+                    )}
+                    <Ionicons
+                      name="chevron-forward"
+                      size={18}
+                      color={isCategoryCycling ? '#ea580c' : '#cbd5e1'}
+                    />
+                  </View>
+                </TouchableOpacity>
+
+                {/* 1. Marka */}
+                <TouchableOpacity
+                  style={[
+                    styles.filterRowItem,
+                    (!selectedCategory || isCategoryCycling) && styles.filterRowItemDisabled,
+                  ]}
+                  onPress={() => selectedCategory && !isCategoryCycling && openStepView('brand')}
+                  disabled={!selectedCategory || isCategoryCycling}
+                >
+                  <Text style={styles.filterRowLabel}>
+                    {selectedCategory === 'MOTORCYCLE' ? 'Motosiklet Markası' : 'Marka'}
+                  </Text>
+                  <View style={styles.filterRowRight}>
+                    <Text style={selectedBrand ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                      {selectedBrand ? selectedBrand.name : 'Seçilmedi'}
                     </Text>
+                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                  </View>
+                </TouchableOpacity>
+
+                {/* 2. Model Ailesi */}
+                <TouchableOpacity
+                  style={[
+                    styles.filterRowItem,
+                    selectedCategory === 'MOTORCYCLE' && { borderBottomWidth: 0 },
+                    !selectedBrand && styles.filterRowItemDisabled,
+                  ]}
+                  onPress={() => selectedBrand && openStepView('model')}
+                  disabled={!selectedBrand}
+                >
+                  <Text style={styles.filterRowLabel}>Model Ailesi</Text>
+                  <View style={styles.filterRowRight}>
+                    <Text style={selectedModel ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                      {selectedModel ? selectedModel.name : 'Seçilmedi'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                  </View>
+                </TouchableOpacity>
+
+                {/* Otomobil, Arazi/SUV & Minivan için Kalan 6 Varyant Alanı */}
+                {selectedCategory !== 'MOTORCYCLE' && (
+                  <>
+                    {/* 3. Yıl */}
+                    <TouchableOpacity
+                      style={[
+                        styles.filterRowItem,
+                        !selectedModel && styles.filterRowItemDisabled,
+                      ]}
+                      onPress={() => selectedModel && openStepView('year')}
+                      disabled={!selectedModel}
+                    >
+                      <Text style={styles.filterRowLabel}>Yıl</Text>
+                      <View style={styles.filterRowRight}>
+                        <Text style={selectedYear ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                          {selectedYear ? selectedYear : 'Seçilmedi'}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* 4. Kasa Tipi */}
+                    <TouchableOpacity
+                      style={[
+                        styles.filterRowItem,
+                        !selectedYear && styles.filterRowItemDisabled,
+                      ]}
+                      onPress={() => selectedYear && openStepView('bodyType')}
+                      disabled={!selectedYear}
+                    >
+                      <Text style={styles.filterRowLabel}>Kasa Tipi</Text>
+                      <View style={styles.filterRowRight}>
+                        <Text style={selectedBodyType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                          {selectedBodyType ? selectedBodyType : 'Seçilmedi'}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* 5. Motor / Versiyon */}
+                    <TouchableOpacity
+                      style={[
+                        styles.filterRowItem,
+                        !selectedBodyType && styles.filterRowItemDisabled,
+                      ]}
+                      onPress={() => selectedBodyType && openStepView('engine')}
+                      disabled={!selectedBodyType}
+                    >
+                      <Text style={styles.filterRowLabel}>Motor / Versiyon</Text>
+                      <View style={styles.filterRowRight}>
+                        <Text style={selectedEngine ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                          {selectedEngine ? selectedEngine : 'Seçilmedi'}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* 6. Yakıt */}
+                    <TouchableOpacity
+                      style={[
+                        styles.filterRowItem,
+                        !selectedEngine && styles.filterRowItemDisabled,
+                      ]}
+                      onPress={() => selectedEngine && openStepView('fuelType')}
+                      disabled={!selectedEngine}
+                    >
+                      <Text style={styles.filterRowLabel}>Yakıt Türü</Text>
+                      <View style={styles.filterRowRight}>
+                        <Text style={selectedFuelType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                          {selectedFuelType ? selectedFuelType : 'Seçilmedi'}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* 7. Şanzıman */}
+                    <TouchableOpacity
+                      style={[
+                        styles.filterRowItem,
+                        !selectedFuelType && styles.filterRowItemDisabled,
+                      ]}
+                      onPress={() => selectedFuelType && openStepView('transmission')}
+                      disabled={!selectedFuelType}
+                    >
+                      <Text style={styles.filterRowLabel}>Şanzıman Tipi</Text>
+                      <View style={styles.filterRowRight}>
+                        <Text style={selectedTransmission ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                          {selectedTransmission ? selectedTransmission : 'Seçilmedi'}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* 8. Donanım */}
+                    <TouchableOpacity
+                      style={[
+                        styles.filterRowItem,
+                        { borderBottomWidth: 0 },
+                        !selectedTransmission && styles.filterRowItemDisabled,
+                      ]}
+                      onPress={() => selectedTransmission && openStepView('trim')}
+                      disabled={!selectedTransmission}
+                    >
+                      <Text style={styles.filterRowLabel}>Donanım Paketi</Text>
+                      <View style={styles.filterRowRight}>
+                        <Text style={selectedTrim ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                          {selectedTrim ? selectedTrim : 'Seçilmedi'}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                      </View>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+
+              {/* Bottom Orange Action Button */}
+              <TouchableOpacity
+                style={[
+                  styles.refOrangeSubmitButton,
+                  (!selectedCategory || !selectedBrand || !selectedModel || isCategoryCycling) && styles.refOrangeSubmitButtonDisabled,
+                ]}
+                onPress={handleStartReport}
+                disabled={!selectedCategory || !selectedBrand || !selectedModel || isCategoryCycling}
+              >
+                <Text style={styles.refOrangeSubmitButtonText}>Sorgulamaya Başla</Text>
+                <Ionicons name="arrow-forward" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+            </ScrollView>
+          ) : (
+            /* STEP SELECTION VIEW MATCHING REFERENCE UI */
+            <View style={styles.refModalContent}>
+              {/* Header with Back Arrow & Centered Title */}
+              <View style={styles.refHeaderRow}>
+                <TouchableOpacity style={styles.refBackButton} onPress={handleStepBack}>
+                  <Ionicons name="chevron-back" size={24} color="#0f172a" />
+                </TouchableOpacity>
+
+                <Text style={styles.refHeaderTitle}>{getStepTitle()}</Text>
+                <View style={{ width: 24 }} />
+              </View>
+
+              {/* Progress Indicator: Step Badge (e.g. 2/2 or 8/8) & Segmented Bar */}
+              {activeStep !== 'category' && (
+                <View style={styles.progressRow}>
+                  <Text style={styles.progressText}>
+                    {getStepNumber()} / {selectedCategory === 'MOTORCYCLE' ? 2 : 8}
+                  </Text>
+                  <View style={styles.progressBarTrack}>
+                    {Array.from({ length: selectedCategory === 'MOTORCYCLE' ? 2 : 8 }, (_, i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.progressBarSegment,
+                          i < getStepNumber() && styles.progressBarSegmentActive,
+                        ]}
+                      />
+                    ))}
                   </View>
                 </View>
-              ) : activeStep === 'brand' ? (
-                getGroupedBrands().map((group) => (
-                  <View key={group.key} style={styles.brandGroupBlock}>
-                    <Text style={styles.brandGroupLetter}>{group.key}</Text>
-                    <View style={styles.brandGroupCard}>
-                      {group.data.map((item, idx) => {
-                        const logoUri = getHomeBrandLogo(item.name, selectedCategory);
+              )}
+
+              <Text style={styles.refSubtitle}>{getStepSubtitle()}</Text>
+
+              {/* Selected Brand Summary Card for Step 2 (Model Selection) */}
+              {selectedBrand && activeStep === 'model' && (
+                <View style={styles.selectedBrandBadgeCard}>
+                  <View style={styles.selectedBrandBadgeLeft}>
+                    {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                      <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.selectedBrandBadgeLogo} resizeMode="contain" />
+                    ) : (
+                      <Ionicons name="car-sport" size={24} color="#0f172a" />
+                    )}
+                    <Text style={styles.selectedBrandBadgeName} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
+                  </View>
+                  <Ionicons name="checkmark" size={20} color="#ea580c" />
+                </View>
+              )}
+
+              {/* Selected Summary Card for Step 3 (Year Selection) */}
+              {selectedBrand && selectedModel && activeStep === 'year' && (
+                <View style={styles.selectedSummaryBadgeCard}>
+                  <View style={styles.selectedSummaryBadgeItem}>
+                    {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                      <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.selectedSummaryLogo} resizeMode="contain" />
+                    ) : (
+                      <Ionicons name="car-sport" size={22} color="#0f172a" />
+                    )}
+                    <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
+                    <Ionicons name="checkmark" size={16} color="#ea580c" />
+                  </View>
+
+                  <View style={styles.selectedSummaryDivider} />
+
+                  <View style={styles.selectedSummaryBadgeItem}>
+                    <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
+                    <Ionicons name="checkmark" size={16} color="#ea580c" />
+                  </View>
+                </View>
+              )}
+
+              {/* Selected Summary Card for Step 4 (Body Type Selection) */}
+              {selectedBrand && selectedModel && selectedYear && activeStep === 'bodyType' && (
+                <View style={styles.selectedSummaryBadgeCard}>
+                  <View style={styles.selectedSummaryBadgeItem}>
+                    {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                      <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.selectedSummaryLogo} resizeMode="contain" />
+                    ) : (
+                      <Ionicons name="car-sport" size={20} color="#0f172a" />
+                    )}
+                    <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
+                    <Ionicons name="checkmark" size={15} color="#ea580c" />
+                  </View>
+
+                  <View style={styles.selectedSummaryDivider} />
+
+                  <View style={styles.selectedSummaryBadgeItem}>
+                    <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
+                    <Ionicons name="checkmark" size={15} color="#ea580c" />
+                  </View>
+
+                  <View style={styles.selectedSummaryDivider} />
+
+                  <View style={styles.selectedSummaryBadgeItem}>
+                    <Text style={styles.selectedSummaryText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
+                    <Ionicons name="checkmark" size={15} color="#ea580c" />
+                  </View>
+                </View>
+              )}
+
+              {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 5 (Motor / Versiyon Seç) MATCHING REFERENCE IMAGE */}
+              {selectedBrand && selectedModel && selectedYear && activeStep === 'engine' && (
+                <View style={styles.breadCrumbSummaryCard}>
+                  <View style={styles.breadCrumbItem}>
+                    {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                      <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                    ) : (
+                      <Ionicons name="car-sport" size={20} color="#0f172a" />
+                    )}
+                    <View style={{ gap: 1 }}>
+                      <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
+                      <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
+                      <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
+                    </View>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+
+                  <View style={styles.breadCrumbItem}>
+                    <Ionicons name="car-outline" size={22} color="#0f172a" />
+                    <View style={{ gap: 1 }}>
+                      <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedBodyType || 'Sedan'}</Text>
+                      <Text style={styles.breadCrumbSubText}>Kasa Tipi</Text>
+                    </View>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+
+                  <View style={styles.breadCrumbItem}>
+                    <Ionicons name="color-fill-outline" size={20} color="#0f172a" />
+                    <View style={{ gap: 1 }}>
+                      <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedFuelType || 'Benzin'}</Text>
+                      <Text style={styles.breadCrumbSubText}>Yakıt</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 6 (Yakıt Türü Seç) MATCHING REFERENCE SCREENSHOT */}
+              {selectedBrand && selectedModel && selectedYear && activeStep === 'fuelType' && (
+                <View style={styles.breadCrumbSummaryCard}>
+                  <View style={styles.breadCrumbItem}>
+                    {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                      <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                    ) : (
+                      <Ionicons name="car-sport" size={20} color="#0f172a" />
+                    )}
+                    <View style={{ gap: 1 }}>
+                      <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
+                      <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
+                      <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
+                    </View>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+
+                  <View style={styles.breadCrumbItem}>
+                    <View style={{ gap: 1 }}>
+                      <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedEngine || '—'}</Text>
+                      <Text style={styles.breadCrumbSubText}>Motor</Text>
+                    </View>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+
+                  <View style={styles.breadCrumbItem}>
+                    <Ionicons name="car-outline" size={22} color="#0f172a" />
+                    <View style={{ gap: 1 }}>
+                      <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedBodyType || '—'}</Text>
+                      <Text style={styles.breadCrumbSubText}>Kasa Tipi</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 7 (Şanzıman Tipi Seç) MATCHING REFERENCE SCREENSHOT */}
+              {selectedBrand && selectedModel && selectedYear && activeStep === 'transmission' && (
+                <View style={styles.breadCrumbSummaryCard}>
+                  <View style={styles.breadCrumbItem}>
+                    {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                      <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                    ) : (
+                      <Ionicons name="car-sport" size={20} color="#0f172a" />
+                    )}
+                    <View style={{ gap: 1 }}>
+                      <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
+                      <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
+                      <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
+                    </View>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
+
+                  <View style={styles.breadCrumbItem}>
+                    <View style={{ gap: 1 }}>
+                      <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedEngine || '—'}</Text>
+                    </View>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
+
+                  <View style={styles.breadCrumbItem}>
+                    <Ionicons name="color-fill-outline" size={16} color="#0f172a" />
+                    <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedFuelType || '—'}</Text>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
+
+                  <View style={styles.breadCrumbItem}>
+                    <Ionicons name="car-outline" size={16} color="#0f172a" />
+                    <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedBodyType || '—'}</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 8 (Donanım Paketi Seç) MATCHING REFERENCE SCREENSHOT */}
+              {selectedBrand && selectedModel && selectedYear && activeStep === 'trim' && (
+                <View style={styles.breadCrumbSummaryCard}>
+                  <View style={styles.breadCrumbItem}>
+                    {getHomeBrandLogo(selectedBrand.name, selectedCategory) ? (
+                      <Image source={{ uri: getHomeBrandLogo(selectedBrand.name, selectedCategory) }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                    ) : (
+                      <Ionicons name="car-sport" size={20} color="#0f172a" />
+                    )}
+                    <View style={{ gap: 1 }}>
+                      <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedBrand.name}</Text>
+                      <Text style={styles.breadCrumbMainText} numberOfLines={1} ellipsizeMode="tail">{selectedModel.name}</Text>
+                      <Text style={styles.breadCrumbSubText} numberOfLines={1} ellipsizeMode="tail">{selectedYear}</Text>
+                    </View>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+
+                  <View style={styles.breadCrumbItem}>
+                    <Text style={styles.breadCrumbMainText}>{selectedEngine || '—'}</Text>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+
+                  <View style={styles.breadCrumbItem}>
+                    <Ionicons name="color-fill-outline" size={14} color="#0f172a" />
+                    <Text style={styles.breadCrumbMainText}>{selectedFuelType || '—'}</Text>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+
+                  <View style={styles.breadCrumbItem}>
+                    <AutomaticGearIcon color="#0f172a" />
+                    <Text style={styles.breadCrumbMainText}>{selectedTransmission || '—'}</Text>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+
+                  <View style={styles.breadCrumbItem}>
+                    <Ionicons name="car-outline" size={14} color="#0f172a" />
+                    <Text style={styles.breadCrumbMainText}>{selectedBodyType || '—'}</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Search Bar matching reference UI (Hidden for Category, Year, Body Type, Engine, Fuel Type, Transmission, and Trim selections) */}
+              {activeStep !== 'category' && activeStep !== 'year' && activeStep !== 'bodyType' && activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'transmission' && activeStep !== 'trim' && (
+                <View style={styles.refSearchBox}>
+                  <Ionicons name="search-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={styles.refSearchInput}
+                    placeholder={getSearchPlaceholder()}
+                    placeholderTextColor="#94a3b8"
+                    value={searchText}
+                    onChangeText={setSearchText}
+                  />
+                </View>
+              )}
+
+              {/* Scrollable Content Container */}
+              <View style={styles.stepBodyWithJumper}>
+                <ScrollView
+                  contentContainerStyle={styles.stepScrollInner}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {activeStep === 'brand' && !searchText && (
+                    <>
+                      {/* Popüler Markalar Horizontal Row */}
+                      <Text style={styles.sectionHeaderLabel}>Popüler Markalar</Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.popularRowContent}
+                      >
+                        {(getPopularBrands().length > 0
+                          ? getPopularBrands()
+                          : [
+                            { id: 'pop-1', name: 'Volkswagen' },
+                            { id: 'pop-2', name: 'BMW' },
+                            { id: 'pop-3', name: 'Mercedes-Benz' },
+                            { id: 'pop-4', name: 'Renault' },
+                            { id: 'pop-5', name: 'Audi' },
+                          ]
+                        ).map((pBrand) => {
+                          const logoUri = getHomeBrandLogo(pBrand.name, selectedCategory);
+                          return (
+                            <TouchableOpacity
+                              key={pBrand.id || pBrand.name}
+                              style={styles.popularBrandCard}
+                              activeOpacity={0.8}
+                              onPress={() => selectOption(pBrand)}
+                            >
+                              <View style={styles.popularLogoContainer}>
+                                {logoUri ? (
+                                  <Image source={{ uri: logoUri }} style={styles.popularLogoImage} resizeMode="contain" />
+                                ) : (
+                                  <Ionicons name="car-sport" size={26} color="#0f172a" />
+                                )}
+                              </View>
+                              <Text style={styles.popularBrandTitle} numberOfLines={1} ellipsizeMode="tail">
+                                {pBrand.name}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </>
+                  )}
+
+                  {/* Options Section Header */}
+                  {activeStep !== 'category' && activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'trim' && (
+                    <Text style={styles.sectionHeaderLabel}>
+                      {activeStep === 'brand'
+                        ? (selectedCategory === 'MOTORCYCLE' ? 'Motosiklet Markaları' : 'Tüm Markalar')
+                        : activeStep === 'model'
+                          ? 'Model Aileleri'
+                          : activeStep === 'year'
+                            ? 'Yıl Seçenekleri'
+                            : activeStep === 'bodyType'
+                              ? 'Kasa Tipi Seçenekleri'
+                              : activeStep === 'transmission'
+                                ? 'Şanzıman tipini seçin.'
+                                : 'Seçenekler'}
+                    </Text>
+                  )}
+
+                  {loadingOptions ? (
+                    <TorkScoutLoader style={{ marginVertical: 40 }} />
+                  ) : activeStep === 'category' ? (
+                    /* CATEGORY SELECTION LIST */
+                    <View style={styles.categoryStepContainer}>
+                      {CATEGORY_ITEMS.map((cat) => {
+                        const isSelected = selectedCategory === cat.id;
                         return (
                           <TouchableOpacity
-                            key={item.id || item.name}
+                            key={cat.id}
+                            style={[styles.categoryStepCard, isSelected && styles.categoryStepCardSelected]}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              handleCategoryChange(cat.id);
+                              setModalView('form');
+                            }}
+                          >
+                            <View style={styles.categoryStepCardLeft}>
+                              <View style={[styles.categoryStepIconCircle, isSelected && styles.categoryStepIconCircleSelected]}>
+                                <MaterialCommunityIcons
+                                  name={cat.icon}
+                                  size={24}
+                                  color={isSelected ? '#ea580c' : '#0f172a'}
+                                />
+                              </View>
+                              <Text style={[styles.categoryStepTitle, isSelected && styles.categoryStepTitleSelected]}>
+                                {cat.name}
+                              </Text>
+                            </View>
+
+                            <View style={styles.categoryStepCardRight}>
+                              {isSelected ? (
+                                <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
+                              ) : (
+                                <View style={styles.categoryStepUncheckedCircle} />
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+
+                      <View style={styles.engineInfoBanner}>
+                        <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
+                        <Text style={styles.engineInfoBannerText}>
+                          Seçtiğiniz vasıta türüne göre ilgili marka, model ve teknik varyant kriterleri listelenecektir.
+                        </Text>
+                      </View>
+                    </View>
+                  ) : activeStep === 'brand' ? (
+                    getGroupedBrands().map((group) => (
+                      <View key={group.key} style={styles.brandGroupBlock}>
+                        <Text style={styles.brandGroupLetter}>{group.key}</Text>
+                        <View style={styles.brandGroupCard}>
+                          {group.data.map((item, idx) => {
+                            const logoUri = getHomeBrandLogo(item.name, selectedCategory);
+                            return (
+                              <TouchableOpacity
+                                key={item.id || item.name}
+                                style={[
+                                  styles.brandRowItem,
+                                  idx < group.data.length - 1 && styles.brandRowBorderBottom,
+                                ]}
+                                activeOpacity={0.7}
+                                onPress={() => selectOption(item)}
+                              >
+                                <View style={styles.brandRowLeft}>
+                                  <View style={styles.brandLogoBox}>
+                                    {logoUri ? (
+                                      <Image source={{ uri: logoUri }} style={styles.brandRowLogoImage} resizeMode="contain" />
+                                    ) : (
+                                      <Ionicons name="car-outline" size={20} color="#0f172a" />
+                                    )}
+                                  </View>
+                                  <Text style={styles.brandRowName} numberOfLines={1} ellipsizeMode="tail">{item.name}</Text>
+                                </View>
+
+                                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ))
+                  ) : activeStep === 'year' ? (
+                    /* 3-COLUMN GRID FOR YEAR SELECTION */
+                    <View style={styles.yearGridContainer}>
+                      {getStepData().map((yearVal, idx) => {
+                        const isSelected = selectedYear === String(yearVal);
+                        return (
+                          <TouchableOpacity
+                            key={String(yearVal) || idx}
+                            style={[styles.yearGridCard, isSelected && styles.yearGridCardSelected]}
+                            activeOpacity={0.8}
+                            onPress={() => selectOption(yearVal)}
+                          >
+                            <Text style={[styles.yearGridCardText, isSelected && styles.yearGridCardTextSelected]}>
+                              {String(yearVal)}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : activeStep === 'bodyType' ? (
+                    /* 2-COLUMN GRID FOR BODY TYPE SELECTION WITH HIGH-END AUTOMOTIVE ILLUSTRATIONS */
+                    <View style={styles.bodyTypeGridContainer}>
+                      {getStepData().map((bodyTypeVal, idx) => {
+                        const isSelected = selectedBodyType === String(bodyTypeVal);
+                        return (
+                          <TouchableOpacity
+                            key={String(bodyTypeVal) || idx}
+                            style={[styles.bodyTypeGridCard, isSelected && styles.bodyTypeGridCardSelected]}
+                            activeOpacity={0.8}
+                            onPress={() => selectOption(bodyTypeVal)}
+                          >
+                            <View style={styles.bodyTypeIconBox}>
+                              {renderBodyTypeImage(String(bodyTypeVal))}
+                            </View>
+                            <Text style={[styles.bodyTypeGridCardText, isSelected && styles.bodyTypeGridCardTextSelected]}>
+                              {String(bodyTypeVal)}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : activeStep === 'engine' ? (
+                    /* CLEAN MOTOR / VERSION SELECTION LIST SHOWING MOTOR CODES ONLY */
+                    <View style={styles.engineListContainer}>
+                      {getStepData().map((engineItem, idx) => {
+                        const engineLabel = typeof engineItem === 'string' ? engineItem : engineItem.name || engineItem.label || String(engineItem);
+                        const isSelected = selectedEngine === engineLabel;
+
+                        return (
+                          <TouchableOpacity
+                            key={engineLabel || idx}
+                            style={[styles.engineOptionCard, isSelected && styles.engineOptionCardSelected]}
+                            activeOpacity={0.8}
+                            onPress={() => selectOption(engineItem)}
+                          >
+                            <View style={styles.engineOptionCardLeft}>
+                              <Text style={styles.engineOptionTitle}>{engineLabel}</Text>
+                            </View>
+
+                            <View style={styles.engineOptionCardRight}>
+                              {isSelected ? (
+                                <View style={styles.engineOptionCheckedBox}>
+                                  <Ionicons name="checkmark-circle" size={22} color="#ea580c" />
+                                  <Ionicons name="chevron-forward" size={18} color="#ea580c" />
+                                </View>
+                              ) : (
+                                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+
+                      {/* Bottom Info Banner */}
+                      <View style={styles.engineInfoBanner}>
+                        <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
+                        <Text style={styles.engineInfoBannerText}>
+                          Listelenen motor / versiyonlar seçilen araç kombinasyonuna uygundur.
+                        </Text>
+                      </View>
+                    </View>
+                  ) : activeStep === 'fuelType' ? (
+                    /* DYNAMIC FUEL TYPE SELECTION LIST MATCHING REFERENCE SCREENSHOT */
+                    <View style={styles.fuelListContainer}>
+                      {getStepData().map((fuelVal, idx) => {
+                        const fuelLabel = typeof fuelVal === 'string' ? fuelVal : fuelVal.name || fuelVal.label || String(fuelVal);
+                        const isSelected = selectedFuelType === fuelLabel;
+
+                        return (
+                          <TouchableOpacity
+                            key={fuelLabel || idx}
+                            style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
+                            activeOpacity={0.8}
+                            onPress={() => selectOption(fuelVal)}
+                          >
+                            <View style={styles.fuelOptionCardLeft}>
+                              {renderFuelTypeIcon(fuelLabel)}
+                              <Text style={styles.fuelOptionTitle}>{fuelLabel}</Text>
+                            </View>
+
+                            <View style={styles.fuelOptionCardRight}>
+                              {isSelected ? (
+                                <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
+                              ) : (
+                                <View style={styles.fuelOptionUncheckedCircle} />
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+
+                      {/* Bottom Info Banner */}
+                      <View style={styles.engineInfoBanner}>
+                        <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
+                        <Text style={styles.engineInfoBannerText}>
+                          Seçtiğiniz yakıt türüne göre ilgili donanımlar ve teknik veriler gösterilecektir.
+                        </Text>
+                      </View>
+                    </View>
+                  ) : activeStep === 'transmission' ? (
+                    /* TRANSMISSION TYPE SELECTION LIST MATCHING REFERENCE SCREENSHOT */
+                    <View style={styles.fuelListContainer}>
+                      {getStepData().map((transVal, idx) => {
+                        const transLabel = typeof transVal === 'string' ? transVal : transVal.name || transVal.label || String(transVal);
+                        const isSelected = selectedTransmission === transLabel;
+
+                        return (
+                          <TouchableOpacity
+                            key={transLabel || idx}
+                            style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
+                            activeOpacity={0.8}
+                            onPress={() => selectOption(transVal)}
+                          >
+                            <View style={styles.fuelOptionCardLeft}>
+                              {renderTransmissionIcon(transLabel, isSelected)}
+                              <Text style={styles.fuelOptionTitle}>{transLabel}</Text>
+                            </View>
+
+                            <View style={styles.fuelOptionCardRight}>
+                              {isSelected ? (
+                                <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
+                              ) : (
+                                <View style={styles.fuelOptionUncheckedCircle} />
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : activeStep === 'trim' ? (
+                    /* TRIM PACKAGE SELECTION LIST MATCHING USER DIRECTIVE (STEP 8) */
+                    <View style={styles.fuelListContainer}>
+                      {getStepData().map((trimVal, idx) => {
+                        const trimLabel = typeof trimVal === 'string' ? trimVal : trimVal.name || trimVal.label || String(trimVal);
+                        const isSelected = selectedTrim === trimLabel;
+
+                        return (
+                          <TouchableOpacity
+                            key={trimLabel || idx}
+                            style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
+                            activeOpacity={0.8}
+                            onPress={() => selectOption(trimVal)}
+                          >
+                            <View style={styles.fuelOptionCardLeft}>
+                              {renderTrimBadge(trimLabel)}
+                              <Text style={styles.fuelOptionTitle}>{trimLabel}</Text>
+                            </View>
+
+                            <View style={styles.fuelOptionCardRight}>
+                              {isSelected ? (
+                                <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
+                              ) : (
+                                <View style={styles.fuelOptionUncheckedCircle} />
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+
+                      {/* Bottom Info Banner */}
+                      <View style={styles.engineInfoBanner}>
+                        <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
+                        <Text style={styles.engineInfoBannerText}>
+                          Donanım paketleri, aracınızın konfor, tasarım ve teknoloji özelliklerini belirler.
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.brandGroupCard}>
+                      {getStepData().map((item, idx, arr) => {
+                        const label = typeof item === 'string' ? item : item.name || item.label || item.value || String(item);
+                        const itemKey = typeof item === 'string' ? item : item.id || item.value || `${label}-${idx}`;
+                        return (
+                          <TouchableOpacity
+                            key={itemKey}
                             style={[
                               styles.brandRowItem,
-                              idx < group.data.length - 1 && styles.brandRowBorderBottom,
+                              idx < arr.length - 1 && styles.brandRowBorderBottom,
                             ]}
                             activeOpacity={0.7}
                             onPress={() => selectOption(item)}
                           >
-                            <View style={styles.brandRowLeft}>
-                              <View style={styles.brandLogoBox}>
-                                {logoUri ? (
-                                  <Image source={{ uri: logoUri }} style={styles.brandRowLogoImage} resizeMode="contain" />
-                                ) : (
-                                  <Ionicons name="car-outline" size={20} color="#0f172a" />
-                                )}
-                              </View>
-                              <Text style={styles.brandRowName} numberOfLines={1} ellipsizeMode="tail">{item.name}</Text>
-                            </View>
-
+                            <Text style={styles.brandRowName}>{label}</Text>
                             <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
                           </TouchableOpacity>
                         );
                       })}
                     </View>
-                  </View>
-                ))
-              ) : activeStep === 'year' ? (
-                /* 3-COLUMN GRID FOR YEAR SELECTION */
-                <View style={styles.yearGridContainer}>
-                  {getStepData().map((yearVal, idx) => {
-                    const isSelected = selectedYear === String(yearVal);
-                    return (
-                      <TouchableOpacity
-                        key={String(yearVal) || idx}
-                        style={[styles.yearGridCard, isSelected && styles.yearGridCardSelected]}
-                        activeOpacity={0.8}
-                        onPress={() => selectOption(yearVal)}
-                      >
-                        <Text style={[styles.yearGridCardText, isSelected && styles.yearGridCardTextSelected]}>
-                          {String(yearVal)}
+                  )}
+                </ScrollView>
+
+                {/* Right Alphabet Quick Jumper Bar */}
+                {activeStep === 'brand' && (
+                  <View style={styles.alphabetJumperColumn}>
+                    {ALPHABET_INDEX.map((char) => (
+                      <TouchableOpacity key={char} style={styles.alphabetJumperTouch}>
+                        <Text style={[styles.alphabetJumperChar, char === 'A' && styles.alphabetJumperCharActive]}>
+                          {char}
                         </Text>
                       </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : activeStep === 'bodyType' ? (
-                /* 2-COLUMN GRID FOR BODY TYPE SELECTION WITH HIGH-END AUTOMOTIVE ILLUSTRATIONS */
-                <View style={styles.bodyTypeGridContainer}>
-                  {getStepData().map((bodyTypeVal, idx) => {
-                    const isSelected = selectedBodyType === String(bodyTypeVal);
-                    return (
-                      <TouchableOpacity
-                        key={String(bodyTypeVal) || idx}
-                        style={[styles.bodyTypeGridCard, isSelected && styles.bodyTypeGridCardSelected]}
-                        activeOpacity={0.8}
-                        onPress={() => selectOption(bodyTypeVal)}
-                      >
-                        <View style={styles.bodyTypeIconBox}>
-                          {renderBodyTypeImage(String(bodyTypeVal))}
-                        </View>
-                        <Text style={[styles.bodyTypeGridCardText, isSelected && styles.bodyTypeGridCardTextSelected]}>
-                          {String(bodyTypeVal)}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : activeStep === 'engine' ? (
-                /* CLEAN MOTOR / VERSION SELECTION LIST SHOWING MOTOR CODES ONLY */
-                <View style={styles.engineListContainer}>
-                  {getStepData().map((engineItem, idx) => {
-                    const engineLabel = typeof engineItem === 'string' ? engineItem : engineItem.name || engineItem.label || String(engineItem);
-                    const isSelected = selectedEngine === engineLabel;
-
-                    return (
-                      <TouchableOpacity
-                        key={engineLabel || idx}
-                        style={[styles.engineOptionCard, isSelected && styles.engineOptionCardSelected]}
-                        activeOpacity={0.8}
-                        onPress={() => selectOption(engineItem)}
-                      >
-                        <View style={styles.engineOptionCardLeft}>
-                          <Text style={styles.engineOptionTitle}>{engineLabel}</Text>
-                        </View>
-
-                        <View style={styles.engineOptionCardRight}>
-                          {isSelected ? (
-                            <View style={styles.engineOptionCheckedBox}>
-                              <Ionicons name="checkmark-circle" size={22} color="#ea580c" />
-                              <Ionicons name="chevron-forward" size={18} color="#ea580c" />
-                            </View>
-                          ) : (
-                            <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-
-                  {/* Bottom Info Banner */}
-                  <View style={styles.engineInfoBanner}>
-                    <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
-                    <Text style={styles.engineInfoBannerText}>
-                      Listelenen motor / versiyonlar seçilen araç kombinasyonuna uygundur.
-                    </Text>
+                    ))}
                   </View>
-                </View>
-              ) : activeStep === 'fuelType' ? (
-                /* DYNAMIC FUEL TYPE SELECTION LIST MATCHING REFERENCE SCREENSHOT */
-                <View style={styles.fuelListContainer}>
-                  {getStepData().map((fuelVal, idx) => {
-                    const fuelLabel = typeof fuelVal === 'string' ? fuelVal : fuelVal.name || fuelVal.label || String(fuelVal);
-                    const isSelected = selectedFuelType === fuelLabel;
-
-                    return (
-                      <TouchableOpacity
-                        key={fuelLabel || idx}
-                        style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
-                        activeOpacity={0.8}
-                        onPress={() => selectOption(fuelVal)}
-                      >
-                        <View style={styles.fuelOptionCardLeft}>
-                          {renderFuelTypeIcon(fuelLabel)}
-                          <Text style={styles.fuelOptionTitle}>{fuelLabel}</Text>
-                        </View>
-
-                        <View style={styles.fuelOptionCardRight}>
-                          {isSelected ? (
-                            <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
-                          ) : (
-                            <View style={styles.fuelOptionUncheckedCircle} />
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-
-                  {/* Bottom Info Banner */}
-                  <View style={styles.engineInfoBanner}>
-                    <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
-                    <Text style={styles.engineInfoBannerText}>
-                      Seçtiğiniz yakıt türüne göre ilgili donanımlar ve teknik veriler gösterilecektir.
-                    </Text>
-                  </View>
-                </View>
-              ) : activeStep === 'transmission' ? (
-                /* TRANSMISSION TYPE SELECTION LIST MATCHING REFERENCE SCREENSHOT */
-                <View style={styles.fuelListContainer}>
-                  {getStepData().map((transVal, idx) => {
-                    const transLabel = typeof transVal === 'string' ? transVal : transVal.name || transVal.label || String(transVal);
-                    const isSelected = selectedTransmission === transLabel;
-
-                    return (
-                      <TouchableOpacity
-                        key={transLabel || idx}
-                        style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
-                        activeOpacity={0.8}
-                        onPress={() => selectOption(transVal)}
-                      >
-                        <View style={styles.fuelOptionCardLeft}>
-                          {renderTransmissionIcon(transLabel, isSelected)}
-                          <Text style={styles.fuelOptionTitle}>{transLabel}</Text>
-                        </View>
-
-                        <View style={styles.fuelOptionCardRight}>
-                          {isSelected ? (
-                            <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
-                          ) : (
-                            <View style={styles.fuelOptionUncheckedCircle} />
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : activeStep === 'trim' ? (
-                /* TRIM PACKAGE SELECTION LIST MATCHING USER DIRECTIVE (STEP 8) */
-                <View style={styles.fuelListContainer}>
-                  {getStepData().map((trimVal, idx) => {
-                    const trimLabel = typeof trimVal === 'string' ? trimVal : trimVal.name || trimVal.label || String(trimVal);
-                    const isSelected = selectedTrim === trimLabel;
-
-                    return (
-                      <TouchableOpacity
-                        key={trimLabel || idx}
-                        style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
-                        activeOpacity={0.8}
-                        onPress={() => selectOption(trimVal)}
-                      >
-                        <View style={styles.fuelOptionCardLeft}>
-                          {renderTrimBadge(trimLabel)}
-                          <Text style={styles.fuelOptionTitle}>{trimLabel}</Text>
-                        </View>
-
-                        <View style={styles.fuelOptionCardRight}>
-                          {isSelected ? (
-                            <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
-                          ) : (
-                            <View style={styles.fuelOptionUncheckedCircle} />
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-
-                  {/* Bottom Info Banner */}
-                  <View style={styles.engineInfoBanner}>
-                    <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
-                    <Text style={styles.engineInfoBannerText}>
-                      Donanım paketleri, aracınızın konfor, tasarım ve teknoloji özelliklerini belirler.
-                    </Text>
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.brandGroupCard}>
-                  {getStepData().map((item, idx, arr) => {
-                    const label = typeof item === 'string' ? item : item.name || item.label || item.value || String(item);
-                    const itemKey = typeof item === 'string' ? item : item.id || item.value || `${label}-${idx}`;
-                    return (
-                      <TouchableOpacity
-                        key={itemKey}
-                        style={[
-                          styles.brandRowItem,
-                          idx < arr.length - 1 && styles.brandRowBorderBottom,
-                        ]}
-                        activeOpacity={0.7}
-                        onPress={() => selectOption(item)}
-                      >
-                        <Text style={styles.brandRowName}>{label}</Text>
-                        <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </ScrollView>
-
-            {/* Right Alphabet Quick Jumper Bar */}
-            {activeStep === 'brand' && (
-              <View style={styles.alphabetJumperColumn}>
-                {ALPHABET_INDEX.map((char) => (
-                  <TouchableOpacity key={char} style={styles.alphabetJumperTouch}>
-                    <Text style={[styles.alphabetJumperChar, char === 'A' && styles.alphabetJumperCharActive]}>
-                      {char}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                )}
               </View>
-            )}
-          </View>
+            </View>
+          )}
         </View>
-      )}
-    </View>
-  ) : null}
+      ) : null}
     </SafeAreaView >
   );
 }

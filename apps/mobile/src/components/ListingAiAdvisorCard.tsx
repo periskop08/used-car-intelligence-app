@@ -153,7 +153,12 @@ export default function ListingAiAdvisorCard({
     typeof chatbotRemaining === 'number' &&
     chatbotRemaining <= 0;
 
-  const handleNavigateToReport = () => {
+  const handleNavigateToReport = async () => {
+    const token = await getToken();
+    if (!token) {
+      router.push('/vehicle-query' as any);
+      return;
+    }
     router.push({
       pathname: '/vehicle-report',
       params: {

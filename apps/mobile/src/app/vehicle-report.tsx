@@ -790,6 +790,15 @@ export default function VehicleReportScreen() {
   };
 
   const initReportLoad = async () => {
+    const token =
+      (await AsyncStorage.getItem('accessToken')) ||
+      (await AsyncStorage.getItem('token'));
+    if (!token) {
+      setLoading(false);
+      router.replace('/vehicle-query' as any);
+      return;
+    }
+
     setReport(null);
     setPipelineStep(1);
     let targetId = rawVariantId;

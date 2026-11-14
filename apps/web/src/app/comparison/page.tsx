@@ -90,6 +90,8 @@ export default function ComparisonPage() {
   // User tier & limit
   const [userTier, setUserTier] = useState<string>("TANISMA");
   const [vehicleLimit, setVehicleLimit] = useState<number>(2);
+  const [hasAuthToken, setHasAuthToken] = useState<boolean>(false);
+  const [authChecked, setAuthChecked] = useState<boolean>(false);
 
   // Selected vehicle category (AUTOMOBILE, SUV_PICKUP, COMMERCIAL, MOTORCYCLE)
   const [searchMode, setSearchMode] = useState<VehicleSearchMode>("AUTOMOBILE");
@@ -174,13 +176,26 @@ export default function ComparisonPage() {
       } catch (e) {}
     }
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("accessToken") || localStorage.getItem("token")
+        : null;
     if (token) {
+      setHasAuthToken(true);
       fetch(`${API_URL}/comparisons/quota`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-        .then(res => res.json())
+        .then(res => {
+          if (res.status === 401) {
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("token");
+            setHasAuthToken(false);
+            return null;
+          }
+          return res.json();
+        })
         .then(data => {
+          if (!data) return;
           if (typeof data.remainingChatbotMessages === "number") {
             setRemainingQuota(data.remainingChatbotMessages);
           }
@@ -188,7 +203,11 @@ export default function ComparisonPage() {
             setLimitAndInitSlots(data.userLimit, data.userTier);
           }
         })
-        .catch(() => null);
+        .catch(() => null)
+        .finally(() => setAuthChecked(true));
+    } else {
+      setHasAuthToken(false);
+      setAuthChecked(true);
     }
 
     // Auto-restore saved draft on initial page load / refresh
@@ -807,6 +826,103 @@ export default function ComparisonPage() {
 
     return "col-span-1";
   };
+
+  if (!authChecked) {
+    return (
+      <div className="max-w-4xl w-full mx-auto px-4 md:px-6 py-20 flex flex-col items-center justify-center gap-3">
+        <div className="w-10 h-10 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
+        <p className="text-xs font-bold text-slate-400">Yükleniyor...</p>
+      </div>
+    );
+  }
+
+  if (!hasAuthToken) {
+    return (
+      <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-10 space-y-6">
+        {/* 1. Üst Başlık (Hero Alanı) */}
+        <div className="bg-slate-900/90 border border-orange-500/30 rounded-3xl p-8 sm:p-10 text-center space-y-4 shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-3xl mx-auto">
+            ⚖️
+          </div>
+          <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+            Tork Scout Akıllı Araç Karşılaştırma
+          </h1>
+          <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
+            İki farklı araç arasında mı kaldınız? Modelleri sadece kağıt üzerindeki verilerle değil; motor dayanıklılığı, şanzıman karakteri, yürütme maliyeti ve ikinci el değer koruma kriterleriyle yan yana kıyaslayın.
+          </p>
+        </div>
+
+        {/* 2. Araç Karşılaştırma'da Sizi Neler Bekliyor? (4 Ana Fayda Kartı) */}
+        <div className="space-y-4">
+          <h2 className="text-base sm:text-lg font-black text-white px-1">
+            Araç Karşılaştırma’da Sizi Neler Bekliyor?
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              {
+                emoji: "⚖️",
+                title: "Yan Yana Teknik & Performans Kıyaslaması",
+                desc: "İki aracın beygir gücü, tork, 0-100 km/s hızlanma, maksimum hız, yakıt tüketimi, bagaj hacmi ve boş ağırlık verilerini kafa kafaya karşılaştırın; hangi aracın hangi kalemde üstün olduğunu anında görün.",
+              },
+              {
+                emoji: "🛡️",
+                title: "Kronik Risk & Dayanıklılık Karşılaştırması",
+                desc: "Her iki modelin motor, şanzıman ve elektronik sistemlerindeki kronik sorun risklerini kıyaslayarak sanayiye daha az uğratacak seçeneği belirleyin.",
+              },
+              {
+                emoji: "💰",
+                title: "Yürütme Maliyeti, MTV & İkinci El Piyasa Analizi",
+                desc: "Yıllık MTV dilimleri, yakıt ekonomisi, yedek parça erişimi ve ikinci el piyasasındaki likidite durumlarını karşılaştırarak bütçenize en uygun kararı verin.",
+              },
+              {
+                emoji: "🏆",
+                title: "Tork Scout AI Kazanan Özeti & Karar Rehberi",
+                desc: '"Şehir içi kullanım", "Uzun yol ve aile", "Performans" veya "Fiyat/Performans" beklentilerinize göre hangi aracın sizin için daha doğru tercih olduğunu özetleyen uzman analizine ulaşın.',
+              },
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className="bg-slate-900/90 border border-white/10 rounded-2xl p-5 flex items-start gap-4 shadow-lg"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-2xl shrink-0">
+                  {item.emoji}
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-sm sm:text-base font-extrabold text-white">
+                    {item.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    {item.desc}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 3. Alt Aksiyon Alanı (CTA Butonları) */}
+        <div className="bg-slate-900/90 border border-white/10 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-lg mx-auto">
+            <a
+              href="/login?redirect=/comparison"
+              className="w-full sm:flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm shadow-lg shadow-orange-500/20 transition flex items-center justify-center gap-2"
+            >
+              <span>Giriş Yap ve Karşılaştırmaya Başla →</span>
+            </a>
+            <a
+              href="/register?redirect=/comparison"
+              className="w-full sm:flex-1 py-3.5 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-orange-500/40 text-orange-300 hover:text-white font-extrabold text-sm transition flex items-center justify-center"
+            >
+              <span>Ücretsiz Hesap Oluştur</span>
+            </a>
+          </div>
+          <p className="text-xs text-slate-400 max-w-xl mx-auto leading-relaxed">
+            Hesabınızla giriş yaparak veya ücretsiz üye olarak Tork Scout Akıllı Araç Karşılaştırma özelliğine hemen erişebilirsiniz.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl w-full mx-auto px-4 md:px-6 py-10 flex flex-col gap-8">

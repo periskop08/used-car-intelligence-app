@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
 import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
@@ -377,12 +377,20 @@ export default function ComparisonScreen() {
 
   const [cachedBrands, setCachedBrands] = useState<string[]>([]);
   const [isQuotaModalVisible, setIsQuotaModalVisible] = useState<boolean>(false);
+  const [hasAuthToken, setHasAuthToken] = useState<boolean>(false);
+  const [authChecked, setAuthChecked] = useState<boolean>(false);
 
   useEffect(() => {
     fetchQuota();
     loadAllBrandsFromDb();
     loadRecentVehicles();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchQuota();
+    }, [])
+  );
 
   const loadRecentVehicles = async () => {
     try {
@@ -517,8 +525,11 @@ export default function ComparisonScreen() {
 
   const fetchQuota = async () => {
     try {
-      const token = await AsyncStorage.getItem('accessToken');
+      const token =
+        (await AsyncStorage.getItem('accessToken')) ||
+        (await AsyncStorage.getItem('token'));
       if (token) {
+        setHasAuthToken(true);
         const res = await fetch(`${API_URL}/comparisons/quota`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -530,10 +541,18 @@ export default function ComparisonScreen() {
           if (data.tier) {
             setUserTier(data.tier);
           }
+        } else if (res.status === 401) {
+          await AsyncStorage.removeItem('accessToken');
+          await AsyncStorage.removeItem('token');
+          setHasAuthToken(false);
         }
+      } else {
+        setHasAuthToken(false);
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      setAuthChecked(true);
     }
   };
 
@@ -956,6 +975,261 @@ export default function ComparisonScreen() {
 
     return () => clearInterval(interval);
   }, [activeResultTab, vehiclesList.length, isSpecsAutoScrollPaused]);
+
+  if (!authChecked) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.navHeader}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={24} color="#0f172a" />
+          </TouchableOpacity>
+          <Text style={styles.navTitle}>Araç Karşılaştır</Text>
+          <View style={{ width: 38 }} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <ActivityIndicator size="large" color="#ea580c" />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748b' }}>Yükleniyor...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!hasAuthToken) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.navHeader}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={24} color="#0f172a" />
+          </TouchableOpacity>
+          <Text style={styles.navTitle}>Araç Karşılaştır</Text>
+          <View style={{ width: 38 }} />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 14 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* 1. Üst Başlık (Hero Alanı) */}
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 20,
+              padding: 20,
+              borderWidth: 1,
+              borderColor: '#fed7aa',
+              alignItems: 'center',
+              shadowColor: '#0f172a',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.05,
+              shadowRadius: 10,
+              elevation: 2,
+            }}
+          >
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: '#fff7ed',
+                borderWidth: 1,
+                borderColor: '#fdba74',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}
+            >
+              <Ionicons name="scale-outline" size={26} color="#ea580c" />
+            </View>
+            <Text
+              style={{
+                fontSize: 20,
+                fontWeight: '900',
+                color: '#0f172a',
+                textAlign: 'center',
+                letterSpacing: -0.4,
+              }}
+            >
+              Tork Scout Akıllı Araç Karşılaştırma
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                color: '#475569',
+                textAlign: 'center',
+                lineHeight: 20,
+                marginTop: 8,
+                fontWeight: '500',
+              }}
+            >
+              İki farklı araç arasında mı kaldınız? Modelleri sadece kağıt üzerindeki verilerle değil; motor dayanıklılığı, şanzıman karakteri, yürütme maliyeti ve ikinci el değer koruma kriterleriyle yan yana kıyaslayın.
+            </Text>
+          </View>
+
+          {/* 2. Araç Karşılaştırma'da Sizi Neler Bekliyor? (4 Ana Fayda Kartı) */}
+          <View style={{ gap: 12 }}>
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: '900',
+                color: '#0f172a',
+                paddingHorizontal: 4,
+              }}
+            >
+              Araç Karşılaştırma’da Sizi Neler Bekliyor?
+            </Text>
+
+            {[
+              {
+                emoji: '⚖️',
+                title: 'Yan Yana Teknik & Performans Kıyaslaması',
+                desc: 'İki aracın beygir gücü, tork, 0-100 km/s hızlanma, maksimum hız, yakıt tüketimi, bagaj hacmi ve boş ağırlık verilerini kafa kafaya karşılaştırın; hangi aracın hangi kalemde üstün olduğunu anında görün.',
+                bg: '#fff7ed',
+                border: '#fed7aa',
+              },
+              {
+                emoji: '🛡️',
+                title: 'Kronik Risk & Dayanıklılık Karşılaştırması',
+                desc: 'Her iki modelin motor, şanzıman ve elektronik sistemlerindeki kronik sorun risklerini kıyaslayarak sanayiye daha az uğratacak seçeneği belirleyin.',
+                bg: '#eff6ff',
+                border: '#bfdbfe',
+              },
+              {
+                emoji: '💰',
+                title: 'Yürütme Maliyeti, MTV & İkinci El Piyasa Analizi',
+                desc: 'Yıllık MTV dilimleri, yakıt ekonomisi, yedek parça erişimi ve ikinci el piyasasındaki likidite durumlarını karşılaştırarak bütçenize en uygun kararı verin.',
+                bg: '#f0fdf4',
+                border: '#bbf7d0',
+              },
+              {
+                emoji: '🏆',
+                title: 'Tork Scout AI Kazanan Özeti & Karar Rehberi',
+                desc: '"Şehir içi kullanım", "Uzun yol ve aile", "Performans" veya "Fiyat/Performans" beklentilerinize göre hangi aracın sizin için daha doğru tercih olduğunu özetleyen uzman analizine ulaşın.',
+                bg: '#faf5ff',
+                border: '#e9d5ff',
+              },
+            ].map((item, idx) => (
+              <View
+                key={idx}
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: 16,
+                  padding: 15,
+                  borderWidth: 1,
+                  borderColor: '#e2e8f0',
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                }}
+              >
+                <View
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 12,
+                    backgroundColor: item.bg,
+                    borderWidth: 1,
+                    borderColor: item.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 20 }}>{item.emoji}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '800',
+                      color: '#0f172a',
+                      marginBottom: 4,
+                    }}
+                  >
+                    {item.title}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: '#64748b',
+                      lineHeight: 18,
+                    }}
+                  >
+                    {item.desc}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* 3. Alt Aksiyon Alanı (CTA Butonları) */}
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 18,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: '#e2e8f0',
+              gap: 10,
+              marginTop: 4,
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#ea580c',
+                borderRadius: 14,
+                paddingVertical: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                shadowColor: '#ea580c',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.25,
+                shadowRadius: 8,
+                elevation: 4,
+              }}
+              activeOpacity={0.85}
+              onPress={() => router.push('/login' as any)}
+            >
+              <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '900' }}>
+                Giriş Yap ve Karşılaştırmaya Başla
+              </Text>
+              <Ionicons name="arrow-forward" size={17} color="#ffffff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#fff7ed',
+                borderRadius: 14,
+                paddingVertical: 13,
+                borderWidth: 1,
+                borderColor: '#fdba74',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              activeOpacity={0.85}
+              onPress={() => router.push('/register' as any)}
+            >
+              <Text style={{ color: '#ea580c', fontSize: 13.5, fontWeight: '800' }}>
+                Ücretsiz Hesap Oluştur
+              </Text>
+            </TouchableOpacity>
+
+            <Text
+              style={{
+                fontSize: 11,
+                color: '#64748b',
+                textAlign: 'center',
+                lineHeight: 16,
+                marginTop: 4,
+              }}
+            >
+              Hesabınızla giriş yaparak veya ücretsiz üye olarak Tork Scout Akıllı Araç Karşılaştırma özelliğine hemen erişebilirsiniz.
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
