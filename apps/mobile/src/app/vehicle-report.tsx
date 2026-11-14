@@ -1302,12 +1302,24 @@ export default function VehicleReportScreen() {
 
   const displayedScore = isInsufficient
     ? '—'
+    : typeof decisionScore?.score === 'number'
+    ? (totalRiskPenalty > 0 ? Math.min(decisionScore.score, Math.max(0, 100 - totalRiskPenalty)) : decisionScore.score)
     : totalRiskPenalty > 0
     ? Math.max(0, 100 - totalRiskPenalty)
     : (decisionScore?.score ?? rawBuyability);
 
   const numScore = typeof displayedScore === 'number' ? displayedScore : (decisionScore?.score ?? rawBuyability);
-  const scoreState = decisionScore?.state || (numScore >= 90 ? 'EXCELLENT' : numScore >= 78 ? 'GOOD' : numScore >= 65 ? 'CAUTION' : numScore >= 48 ? 'HIGH_RISK' : 'AVOID');
+  const scoreState = isInsufficient
+    ? 'INSUFFICIENT_DATA'
+    : numScore >= 90
+    ? 'EXCELLENT'
+    : numScore >= 70
+    ? 'GOOD'
+    : numScore >= 50
+    ? 'CAUTION'
+    : numScore >= 40
+    ? 'HIGH_RISK'
+    : 'AVOID';
 
   const getStateConfig = (state?: string) => {
     switch (state) {

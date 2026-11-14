@@ -196,9 +196,25 @@ export default function VehicleReportScoreHero({ report }: VehicleReportScoreHer
     
     const displayedScore = isInsufficient 
       ? "—" 
+      : typeof decisionScore.score === "number"
+      ? (computedDeductionsSum > 0 ? Math.min(decisionScore.score, Math.max(0, 100 - totalRiskPenalty)) : decisionScore.score)
       : computedDeductionsSum > 0 
       ? Math.max(0, 100 - totalRiskPenalty)
       : decisionScore.score;
+
+    const effectiveScoreNum = typeof displayedScore === 'number' ? displayedScore : (decisionScore.score ?? 100);
+    const effectiveState = isInsufficient
+      ? 'INSUFFICIENT_DATA'
+      : effectiveScoreNum >= 90
+      ? 'EXCELLENT'
+      : effectiveScoreNum >= 70
+      ? 'GOOD'
+      : effectiveScoreNum >= 50
+      ? 'CAUTION'
+      : effectiveScoreNum >= 40
+      ? 'HIGH_RISK'
+      : 'AVOID';
+    const effectiveStateCfg = getStateConfig(effectiveState);
 
     const hasDeductedRisks = Boolean(totalRiskPenalty > 0 && deductedRisks.length > 0);
 
@@ -231,7 +247,7 @@ export default function VehicleReportScoreHero({ report }: VehicleReportScoreHer
         {/* Header Row: Score + State + Scope */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-white/10">
           <div className="flex items-center gap-4">
-            <div className={`px-4 py-3 rounded-2xl border flex flex-col items-center justify-center min-w-[120px] ${stateCfg.color}`}>
+            <div className={`px-4 py-3 rounded-2xl border flex flex-col items-center justify-center min-w-[120px] ${effectiveStateCfg.color}`}>
               <span className="text-[10px] uppercase font-bold tracking-wider opacity-80">Alınabilirlik Skoru</span>
               <span className="text-3xl font-black mt-0.5">
                 {isInsufficient ? "—" : `${displayedScore} / 100`}
@@ -239,8 +255,8 @@ export default function VehicleReportScoreHero({ report }: VehicleReportScoreHer
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${stateCfg.badge}`}>
-                  {stateCfg.label}
+                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${effectiveStateCfg.badge}`}>
+                  {effectiveStateCfg.label}
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-1.5 max-w-xl leading-relaxed">

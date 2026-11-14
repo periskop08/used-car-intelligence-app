@@ -1410,15 +1410,19 @@ Perform adversarial red-team audit. Output strict JSON.`;
         effectiveSev = 'HIGH';
       }
 
-      const penalty = effectiveSev === 'CRITICAL' ? 22 : effectiveSev === 'HIGH' ? 12 : effectiveSev === 'MODERATE' ? 6 : 3;
+      const penalty = effectiveSev === 'CRITICAL' ? 18 : effectiveSev === 'HIGH' ? 13 : effectiveSev === 'MODERATE' ? 8 : 4;
       return sum + penalty;
     }, 0);
 
-    const baseScore = 96;
-    let decisionScore = Math.max(35, Math.min(96, baseScore - totalPenalty));
+    const currentYear = new Date().getFullYear();
+    const vehicleAge = context.year ? Math.max(0, currentYear - Number(context.year)) : 8;
+    const ageWearPenalty = vehicleAge >= 15 ? 6 : vehicleAge >= 11 ? 5 : vehicleAge >= 8 ? 3 : vehicleAge >= 5 ? 2 : 0;
+
+    const baseScore = 90;
+    let decisionScore = Math.max(30, Math.min(86, baseScore - ageWearPenalty - totalPenalty));
 
     const technicalRiskLevel: 'DUSUK' | 'ORTA' | 'YUKSEK' | 'KRITIK' =
-      decisionScore >= 88 ? 'DUSUK' : decisionScore >= 76 ? 'ORTA' : decisionScore >= 60 ? 'YUKSEK' : 'KRITIK';
+      decisionScore >= 80 ? 'DUSUK' : decisionScore >= 68 ? 'ORTA' : decisionScore >= 52 ? 'YUKSEK' : 'KRITIK';
 
     const decisionRationale =
       agent1.vehicleType === 'MOTORCYCLE'
@@ -2305,7 +2309,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
 
     // Deducted risks construction for V6 Score Hero (with Turkish sanitization)
     const deductedRisks = judge.approvedFactsOnly.map((fact) => {
-      const penalty = fact.severity === 'CRITICAL' ? 10 : fact.severity === 'HIGH' ? 7 : fact.severity === 'MODERATE' ? 4 : 2;
+      const penalty = fact.severity === 'CRITICAL' ? 17 : fact.severity === 'HIGH' ? 12 : fact.severity === 'MODERATE' ? 7 : 4;
       const cleanTitle = this.sanitizeTurkishAutomotiveText(fact.title);
       const exp = this.sanitizeTurkishAutomotiveText(fact.userExperience || '');
       const sym = this.sanitizeTurkishAutomotiveText(fact.symptoms?.[0] || '');
@@ -2361,7 +2365,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     const isUpperTrim = /performance line|rivoli|opera|bastille|titanium|highline|cosmo|elegance|amg|m sport|r-line|prestige|lounge|tekna|platinum|gt line|gt-line|laurin & klement|vignale|insignia/i.test(cleanTrimName);
 
     const totalRiskPenalty = deductedRisks.reduce((sum, r) => sum + r.penalty, 0);
-    const calibratedScore = Math.max(50, Math.min(96, 96 - totalRiskPenalty));
+    const calibratedScore = Math.max(30, Math.min(86, 90 - totalRiskPenalty));
 
     // Motorcycle Era Analysis Sanitization
     let motorcycleEraAnalysis: any = undefined;
@@ -3185,24 +3189,31 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         return true;
       });
 
-      // Ensure chronic oil burning, wet belt, or transmission mechatronic risks have realistic penalties
+      // Ensure chronic oil burning, wet belt, head gasket, or transmission mechatronic risks have realistic strict penalties
       report.decisionScore.deductedRisks.forEach((risk: any) => {
         const text = `${risk.title || ''} ${risk.reason || ''} ${risk.description || ''}`.toLowerCase();
-        if (/yağ yakma|yağ eksiltme|oil consumption|piston segman|segman aşınma|yağ tüketimi/i.test(text)) {
-          if (!risk.penalty || risk.penalty < 8) {
-            risk.penalty = 10;
-          }
+        const isCatastrophic = /yağ içi triger|wet belt|yağ süzgeci|motor kırma|krank|yatak sarma|şanzıman kilit|blok çatla/i.test(text);
+        const isMajorChronic = /yağ yakma|yağ eksiltme|oil consumption|piston segman|segman aşınma|yağ tüketimi|mekatronik|mechatronic|kuru kavrama|dq200|zincir uzama|silindir kapak contası|enjektör|dpf|turbo/i.test(text);
+        if (isCatastrophic) {
+          risk.penalty = Math.max(risk.penalty || 0, 17);
+        } else if (isMajorChronic) {
+          risk.penalty = Math.max(risk.penalty || 0, 12);
+        } else if (!risk.penalty || risk.penalty < 6) {
+          risk.penalty = risk.severity === 'CRITICAL' ? 17 : risk.severity === 'HIGH' ? 12 : risk.severity === 'MODERATE' ? 7 : 5;
         }
+        risk.deduction = risk.penalty;
+        risk.netDeduction = risk.penalty;
       });
 
       // Recalculate score from surviving valid risks
-      const totalRiskPenalty = report.decisionScore.deductedRisks.reduce((sum: number, r: any) => sum + (r.penalty || 0), 0);
+      const rawMechanicalPenalty = report.decisionScore.deductedRisks.reduce((sum: number, r: any) => sum + (r.penalty || 0), 0);
 
-      // Holistic Evaluation Deductions requested by user:
+      // Holistic Evaluation Deductions:
       // 1. Satın Almadan Önce Bilinecek Tavizler (compromisesAndLimitations)
       // 2. Kimler İçin Uygun Olmayabilir? (notSuitableFor)
-      // 3. Günümüz Şartlarında Olumsuz / Eksiklikleri (contemporaryCons)
+      // 3. Günümüz Şartlarında Olumsuz / Eksiklikleri (contemporaryCons - pre-2019 base trims only)
       // 4. Hangi Durumda Satın Almaktan Vazgeçilmeli? (walkAwayConditions)
+      // 5. Yaş / Yıpranma Payı (ageWearDeduction)
       const synth = report.expertDecisionSynthesis || {};
 
       // 1. Tavizler (compromisesAndLimitations)
@@ -3225,19 +3236,21 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           notSuitableDeduction += 1.5;
         }
       });
-      notSuitableDeduction = Math.min(5, Math.round(notSuitableDeduction));
+      notSuitableDeduction = Math.min(4, Math.round(notSuitableDeduction));
 
-      // 3. Günümüz Şartlarında Olumsuz / Eksiklikleri (contemporaryCons)
+      // 3. Günümüz Şartlarında Olumsuz / Eksiklikleri (contemporaryCons - strictly 0 for modern/premium/upper trims)
       const trimComp = synth.trimPackageComparison || synth.trimComparison || {};
       const rawCons: any[] = Array.isArray(trimComp.contemporaryCons) ? trimComp.contemporaryCons : [];
       let contemporaryConsDeduction = 0;
-      rawCons.forEach((con: any) => {
-        const text = String(con || '').toLowerCase().trim();
-        if (text && text !== '[object object]') {
-          contemporaryConsDeduction += 1.5;
-        }
-      });
-      contemporaryConsDeduction = Math.min(5, Math.round(contemporaryConsDeduction));
+      if (!isModernVehicle && !isPremiumBrand && !isUpperTrim) {
+        rawCons.forEach((con: any) => {
+          const text = String(con || '').toLowerCase().trim();
+          if (text && text !== '[object object]') {
+            contemporaryConsDeduction += 1.5;
+          }
+        });
+        contemporaryConsDeduction = Math.min(3, Math.round(contemporaryConsDeduction));
+      }
 
       // 4. Hangi Durumda Satın Almaktan Vazgeçilmeli? (walkAwayConditions)
       const rawWalks: any[] = Array.isArray(synth.walkAwayConditions) ? synth.walkAwayConditions : [];
@@ -3249,34 +3262,80 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           walkAwayDeduction += isCriticalDealbreaker ? 2.5 : 1.5;
         }
       });
-      walkAwayDeduction = Math.min(6, Math.round(walkAwayDeduction));
+      walkAwayDeduction = Math.min(5, Math.round(walkAwayDeduction));
 
-      const totalHolisticPenalty = compromisesDeduction + notSuitableDeduction + contemporaryConsDeduction + walkAwayDeduction;
-      const grandTotalPenalty = totalRiskPenalty + totalHolisticPenalty;
+      // 5. Yaş / Yıpranma Payı
+      const currentYear = new Date().getFullYear();
+      const vehicleAge = context.year ? Math.max(0, currentYear - Number(context.year)) : 7;
+      const ageWearDeduction = vehicleAge >= 15 ? 6 : vehicleAge >= 11 ? 5 : vehicleAge >= 8 ? 3 : vehicleAge >= 5 ? 2 : 1;
 
-      const calibratedScore = Math.max(30, Math.min(96, 96 - grandTotalPenalty));
-      report.decisionScore.score = calibratedScore;
-      report.decisionScore.totalRiskPenalty = totalRiskPenalty;
-      report.decisionScore.grandTotalPenalty = grandTotalPenalty;
+      const totalHolisticPenalty = Math.round((compromisesDeduction + notSuitableDeduction + contemporaryConsDeduction + walkAwayDeduction) * 0.55) + ageWearDeduction;
+
+      // Base ceiling is 90 (10-pt used-vehicle baseline margin). Calculate strict final score:
+      const calibratedScore = Math.max(30, Math.min(85, 90 - rawMechanicalPenalty - totalHolisticPenalty));
+      const targetTotalDeductionFrom100 = 100 - calibratedScore;
+
+      // Distribute the difference (targetTotalDeductionFrom100 - rawMechanicalPenalty) across deductedRisks
+      // so the sum of displayed risk card deductions equals (100 - calibratedScore) with 100% mathematical precision.
+      const riskCount = report.decisionScore.deductedRisks.length;
+      if (riskCount > 0) {
+        const diff = targetTotalDeductionFrom100 - rawMechanicalPenalty;
+        if (diff !== 0) {
+          const perItem = Math.trunc(diff / riskCount);
+          let remainder = diff - perItem * riskCount;
+          report.decisionScore.deductedRisks.forEach((r: any) => {
+            const extra = perItem + (remainder > 0 ? 1 : remainder < 0 ? -1 : 0);
+            if (remainder > 0) remainder--;
+            else if (remainder < 0) remainder++;
+            const updatedPenalty = Math.max(3, (r.penalty || 0) + extra);
+            r.penalty = updatedPenalty;
+            r.deduction = updatedPenalty;
+            r.netDeduction = updatedPenalty;
+          });
+        }
+      }
+
+      const finalTotalPenalty = report.decisionScore.deductedRisks.reduce((sum: number, r: any) => sum + (r.penalty || 0), 0) || targetTotalDeductionFrom100;
+      const finalSynchronizedScore = Math.max(30, Math.min(85, 100 - finalTotalPenalty));
+
+      const harmonizedVerdictText =
+        finalSynchronizedScore >= 90
+          ? 'Sınıfında referans kondisyonda, kontrolleri teyit edilerek doğrudan değerlendirilebilir.'
+          : finalSynchronizedScore >= 70
+          ? 'Dengeli kondisyonda, belirli kontrollerin sağlanması ve ekspertiz teyidi şartıyla değerlendirilebilir.'
+          : finalSynchronizedScore >= 50
+          ? 'Riskli kondisyonda, kapsamlı ekspertiz ve mekanik kontroller sağlanmadan karar verilmemelidir.'
+          : 'Ağır riskli kondisyonda, yüksek maliyetli kronik arıza riskleri nedeniyle uzak durulması önerilir.';
+
+      report.decisionScore.score = finalSynchronizedScore;
+      report.decisionScore.totalRiskPenalty = finalTotalPenalty;
+      report.decisionScore.grandTotalPenalty = finalTotalPenalty;
+      report.decisionScore.verdict = harmonizedVerdictText;
+      report.decisionScore.shortVerdict = harmonizedVerdictText;
       report.decisionScore.holisticDeductions = {
         compromisesDeduction,
         notSuitableDeduction,
         contemporaryConsDeduction,
         walkAwayDeduction,
+        ageWearDeduction,
         totalHolisticPenalty,
       };
-      report.decisionScore.riskLevel = calibratedScore >= 88 ? 'DUSUK' : calibratedScore >= 76 ? 'ORTA' : calibratedScore >= 60 ? 'YUKSEK' : 'KRITIK';
+      report.decisionScore.riskLevel = finalSynchronizedScore >= 80 ? 'DUSUK' : finalSynchronizedScore >= 68 ? 'ORTA' : finalSynchronizedScore >= 52 ? 'YUKSEK' : 'KRITIK';
+
+      if (report.expertDecisionSynthesis?.finalConditionalVerdict) {
+        report.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict = harmonizedVerdictText;
+      }
 
       if (report.torqueScoutDecisionScoreV1) {
-        report.torqueScoutDecisionScoreV1.score = calibratedScore;
+        report.torqueScoutDecisionScoreV1.score = finalSynchronizedScore;
         report.torqueScoutDecisionScoreV1.deductedRisks = report.decisionScore.deductedRisks;
-        report.torqueScoutDecisionScoreV1.totalRiskPenalty = grandTotalPenalty;
-        report.torqueScoutDecisionScoreV1.modelDecisionRisk = grandTotalPenalty;
-        report.torqueScoutDecisionScoreV1.state = calibratedScore >= 90 ? 'EXCELLENT' : calibratedScore >= 78 ? 'GOOD' : calibratedScore >= 65 ? 'CAUTION' : 'HIGH_RISK';
+        report.torqueScoutDecisionScoreV1.totalRiskPenalty = finalTotalPenalty;
+        report.torqueScoutDecisionScoreV1.modelDecisionRisk = finalTotalPenalty;
+        report.torqueScoutDecisionScoreV1.state = finalSynchronizedScore >= 90 ? 'EXCELLENT' : finalSynchronizedScore >= 70 ? 'GOOD' : finalSynchronizedScore >= 50 ? 'CAUTION' : 'HIGH_RISK';
       }
       if (report.scoring) {
-        report.scoring.buyabilityScore = { value: calibratedScore };
-        report.scoring.technicalRiskScore = { value: grandTotalPenalty };
+        report.scoring.buyabilityScore = { value: finalSynchronizedScore };
+        report.scoring.technicalRiskScore = { value: finalTotalPenalty };
       }
     }
 
