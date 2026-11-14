@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import UrgentBadge from '../../components/UrgentBadge';
 import TorkScoutLoader from '../../components/TorkScoutLoader';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
+import { useDeviceSafeArea } from '../../utils/deviceSafeArea';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -104,6 +105,7 @@ const getRemainingDays = (targetDateString?: string) => {
 
 export default function MyListingsScreen() {
   const router = useRouter();
+  const { safeTopInset, safeBottomInset, maxSheetHeight } = useDeviceSafeArea();
   const params = useLocalSearchParams();
   const [listings, setListings] = useState<ListingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -810,7 +812,7 @@ export default function MyListingsScreen() {
           }
         }}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, { paddingTop: safeTopInset + 8 }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => {
@@ -819,7 +821,15 @@ export default function MyListingsScreen() {
               }
             }}
           />
-          <View style={styles.promoSheet}>
+          <View
+            style={[
+              styles.promoSheet,
+              {
+                maxHeight: maxSheetHeight,
+                paddingBottom: Math.max(safeBottomInset + 12, 24),
+              },
+            ]}
+          >
             {/* Header */}
             <View style={styles.promoHeader}>
               <View style={{ flex: 1, paddingRight: 8 }}>

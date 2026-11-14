@@ -25,6 +25,7 @@ import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
 import QuotaExhaustionModal from '../components/QuotaExhaustionModal';
 import { createEdgeSwipeDismissHandlers } from '../utils/backGesture';
 import TorkScoutLoader from '../components/TorkScoutLoader';
+import { useDeviceSafeArea } from '../utils/deviceSafeArea';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -326,6 +327,7 @@ const DEFAULT_RECENT_VEHICLES: VehicleSlot[] = [
 
 export default function ComparisonScreen() {
   const router = useRouter();
+  const { safeTopInset, safeBottomInset, maxSheetHeight } = useDeviceSafeArea();
 
   // Vehicle category state (AUTOMOBILE, SUV_PICKUP, COMMERCIAL, MOTORCYCLE)
   const [searchMode, setSearchMode] = useState<VehicleCategory>('AUTOMOBILE');
@@ -1937,7 +1939,7 @@ export default function ComparisonScreen() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { paddingTop: safeTopInset + 8 }]}
           {...createEdgeSwipeDismissHandlers(handleStepBackInModal)}
         >
           <Pressable
@@ -1947,7 +1949,15 @@ export default function ComparisonScreen() {
               setModalVisible(false);
             }}
           />
-          <View style={styles.modalContent}>
+          <View
+            style={[
+              styles.modalContent,
+              {
+                maxHeight: maxSheetHeight,
+                paddingBottom: Math.max(safeBottomInset + 14, 24),
+              },
+            ]}
+          >
             {/* Modal Header with Back Arrow, Title and Close */}
             <View style={styles.modalHeader}>
               <TouchableOpacity style={styles.modalBackStepBtn} onPress={handleStepBackInModal}>

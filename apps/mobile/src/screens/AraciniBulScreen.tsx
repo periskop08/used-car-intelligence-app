@@ -25,6 +25,7 @@ import { getCanonicalBrandLogoUrl } from '@used-car-intelligence/shared';
 import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
 import { createEdgeSwipeDismissHandlers } from '../utils/backGesture';
 import TorkScoutLoader from '../components/TorkScoutLoader';
+import { useDeviceSafeArea } from '../utils/deviceSafeArea';
 
 const BrandLogo = ({ brandName, size = 36 }: { brandName?: string; size?: number }) => {
   const [imgError, setImgError] = useState(false);
@@ -633,6 +634,7 @@ const VehicleCardContent = React.memo(({ card }: { card: DiscoveryCard }) => {
 
 export default function AraciniBulScreen() {
   const router = useRouter();
+  const { safeTopInset, safeBottomInset, maxSheetHeight } = useDeviceSafeArea();
 
   type GameState = 'intro' | 'loading' | 'swiping' | 'result' | 'empty' | 'error';
   type ResultsData = RecommendationResult;
@@ -1582,14 +1584,22 @@ export default function AraciniBulScreen() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { paddingTop: safeTopInset + 8 }]}
           {...createEdgeSwipeDismissHandlers(() => setShowFilterModal(false))}
         >
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setShowFilterModal(false)}
           />
-          <View style={styles.modalContent}>
+          <View
+            style={[
+              styles.modalContent,
+              {
+                maxHeight: maxSheetHeight,
+                paddingBottom: Math.max(safeBottomInset + 14, 24),
+              },
+            ]}
+          >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Keşif Kriterleri</Text>
               <TouchableOpacity onPress={() => setShowFilterModal(false)}>

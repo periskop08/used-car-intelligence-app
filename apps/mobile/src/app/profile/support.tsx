@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDeviceSafeArea } from '../../utils/deviceSafeArea';
 
 let ImagePicker: any = null;
 try {
@@ -69,6 +70,7 @@ const FAQ_ITEMS = [
 
 export default function SupportScreen() {
   const router = useRouter();
+  const { safeTopInset, safeBottomInset, maxSheetHeight } = useDeviceSafeArea();
   const params = useLocalSearchParams();
   const listingId = params.listingId ? String(params.listingId) : '';
   const isListingReport = Boolean(listingId);
@@ -385,12 +387,20 @@ export default function SupportScreen() {
         animationType="slide"
         onRequestClose={() => setSubjectPickerVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, { paddingTop: safeTopInset + 8 }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setSubjectPickerVisible(false)}
           />
-          <View style={styles.modalSheet}>
+          <View
+            style={[
+              styles.modalSheet,
+              {
+                maxHeight: maxSheetHeight,
+                paddingBottom: Math.max(safeBottomInset + 12, 24),
+              },
+            ]}
+          >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Konu Seçin</Text>
               <TouchableOpacity onPress={() => setSubjectPickerVisible(false)}>

@@ -25,6 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { goBackFromTab, setCustomTabBackHandler } from '../../utils/tabNavigation';
 import TorkScoutLoader from '../../components/TorkScoutLoader';
+import { useDeviceSafeArea } from '../../utils/deviceSafeArea';
 import {
   TURKEY_81_PROVINCES,
   getDistrictsForCity,
@@ -342,6 +343,7 @@ type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'km_asc' | 'featured';
 
 export default function ListingsScreen() {
   const router = useRouter();
+  const { safeTopInset, safeBottomInset } = useDeviceSafeArea();
   const params = useLocalSearchParams<{
     urgentOnly?: string;
     showcaseOnly?: string;
@@ -1631,7 +1633,15 @@ export default function ListingsScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <SafeAreaView style={styles.filterModalContainer} edges={['top', 'bottom']}>
+        <View
+          style={[
+            styles.filterModalContainer,
+            {
+              paddingTop: Platform.OS === 'android' ? safeTopInset : 8,
+              paddingBottom: safeBottomInset,
+            },
+          ]}
+        >
           {/* Modal Header */}
           <View style={styles.filterModalHeader}>
             <TouchableOpacity onPress={handleClearFilters}>
@@ -2994,7 +3004,7 @@ export default function ListingsScreen() {
               </View>
             </KeyboardAvoidingView>
           )}
-        </SafeAreaView>
+        </View>
       </Modal>
 
       {/* ========================================================================= */}
@@ -3006,12 +3016,12 @@ export default function ListingsScreen() {
         transparent={true}
         onRequestClose={() => setSortModalVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, { paddingTop: safeTopInset + 10 }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setSortModalVisible(false)}
           />
-          <View style={styles.pickerSheet}>
+          <View style={[styles.pickerSheet, { paddingBottom: Math.max(safeBottomInset + 10, 24) }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>İlanları Sırala</Text>
               <TouchableOpacity

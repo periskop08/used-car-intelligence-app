@@ -32,6 +32,7 @@ import UrgentBadge from '../components/UrgentBadge';
 import TorkScoutLoader from '../components/TorkScoutLoader';
 import ShowcaseBadge from '../components/ShowcaseBadge';
 import VehicleConditionVisualizer, { PART_LABELS, CompactMobileVehicleBodySvg } from '../components/VehicleConditionVisualizer';
+import { useDeviceSafeArea } from '../utils/deviceSafeArea';
 
 function SwipeUpHandCoachmark() {
   const progress = useRef(new Animated.Value(0)).current;
@@ -388,6 +389,7 @@ const matchesFeedCity = (item: ListingFeedItem, cityFilter: string): boolean => 
 
 export default function ListingFeedScreen() {
   const router = useRouter();
+  const { safeTopInset, safeBottomInset } = useDeviceSafeArea();
   const [feedHeight, setFeedHeight] = useState<number>(windowHeight - 90);
   const [photoBoxWidth, setPhotoBoxWidth] = useState<number>(windowWidth - 48);
   const [descBodyLines, setDescBodyLines] = useState<number>(8);
@@ -1335,7 +1337,15 @@ export default function ListingFeedScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <SafeAreaView style={styles.filterModalContainer}>
+        <View
+          style={[
+            styles.filterModalContainer,
+            {
+              paddingTop: Platform.OS === 'android' ? safeTopInset : 8,
+              paddingBottom: safeBottomInset,
+            },
+          ]}
+        >
           {/* Modal Header */}
           <View style={styles.filterModalHeader}>
             <TouchableOpacity onPress={handleClearFilters}>
@@ -1566,7 +1576,7 @@ export default function ListingFeedScreen() {
               </View>
             </KeyboardAvoidingView>
           )}
-        </SafeAreaView>
+        </View>
       </Modal>
 
       {/* Full Expertise / Condition Modal */}
@@ -1577,7 +1587,12 @@ export default function ListingFeedScreen() {
           transparent={true}
           onRequestClose={() => setSelectedExpertiseItem(null)}
         >
-          <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalOverlay,
+              { paddingTop: safeTopInset + 10, paddingBottom: safeBottomInset + 10 },
+            ]}
+          >
             <Pressable
               style={StyleSheet.absoluteFill}
               onPress={() => setSelectedExpertiseItem(null)}

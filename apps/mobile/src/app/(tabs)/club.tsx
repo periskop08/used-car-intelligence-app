@@ -1818,7 +1818,10 @@ export default function TorqueScoutClubScreen() {
         onRequestClose={() => setCreatePostModalVisible(false)}
       >
         <KeyboardAvoidingView
-          style={styles.modalBackdrop}
+          style={[
+            styles.modalBackdrop,
+            { paddingTop: Math.max(insets.top + 8, Platform.OS === 'ios' ? 54 : 28) },
+          ]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           {...createEdgeSwipeDismissHandlers(() => setCreatePostModalVisible(false))}
         >
@@ -2006,7 +2009,10 @@ export default function TorqueScoutClubScreen() {
         onRequestClose={() => setActivePostForComments(null)}
       >
         <KeyboardAvoidingView
-          style={styles.modalBackdrop}
+          style={[
+            styles.modalBackdrop,
+            { paddingTop: Math.max(insets.top + 8, Platform.OS === 'ios' ? 54 : 28) },
+          ]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           {...createEdgeSwipeDismissHandlers(() => setActivePostForComments(null))}
         >

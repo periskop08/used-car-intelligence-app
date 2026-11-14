@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TorkScoutLoader from '../../components/TorkScoutLoader';
+import { useDeviceSafeArea } from '../../utils/deviceSafeArea';
 
 let ImagePicker: any = null;
 try {
@@ -123,6 +124,7 @@ const HEALTH_CHECK_CARDS = [
 
 export default function AdminScreen() {
   const router = useRouter();
+  const { safeTopInset, safeBottomInset, maxSheetHeight } = useDeviceSafeArea();
 
   // Navigation State
   const [mainSection, setMainSection] = useState<MainSection>('LISTINGS');
@@ -3175,9 +3177,15 @@ export default function AdminScreen() {
       <Modal
         visible={!!selectedListingId}
         animationType="slide"
+        statusBarTranslucent
         onRequestClose={() => setSelectedListingId(null)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <View
+          style={[
+            styles.modalContainer,
+            { paddingTop: safeTopInset, paddingBottom: safeBottomInset },
+          ]}
+        >
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setSelectedListingId(null)} style={styles.backBtn}>
               <Ionicons name="close" size={20} color="#f8fafc" />
@@ -3334,7 +3342,7 @@ export default function AdminScreen() {
               </View>
             </ScrollView>
           )}
-        </SafeAreaView>
+        </View>
       </Modal>
 
       {/* FULLSCREEN IMAGE LIGHTBOX MODAL */}
@@ -3342,9 +3350,15 @@ export default function AdminScreen() {
         visible={!!lightboxImageUrl}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => setLightboxImageUrl(null)}
       >
-        <View style={styles.dialogBackdrop}>
+        <View
+          style={[
+            styles.dialogBackdrop,
+            { paddingTop: safeTopInset + 12, paddingBottom: safeBottomInset + 12 },
+          ]}
+        >
           <TouchableOpacity
             style={[styles.backBtn, { alignSelf: 'flex-end', marginBottom: 12 }]}
             onPress={() => setLightboxImageUrl(null)}
@@ -3368,13 +3382,17 @@ export default function AdminScreen() {
         visible={reasonModalOpen}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => setReasonModalOpen(false)}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.dialogBackdrop}
+          style={[
+            styles.dialogBackdrop,
+            { paddingTop: safeTopInset + 12, paddingBottom: safeBottomInset + 12 },
+          ]}
         >
-          <View style={styles.dialogBox}>
+          <View style={[styles.dialogBox, { maxHeight: maxSheetHeight }]}>
             <Text style={styles.dialogTitle}>
               {reasonActionType === 'REQUEST_REVISION'
                 ? 'Satıcıdan Düzeltme İste'
@@ -3468,12 +3486,18 @@ export default function AdminScreen() {
       <Modal
         visible={!!perfDrilldownMetric || !!qualityDrilldownCategory}
         animationType="slide"
+        statusBarTranslucent
         onRequestClose={() => {
           setPerfDrilldownMetric(null);
           setQualityDrilldownCategory(null);
         }}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <View
+          style={[
+            styles.modalContainer,
+            { paddingTop: safeTopInset, paddingBottom: safeBottomInset },
+          ]}
+        >
           <View style={styles.modalHeader}>
             <TouchableOpacity
               onPress={() => {
@@ -3528,7 +3552,7 @@ export default function AdminScreen() {
               ))}
             </ScrollView>
           )}
-        </SafeAreaView>
+        </View>
       </Modal>
 
       {/* ============================================================== */}
@@ -3537,9 +3561,15 @@ export default function AdminScreen() {
       <Modal
         visible={!!selectedClubPost}
         animationType="slide"
+        statusBarTranslucent
         onRequestClose={() => setSelectedClubPost(null)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <View
+          style={[
+            styles.modalContainer,
+            { paddingTop: safeTopInset, paddingBottom: safeBottomInset },
+          ]}
+        >
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setSelectedClubPost(null)} style={styles.backBtn}>
               <Ionicons name="close" size={20} color="#f8fafc" />
@@ -3679,7 +3709,7 @@ export default function AdminScreen() {
               )}
             </ScrollView>
           )}
-        </SafeAreaView>
+        </View>
       </Modal>
 
       {/* ============================================================== */}
@@ -3689,13 +3719,17 @@ export default function AdminScreen() {
         visible={rejectPostModalOpen}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => setRejectPostModalOpen(false)}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.dialogBackdrop}
+          style={[
+            styles.dialogBackdrop,
+            { paddingTop: safeTopInset + 12, paddingBottom: safeBottomInset + 12 },
+          ]}
         >
-          <View style={styles.dialogBox}>
+          <View style={[styles.dialogBox, { maxHeight: maxSheetHeight }]}>
             <Text style={styles.dialogTitle}>Üye Gönderisini Reddet</Text>
             <Text style={styles.dialogSub}>
               Kullanıcının Garajım ekranında göreceği reddetme gerekçesi:
@@ -3731,9 +3765,15 @@ export default function AdminScreen() {
       <Modal
         visible={createPostModalOpen}
         animationType="slide"
+        statusBarTranslucent
         onRequestClose={() => setCreatePostModalOpen(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <View
+          style={[
+            styles.modalContainer,
+            { paddingTop: safeTopInset, paddingBottom: safeBottomInset },
+          ]}
+        >
           <View style={styles.modalHeader}>
             <TouchableOpacity
               onPress={() => setCreatePostModalOpen(false)}
@@ -4159,7 +4199,7 @@ export default function AdminScreen() {
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
-        </SafeAreaView>
+        </View>
       </Modal>
 
       {/* ============================================================== */}
@@ -4169,13 +4209,17 @@ export default function AdminScreen() {
         visible={!!restrictModalUser}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => setRestrictModalUser(null)}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.dialogBackdrop}
+          style={[
+            styles.dialogBackdrop,
+            { paddingTop: safeTopInset + 12, paddingBottom: safeBottomInset + 12 },
+          ]}
         >
-          <View style={styles.dialogBox}>
+          <View style={[styles.dialogBox, { maxHeight: maxSheetHeight }]}>
             <Text style={styles.dialogTitle}>
               {restrictType === 'BAN'
                 ? 'Kullanıcıyı Kulüpten Yasakla (Ban)'
@@ -4230,6 +4274,7 @@ export default function AdminScreen() {
         visible={!!msgTargetUser || bulkMsgModalOpen}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => {
           setMsgTargetUser(null);
           setBulkMsgModalOpen(false);
@@ -4237,9 +4282,12 @@ export default function AdminScreen() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.dialogBackdrop}
+          style={[
+            styles.dialogBackdrop,
+            { paddingTop: safeTopInset + 12, paddingBottom: safeBottomInset + 12 },
+          ]}
         >
-          <View style={styles.dialogBox}>
+          <View style={[styles.dialogBox, { maxHeight: maxSheetHeight }]}>
             <Text style={styles.dialogTitle}>
               {bulkMsgModalOpen
                 ? `Toplu Bildirim & Mesaj Gönder (${selectedBulkUserIds.length} Üye)`

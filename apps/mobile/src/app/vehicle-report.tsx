@@ -21,6 +21,7 @@ import {
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TorkScoutLoader from '../components/TorkScoutLoader';
+import { useDeviceSafeArea } from '../utils/deviceSafeArea';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -333,6 +334,7 @@ const isUuid = (val?: string | null): boolean => {
 
 export default function VehicleReportScreen() {
   const router = useRouter();
+  const { safeTopInset, safeBottomInset, maxSheetHeight } = useDeviceSafeArea();
   const params = useLocalSearchParams();
   const rawVariantId = isUuid(params.variantId as string)
     ? String(params.variantId)
@@ -2591,7 +2593,7 @@ export default function VehicleReportScreen() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.chatModalOverlay}
+          style={[styles.chatModalOverlay, { paddingTop: safeTopInset + 8 }]}
         >
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -2601,6 +2603,7 @@ export default function VehicleReportScreen() {
             style={[
               styles.chatModalContainer,
               {
+                maxHeight: maxSheetHeight,
                 transform: [{ translateY: chatPanY }],
               },
             ]}
@@ -2779,7 +2782,12 @@ export default function VehicleReportScreen() {
             )}
 
             {/* Input Bar */}
-            <View style={styles.chatInputRow}>
+            <View
+              style={[
+                styles.chatInputRow,
+                { paddingBottom: Math.max(safeBottomInset, 14) },
+              ]}
+            >
               <TextInput
                 value={chatQuestion}
                 onChangeText={setChatQuestion}

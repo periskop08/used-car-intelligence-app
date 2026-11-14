@@ -30,6 +30,7 @@ import {
 import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
 import UrgentBadge from '../components/UrgentBadge';
 import ShowcaseBadge from '../components/ShowcaseBadge';
+import { useDeviceSafeArea } from '../utils/deviceSafeArea';
 
 let ImagePicker: any = null;
 try {
@@ -297,6 +298,7 @@ interface TaxonomyOption {
 
 export default function CreateListingScreen() {
   const router = useRouter();
+  const { safeTopInset, safeBottomInset, maxSheetHeight } = useDeviceSafeArea();
   const mainScrollRef = useRef<ScrollView>(null);
 
   // WIZARD STEP (1 to 6)
@@ -3033,7 +3035,7 @@ export default function CreateListingScreen() {
         >
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalBackdrop}
+            style={[styles.modalBackdrop, { paddingTop: safeTopInset + 8 }]}
             {...pickerSwipeHandlers}
           >
             <Pressable
@@ -3044,7 +3046,15 @@ export default function CreateListingScreen() {
                 setPickerSearch('');
               }}
             />
-            <View style={styles.modalSheet}>
+            <View
+              style={[
+                styles.modalSheet,
+                {
+                  maxHeight: maxSheetHeight,
+                  paddingBottom: Math.max(safeBottomInset + 12, 24),
+                },
+              ]}
+            >
               {/* Header */}
               <View style={styles.modalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>

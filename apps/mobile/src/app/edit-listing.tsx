@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TorkScoutLoader from '../components/TorkScoutLoader';
+import { useDeviceSafeArea } from '../utils/deviceSafeArea';
 import { Image as ExpoImage } from 'expo-image';
 import { TURKEY_81_PROVINCES, getDistrictsForCity, getCanonicalBrandLogoUrl, getBrandMonogram } from '@used-car-intelligence/shared';
 import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
@@ -88,6 +89,7 @@ const TURKISH_CITIES = TURKEY_81_PROVINCES;
 
 export default function EditListingScreen() {
   const router = useRouter();
+  const { safeTopInset, safeBottomInset, maxSheetHeight } = useDeviceSafeArea();
   const { id } = useLocalSearchParams();
 
   const [loading, setLoading] = useState(true);
@@ -586,7 +588,7 @@ export default function EditListingScreen() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalBackdrop}
+          style={[styles.modalBackdrop, { paddingTop: safeTopInset + 8 }]}
         >
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -596,7 +598,15 @@ export default function EditListingScreen() {
               setPickerSearch('');
             }}
           />
-          <View style={styles.pickerSheet}>
+          <View
+            style={[
+              styles.pickerSheet,
+              {
+                maxHeight: maxSheetHeight,
+                paddingBottom: Math.max(safeBottomInset + 12, 24),
+              },
+            ]}
+          >
             {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{pickerData.title}</Text>

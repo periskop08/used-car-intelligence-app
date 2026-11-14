@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TorkScoutLoader from '../components/TorkScoutLoader';
+import { useDeviceSafeArea } from '../utils/deviceSafeArea';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { Ionicons } from '@expo/vector-icons';
@@ -335,6 +336,7 @@ function isGenuineAutomobileBrand(brandName: string, dynamicMotoSlugs?: Set<stri
 
 export default function IsiCepteOneriyorScreen() {
   const router = useRouter();
+  const { safeTopInset, safeBottomInset, maxSheetHeight } = useDeviceSafeArea();
   const params = useLocalSearchParams();
 
   const initialBrandParam = typeof params.brand === 'string' && params.brand ? params.brand : 'Tüm Markalar';
@@ -1439,7 +1441,7 @@ export default function IsiCepteOneriyorScreen() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.cityModalOverlay}
+          style={[styles.cityModalOverlay, { paddingTop: safeTopInset + 8 }]}
         >
           {/* Tap outside backdrop to close */}
           <Pressable
@@ -1459,7 +1461,11 @@ export default function IsiCepteOneriyorScreen() {
           <Animated.View
             style={[
               styles.cityModalContainer,
-              { transform: filterModalPan.getTranslateTransform() },
+              {
+                maxHeight: maxSheetHeight,
+                paddingBottom: Math.max(safeBottomInset + 12, 20),
+                transform: filterModalPan.getTranslateTransform(),
+              },
             ]}
           >
             {/* Drag Handle & Header (Swipe Down or Edge Swipe to Close) */}
