@@ -33,7 +33,7 @@ const BrandLogo = ({ brandName, size = 38 }: { brandName?: string; size?: number
   return (
     <div
       style={{ width: size, height: size }}
-      className="rounded-xl bg-white/95 border border-white/20 flex items-center justify-center p-1.5 shrink-0 shadow-md"
+      className="rounded-xl bg-white/95 border border-white/20 flex items-center justify-center p-0.5 overflow-hidden shrink-0 shadow-md"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

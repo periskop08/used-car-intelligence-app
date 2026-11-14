@@ -46,12 +46,13 @@ const BrandLogo = ({ brandName, size = 36 }: { brandName?: string; size?: number
           borderColor: '#e2e8f0',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 4,
+          padding: 2,
+          overflow: 'hidden',
         }}
       >
         <Image
           source={source}
-          style={{ width: size - 8, height: size - 8 }}
+          style={{ width: size - 4, height: size - 4 }}
           resizeMode="contain"
           onError={() => setImgError(true)}
         />

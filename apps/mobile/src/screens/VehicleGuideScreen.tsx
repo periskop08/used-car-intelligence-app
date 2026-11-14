@@ -18,8 +18,11 @@ import { getBrandLogoUrl as resolveBrandLogo } from '../constants/brandLogos';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
 import TorkScoutLoader from '../components/TorkScoutLoader';
 
-const BrandLogo = ({ brandName, size = 24 }: { brandName?: string; size?: number }) => {
+const BrandLogo = ({ brandName, size = 36 }: { brandName?: string; size?: number }) => {
   const [imgError, setImgError] = useState(false);
+  useEffect(() => {
+    setImgError(false);
+  }, [brandName]);
   const logoSrc = resolveBrandLogo(brandName) || getCanonicalBrandLogoUrl(brandName);
 
   if (logoSrc && !imgError) {
@@ -35,12 +38,13 @@ const BrandLogo = ({ brandName, size = 24 }: { brandName?: string; size?: number
           borderColor: '#e2e8f0',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 4,
+          padding: 2,
+          overflow: 'hidden',
         }}
       >
         <Image
           source={source}
-          style={{ width: size - 8, height: size - 8 }}
+          style={{ width: size - 4, height: size - 4 }}
           resizeMode="contain"
           onError={() => setImgError(true)}
         />
